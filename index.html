@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elite Escapes — ระบบดูแลลูกค้า & การจ่ายคืน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=Montserrat:wght@500;600;700&family=EB+Garamond:wght@500;600;700&family=Trirong:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f7f9fb; --surface:#ffffff; --surface2:#f3f6f8; --line:#e7ebef;
+  --ink:#2c3b4a; --ink2:#5b6b7a; --ink3:#97a3ae;
+  --s1:#e0720d; --s2:#c2611b; --s3:#2e8b57; --s8:#c0392b;
+  --brand:#2f3e4e; --brand2:#3a4d60; --deep:#2f3e4e; --deep2:#46586a;
+  --gold:#c9a45c; --orange:#ed7d31; --mint:#c9a45c;
+  --shadow-sm:0 1px 2px rgba(44,59,74,.04),0 6px 20px -10px rgba(44,59,74,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 "Sarabun","IBM Plex Sans Thai","Noto Sans Thai",-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ccd4d0;border-radius:99px;border:2.5px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#b3bdb8}
+::selection{background:rgba(201,164,92,.3)}
+a{color:var(--s1);text-decoration-color:rgba(224,114,13,.35)}
+h1,h2,h3,h4{font-family:"EB Garamond","Trirong",Georgia,"Sarabun",serif;font-variant-numeric:lining-nums;font-feature-settings:"lnum" 1}
+.card .v,.balance .v,.btn,.kick{font-family:"Montserrat","Prompt","Sarabun","Noto Sans Thai",sans-serif}
+.app{display:grid;grid-template-columns:262px 1fr;min-height:100vh}
+/* ===== left sidebar ===== */
+.side{background:linear-gradient(168deg,#071a2e 0%,#102e4c 48%,#1d4a6e 100%);color:#eef3f7;padding:30px 20px 20px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;box-shadow:8px 0 30px -20px rgba(7,26,46,.7)}
+.brand{padding:0 10px 20px;border-bottom:1px solid rgba(255,255,255,.13)}
+.wordmark{font-family:"EB Garamond",Georgia,"Prompt",serif;font-size:21.5px;font-weight:600;letter-spacing:.15em;color:#d6b878;line-height:1.2;white-space:nowrap}
+.kick{font-size:10px;font-weight:600;letter-spacing:.30em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:10px 0 3px}
+.tb-title{display:none}
+.tb-sub{font-size:12px;color:rgba(255,255,255,.62);line-height:1.55}
+nav{display:flex;flex-direction:column;gap:3px;margin-top:20px}
+nav button{font:inherit;font-family:"Montserrat","Prompt","Sarabun",sans-serif;font-size:13px;font-weight:600;text-align:left;width:100%;padding:12px 15px;border-radius:10px;border:none;background:none;color:rgba(255,255,255,.72);cursor:pointer;transition:all .15s;letter-spacing:.08em}
+nav button:hover{color:#fff;background:rgba(255,255,255,.07)}
+nav button.on{color:#fff;background:rgba(255,255,255,.12);box-shadow:inset 3px 0 0 #7fc9e8;font-weight:700}
+.side .tag{margin-top:auto;padding:14px 10px 0;font-size:11px;color:rgba(255,255,255,.42);line-height:1.65;border-top:1px solid rgba(255,255,255,.1)}
+main{padding:34px 42px 90px;max-width:1334px}
+h1{font-size:27px;font-weight:600;margin:0 0 6px;letter-spacing:0}
+.sub{color:var(--ink2);font-size:13px;margin:0 0 24px}
+/* ===== KPI cards ===== */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:26px}
+@media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}}
+.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px;box-shadow:0 1px 2px rgba(28,40,35,.04),0 16px 44px -20px rgba(28,40,35,.18);overflow:hidden}
+.card.kpi{padding:24px 26px 20px;transition:transform .18s,box-shadow .18s}
+.card.kpi:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(28,40,35,.05),0 26px 54px -20px rgba(28,40,35,.26)}
+.card.red{background:#fdeef0;border-color:#f7dfe2}
+.card.orange{background:#fdf3e7;border-color:#f5e5cf}
+.card.green{background:#eaf8f1;border-color:#d8efe3}
+.card.blue{background:#edf3fc;border-color:#dde8f6}
+.card.gold{background:#faf4e6;border-color:#efe4c8}
+.card .ic{display:none}
+.card .l{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--ink3);line-height:1.5}
+.card.kpi .l{order:-1;margin-bottom:8px}
+.card.kpi{display:flex;flex-direction:column;align-items:flex-start}
+.card .v{font-size:30px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
+.card .v.sm{font-size:23px}
+.card .m{font-size:12px;color:var(--ink3)}
+.card.red .v{color:var(--s8)}
+.card.orange .v{color:#b25412}
+.card.green .v{color:var(--s3)}
+.card.blue .v{color:var(--deep2)}
+/* ===== panels ===== */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin-bottom:20px;box-shadow:0 1px 2px rgba(28,40,35,.04),0 16px 44px -20px rgba(28,40,35,.14)}
+.panel h3{margin:0 0 3px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:12px;white-space:nowrap;overflow:hidden}
+.panel h3::after{content:'';flex:1;height:1px;min-width:24px;background:linear-gradient(90deg,#e4d9bd,rgba(0,0,0,0))}
+.panel h3 .idx{display:inline-block;font-size:11.5px;font-weight:600;letter-spacing:.28em;color:#c9702e;margin-right:10px;vertical-align:1px}
+.panel .cs{font-size:12.5px;color:var(--ink2);margin-bottom:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:1000px){.row2{grid-template-columns:1fr}}
+/* ===== tables ===== */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #f0f4f2;vertical-align:top}
+th{font-size:10.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.10em;border-bottom:1.5px solid var(--line);background:none;padding-bottom:7px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.click{transition:background .12s}
+tbody tr.click:hover{background:#f3f7f5;cursor:pointer}
+/* ===== pills ===== */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 11px 2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 6px}
+.p-paid{background:#e2f4ec;color:#0d6b46}
+.p-over{background:#fae5e2;color:#a12b1f}
+.p-soon{background:#faeedd;color:#9c4d13}
+.p-fut{background:#eaeff5;color:#46586a}
+.p-none{background:#eef1f3;color:#6b7580}
+.p-welcome{background:#eaeff5;color:#46586a}
+.p-cancel{background:#eef1f3;color:#97a3ae;text-decoration:line-through}
+.p-up{background:#ece9f7;color:#4a3aa7}
+/* ===== inputs ===== */
+.search{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.search input[type=text],.search input[type=search]{flex:1;min-width:220px;padding:12px 17px;font:inherit;font-size:15px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);outline:none;box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s}
+.search input:focus{border-color:#c9a45c;box-shadow:0 0 0 3.5px rgba(201,164,92,.18)}
+select.flt,input.flt{flex:0 0 auto;padding:10px 14px;font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;outline:none;box-shadow:var(--shadow-sm)}
+.hint{font-size:12.5px;color:var(--ink3);margin:-8px 0 14px}
+.bk{background:none;border:none;color:var(--s1);font:inherit;cursor:pointer;padding:0;margin-bottom:14px;font-size:14px;font-weight:600}
+/* ===== profile ===== */
+.profile-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+.profile-head h2{margin:0 0 2px;font-size:24px;font-weight:600}
+.kv{font-size:13.5px;color:var(--ink2)}
+.kv b{color:var(--ink)}
+.balance{text-align:right;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 18px;box-shadow:var(--shadow-sm)}
+.balance .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:1px 9px;font-size:12px;margin:2px 3px 0 0;color:var(--ink2)}
+.contract-card h4 .chip{background:#f6f0e0;border-color:#e8dcbd;color:#87671f;font-weight:600;vertical-align:2px}
+.feegrid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.fy{width:68px;border-radius:9px;padding:5px 0 6px;text-align:center;font-size:10.5px;line-height:1.4;border:1px solid var(--line);background:var(--surface2);color:var(--ink3)}
+.fy b{display:block;font-size:12.5px;color:inherit;font-family:"Prompt",sans-serif}
+.fy.paid{background:#e2f4ec;border-color:#bfe3d2;color:#0d6b46}
+.fy.due{background:#fae7e4;border-color:#efc9c3;color:#a12b1f}
+/* ===== buttons ===== */
+.btn{display:inline-block;font:inherit;font-family:"Montserrat","Prompt","Sarabun",sans-serif;font-size:13px;font-weight:600;padding:9px 22px;border-radius:99px;border:1.5px solid #102e4c;background:linear-gradient(135deg,#1c486b,#102e4c);color:#fff;cursor:pointer;box-shadow:0 4px 14px -5px rgba(16,46,76,.5);transition:transform .12s,box-shadow .12s,filter .12s;letter-spacing:.04em}
+.btn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.sec{background:#d7e9e7;color:#14324a;border-color:#c2ddda;box-shadow:var(--shadow-sm)}
+.btn.sec:hover{border-color:#9fc8c4;filter:none;background:#c8e2df}
+.btn.sm{padding:4px 13px;font-size:12.5px;box-shadow:none}
+.btn.ghost{background:none;border-color:var(--line);color:var(--ink2);box-shadow:none}
+.btn.ghost:hover{background:var(--surface2);filter:none;transform:none}
+.btn.danger{background:#fff;border-color:#ecc8c3;color:#a12b1f;box-shadow:none}
+.btn.danger:hover{background:#fdf4f3;filter:none;transform:none}
+.btn.paybtn{background:linear-gradient(180deg,#38a267,#2e8b57);border-color:#2e8b57;box-shadow:0 3px 12px -4px rgba(46,139,87,.5)}
+/* ===== misc ===== */
+.note{border:1px solid #ecdfb6;border-left:4px solid var(--gold);background:#fcf9ee;padding:12px 16px;border-radius:12px;font-size:13px;color:#5c4c1c;margin-bottom:18px}
+.note.blue{border-color:#f0dcc0;border-left-color:var(--orange);background:#fdf7ee;color:#7a4e18}
+.tabbtns{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tabbtns button{font:inherit;font-size:13.5px;font-weight:500;padding:7px 17px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;color:var(--ink2);box-shadow:var(--shadow-sm);transition:all .13s}
+.tabbtns button:hover{border-color:#dcc7a8}
+.tabbtns button.on{background:linear-gradient(135deg,#1c486b,#102e4c);border-color:#102e4c;color:#fff;font-weight:700}
+.contract-card{border:1px solid var(--line);border-radius:15px;padding:18px 20px;margin-bottom:16px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.contract-card h4{margin:0 0 2px;font-size:17.5px;font-weight:600}
+.payout-sec{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0}
+.form label{display:block;font-size:11.5px;color:var(--ink2);margin-bottom:4px;font-weight:700;letter-spacing:.03em}
+.form input,.form select{width:100%;padding:9px 12px;font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s}
+.form input:focus,.form select:focus{border-color:#c9a45c;box-shadow:0 0 0 3px rgba(201,164,92,.16)}
+.form .full{grid-column:1/-1}
+.bars{display:grid;gap:7px;margin-top:6px}
+.bar-h{display:grid;grid-template-columns:64px 1fr 130px;gap:10px;align-items:center;font-size:12.5px;color:var(--ink2)}
+.bar-h .tr{height:18px;border-radius:6px;background:#eef1f4;position:relative;overflow:hidden;box-shadow:inset 0 1px 2px rgba(44,59,74,.06)}
+.bar-h .tr i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#1c486b,#4180b0);border-radius:6px;min-width:0}
+.bar-h .tr i.ov{background:linear-gradient(90deg,#b13527,#dd7264)}
+.bar-h .amt{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)}
+#modalwrap{position:fixed;inset:0;background:rgba(31,42,54,.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:18px}
+#modalwrap.hide{display:none}
+#modal{background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:26px 28px;box-shadow:0 24px 80px -12px rgba(22,32,44,.45)}
+#modal h3{margin:0 0 12px;font-size:17px;font-weight:600}
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#102e4c;color:#fff;padding:11px 22px;border-radius:99px;font-size:13.5px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:60;box-shadow:0 10px 30px -8px rgba(22,32,44,.45)}
+#toast.show{opacity:.96}
+.right{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.mini{font-size:12px;color:var(--ink3)}
+.scroll{overflow-x:auto}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin:2px 0 12px}
+.lg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.stack{display:grid;grid-template-columns:44px 1fr 120px;gap:10px;align-items:center;font-size:12.5px;color:var(--ink2);margin-bottom:7px;border-radius:6px;padding:1px 4px}
+.stack:hover{background:#f3f6f8;cursor:pointer}
+.stack .tr{display:flex;height:20px;border-radius:6px;overflow:hidden;background:#eef1f4}
+.stack .tr i{height:100%;display:block}
+.stack .rt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vwrap{display:flex;align-items:flex-end;gap:7px;margin-top:16px}
+.vb{flex:1;display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--ink2);cursor:pointer;border-radius:6px;padding:2px 0}
+.vb:hover{background:#f3f6f8}
+.vb .col{width:100%;max-width:46px;border-radius:6px 6px 0 0;background:#7d99b4}
+.vb.hot .col{background:#c9702e}
+.vb .num{margin-bottom:3px;font-variant-numeric:tabular-nums}
+.vb .yl{margin-top:6px}
+.pmix{display:flex;height:26px;border-radius:8px;overflow:hidden;margin:12px 0 10px}
+.pmix i{display:block;height:100%}
+.card.gold .v{color:#8a6a25}
+.sechead{font-family:"Montserrat","Prompt","Sarabun",sans-serif;font-size:16.5px;font-weight:700;margin:30px 0 14px;color:var(--ink)}
+.sechead small{display:block;font-size:10px;letter-spacing:.28em;color:var(--gold);text-transform:uppercase;margin-bottom:2px;font-weight:600}
+nav .badge{display:inline-block;margin-left:8px;background:#cf3d3d;color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:1px 7px;vertical-align:1px;letter-spacing:0}
+.navlab{font:600 9.5px "Montserrat",sans-serif;letter-spacing:.30em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:16px 16px 5px}
+.brandseg{display:flex;gap:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:99px;padding:4px;margin:18px 2px 0}
+.brandseg button{flex:1;font:600 10px "Montserrat","Sarabun",sans-serif;padding:6px 2px;border:none;border-radius:99px;background:none;color:rgba(255,255,255,.6);cursor:pointer;letter-spacing:.02em;transition:all .15s;white-space:nowrap}
+.brandseg button:hover{color:#fff}
+.brandseg button.on{background:#fff;color:#102e4c;font-weight:700}
+.bchip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;border-radius:6px;padding:1px 8px;vertical-align:2px;margin-left:6px;white-space:nowrap}
+.bchip.ee{background:#f6eedd;color:#8a6a25;border:1px solid #e8dcbd}
+.bchip.cu{background:#e8eff7;color:#3a5f88;border:1px solid #cfdff0}
+.pk{font:600 10px "Montserrat",sans-serif;letter-spacing:.32em;text-transform:uppercase;color:#b4622a;margin-bottom:7px}
+h1::after{content:'';display:block;width:46px;height:3px;border-radius:2px;background:#c9702e;margin-top:10px}
+.hero h1::after{background:linear-gradient(90deg,#d9853f,rgba(217,133,63,.25))}
+nav .navlab:first-child{margin-top:2px}
+/* ===== hero band (ภาพรวม) ===== */
+.hero{position:relative;overflow:hidden;background:linear-gradient(112deg,#071c32 0%,#113250 45%,#1f547e 100%);border-radius:20px;padding:30px 34px 28px;color:#fff;margin-bottom:22px;box-shadow:0 26px 64px -26px rgba(7,28,50,.65)}
+.hero::before{content:'';position:absolute;top:-130px;right:-90px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(127,201,232,.20),transparent 70%)}
+.hero::after{content:'';position:absolute;bottom:-150px;left:28%;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(201,164,92,.20),transparent 70%)}
+.hero-in{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:28px;flex-wrap:wrap}
+.hero-kick{font:600 10px "Montserrat",sans-serif;letter-spacing:.34em;text-transform:uppercase;color:#7fc9e8;margin-bottom:9px}
+.hero h1{color:#fff;font-size:31px;margin:0 0 4px}
+.hero .sub{color:rgba(255,255,255,.62);margin:0}
+.hero-stats{display:flex;gap:36px;flex-wrap:wrap}
+.hero-stats>div{padding-left:20px;border-left:1px solid rgba(255,255,255,.16)}
+.hero-stats b{display:block;font:700 29px "Montserrat","Prompt",sans-serif;color:#fff;line-height:1.1;letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.hero-stats span{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.09em;text-transform:uppercase;font-family:"Montserrat","Sarabun",sans-serif;font-weight:600}
+/* ===== donut ===== */
+.donut{width:176px;height:176px;border-radius:50%;position:relative;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05),0 12px 30px -14px rgba(28,40,35,.4)}
+.donut i{position:absolute;inset:27px;background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal;box-shadow:inset 0 2px 10px rgba(28,40,35,.07)}
+.donut i b{font:700 26px "Prompt",sans-serif;letter-spacing:-.02em}
+.donut i small{font-size:11px;color:var(--ink3)}
+@media(max-width:840px){.app{grid-template-columns:1fr}.side{position:static;height:auto;padding:18px 16px 16px}.brand{padding-bottom:12px}.tb-title{font-size:17px}nav{flex-direction:row;flex-wrap:wrap;margin-top:14px}nav button{width:auto;padding:8px 16px}.side .tag{display:none}main{padding:22px 16px 60px}}
+@media print{.side,.btn,.search,.tabbtns{display:none!important}.app{display:block}main{max-width:none;padding:0}body{background:#fff}}
+
+/* ===== LIVE: login gate ===== */
+#gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#071a2e;overflow:hidden;transition:opacity .5s}
+#gate.bye{opacity:0;pointer-events:none}
+#gate .orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 14s ease-in-out infinite alternate}
+#gate .o1{width:540px;height:540px;background:#1d4a6e;top:-160px;left:-130px}
+#gate .o2{width:440px;height:440px;background:#123252;bottom:-140px;right:-90px;animation-delay:-7s}
+#gate .o3{width:280px;height:280px;background:#b08d3e;bottom:18%;left:12%;opacity:.22;animation-delay:-3s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(70px,45px) scale(1.15)}}
+.gate-card{position:relative;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:26px;padding:46px 46px 34px;width:min(420px,92vw);text-align:center;color:#fff;box-shadow:0 30px 90px -20px rgba(0,0,0,.65);animation:gateIn .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes gateIn{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+.gate-wm{font-family:"EB Garamond",Georgia,serif;font-size:30px;font-weight:600;letter-spacing:.18em;color:#d6b878}
+.gate-kick{font-size:10px;font-weight:600;letter-spacing:.34em;text-transform:uppercase;color:#6fd3bd;margin-bottom:12px;font-family:"Montserrat",sans-serif}
+.gate-sub{font-size:13.5px;opacity:.72;margin:6px 0 26px}
+.gate-card input{width:100%;padding:13px 16px;font:inherit;font-size:15px;border-radius:12px;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;outline:none;text-align:center;transition:all .15s}
+.gate-card input:focus{border-color:#c9a45c;box-shadow:0 0 0 4px rgba(201,164,92,.18)}
+.gate-card input::placeholder{color:rgba(255,255,255,.4)}
+.gate-btn{margin-top:14px;width:100%;padding:13px;font:600 14.5px "Montserrat","Prompt","Sarabun",sans-serif;border-radius:12px;border:none;background:linear-gradient(135deg,#e3c283,#b08d3e);color:#132b24;cursor:pointer;letter-spacing:.06em;transition:all .15s}
+.gate-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.gate-btn.ggl{background:#fff;color:#3c4043;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.35);font-weight:600}
+.gate-btn.ggl:hover{filter:none;background:#f4f6f8;transform:translateY(-1px)}
+.gate-err{min-height:20px;font-size:12.5px;color:#ff9b8a;margin-top:12px}
+.gate-foot{margin-top:20px;font-size:10.5px;opacity:.45;letter-spacing:.04em}
+/* ===== LIVE: command palette (Ctrl+K) ===== */
+#pal{position:fixed;inset:0;z-index:150;background:rgba(7,25,20,.55);backdrop-filter:blur(4px);display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+#pal.hide{display:none}
+.pal-box{width:min(620px,92vw);background:#fff;border-radius:18px;box-shadow:0 30px 90px -18px rgba(0,0,0,.5);overflow:hidden;animation:gateIn .22s ease both}
+.pal-box input{width:100%;border:none;outline:none;font:16px "Sarabun",sans-serif;padding:17px 22px;border-bottom:1px solid var(--line)}
+.pal-res{max-height:52vh;overflow:auto}
+.pal-item{display:flex;justify-content:space-between;gap:12px;padding:11px 22px;cursor:pointer;font-size:14px}
+.pal-item small{color:var(--ink3)}
+.pal-item.on,.pal-item:hover{background:#f3f6f4}
+.pal-empty{padding:18px 22px;color:var(--ink3);font-size:13px}
+.pal-tip{padding:9px 22px;font-size:11px;color:var(--ink3);border-top:1px solid var(--line);background:var(--surface2)}
+.palhint{margin:16px 2px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;width:calc(100% - 4px);font:600 12.5px "Montserrat","Sarabun",sans-serif;padding:10px 15px;border-radius:10px;border:1px dashed rgba(255,255,255,.28);background:none;color:rgba(255,255,255,.65);cursor:pointer;transition:all .15s}
+.palhint:hover{color:#fff;border-color:rgba(255,255,255,.6)}
+.palhint span{font-size:10px;border:1px solid rgba(255,255,255,.3);padding:1px 8px;border-radius:6px;white-space:nowrap}
+/* ===== LIVE: viewer (read-only) role ===== */
+.ro .btn.paybtn,.ro .btn.danger,.ro .payout-sec .btn{display:none!important}
+.ro .feegrid .fy{pointer-events:none}
+.ro .fy[onclick^="promptFeeYear"]{display:none}
+/* ===== LIVE: page transitions ===== */
+main.anim h1,main.anim .sub{animation:fadeUp .3s ease both}
+main.anim .cards,main.anim .search,main.anim .tabbtns{animation:fadeUp .4s ease both}
+main.anim .panel{animation:fadeUp .5s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#gate .orb,.gate-card,.pal-box,main.anim h1,main.anim .sub,main.anim .cards,main.anim .search,main.anim .tabbtns,main.anim .panel{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand">
+    <div class="wordmark">ELITE ESCAPES</div>
+    <div class="kick">Customer Care · Live</div>
+    <div class="tb-sub">ระบบดูแลลูกค้า & การจ่ายคืน</div>
+  </div>
+  <nav>
+    <div class="navlab">Overview</div>
+    <button data-v="dash" class="on">ภาพรวม</button>
+    <button data-v="todo">งานที่ต้องทำ<span class="badge" id="todobadge" style="display:none"></span></button>
+    <div class="navlab">Operations</div>
+    <button data-v="clients">ลูกค้า</button>
+    <button data-v="payouts">การจ่ายคืน</button>
+    <button data-v="ar">ค้างชำระ</button>
+    <button data-v="interval">Interval</button>
+    <div class="navlab">Registry</div>
+    <button data-v="renew">ใกล้หมดอายุ</button>
+    <button data-v="bible">ทะเบียนสัญญา</button>
+    <button data-v="backup">ข้อมูลกลาง</button>
+  </nav>
+  <div class="brandseg">
+    <button data-b="all" class="on" onclick="setBrand('all')">ทั้งหมด</button>
+    <button data-b="CU" onclick="setBrand('CU')">Club Unique</button>
+    <button data-b="EE" onclick="setBrand('EE')">Elite Escapes</button>
+  </div>
+  <button class="palhint" onclick="openPalette()">🔍 ค้นหาด่วน <span>Ctrl+K</span></button>
+  <div class="tag" id="userbox" style="margin-top:auto;line-height:1.7"></div>
+  <div class="tag" style="margin-top:14px" id="synctag">🟢 เชื่อมต่อฐานข้อมูลกลาง<br>Supabase · Elite-Escapes</div>
+</aside>
+<main id="main"></main>
+</div>
+<div id="pal" class="hide" onclick="if(event.target===this)closePalette()"><div class="pal-box"><input id="palq" placeholder="พิมพ์ชื่อลูกค้า / อีเมล / เลขสัญญา… แล้ว Enter" oninput="PAL.q=this.value;PAL.idx=0;palRender()"><div class="pal-res" id="palres"></div><div class="pal-tip">↑↓ เลือก · Enter เปิด · Esc ปิด · เปิดจากหน้าไหนก็ได้ด้วย Ctrl+K</div></div></div>
+<div id="modalwrap" class="hide"><div id="modal"></div></div>
+<div id="toast"></div>
+
+
+<script>
+'use strict';
+/* ================= data layer ================= */
+/* ===== LIVE: เชื่อมฐานข้อมูลกลาง Supabase ===== */
+const LIVE = true;
+const SB_URL = 'https://vpsrfukevrcaapwlkoop.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwc3JmdWtldnJjYWFwd2xrb29wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODA4ODgsImV4cCI6MjEwMjU1Njg4OH0.F9ClGxUU0WjG_d-H2Ic3f48Bvoc1IhBPFEP3W6F1h-w';
+let BASE = {cur_year:(new Date()).getFullYear(), generated:'ฐานข้อมูลกลาง', clients:[], contracts:[]};
+let OV = {plans:{},customClients:[],customContracts:[],nextCid:100000};
+function save(){} /* live: เขียนลงฐานกลางผ่าน push* แทน localStorage */
+/* ===== ระบุตัวตนผู้ใช้ (Google Sign-in + allowlist จากตาราง app_users) ===== */
+const GOOGLE_CLIENT_ID = '848128351658-2sd84ecf5i7bsqgupcnanh1pjr73umg3.apps.googleusercontent.com';
+/* AUTH_MODE: 'off' = เข้าได้ทันทีไม่ต้องล็อกอิน · 'google' = ล็อกอิน Google ผ่าน Supabase Auth (แบบเดียวกับ PISONA) */
+const AUTH_MODE = 'google';
+const SBC = (AUTH_MODE!=='off' && window.supabase)
+  ? window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}})
+  : null;
+let USER = (AUTH_MODE==='off') ? {email:'team', name:'ทีมงาน', role:'admin'} : null;
+function logout(){ if(SBC) SBC.auth.signOut().then(()=>location.reload()); else location.reload(); }
+function renderLogin(msg){
+  const old=document.getElementById('gate'); if(old) old.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="gate">
+    <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+    <div class="gate-card">
+      <div class="gate-kick">Customer Care · Live</div>
+      <div class="gate-wm">ELITE ESCAPES</div>
+      <div class="gate-sub">ระบบดูแลลูกค้า & การจ่ายคืน</div>
+      <button class="gate-btn ggl" onclick="doGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:-3px;margin-right:9px"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.4 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.3-4.5 2.1-8.8 2.1-6.3 0-11.7-3.7-13.6-9l-7.9 6.1C6.4 42.6 14.6 48 24 48z"/></svg>
+        ลงชื่อเข้าใช้ด้วย Google
+      </button>
+      <div class="gate-err" id="lg_err">${msg?esc(msg):''}</div>
+      <div class="gate-foot">🔒 เฉพาะผู้ได้รับสิทธิ์ · ทุกการแก้ไขบันทึกชื่อผู้ทำรายการ</div>
+    </div></div>`);
+  const ub=document.getElementById('userbox'); if(ub) ub.innerHTML='';
+}
+function closeGate(){ const gt=document.getElementById('gate'); if(gt){ gt.classList.add('bye'); setTimeout(()=>gt.remove(),550); } }
+function doGoogleLogin(){
+  const err=document.getElementById('lg_err'); if(err) err.textContent='กำลังพาไปหน้า Google…';
+  SBC.auth.signInWithOAuth({provider:'google', options:{redirectTo: location.origin+location.pathname}});
+}
+async function loadUsers(){
+  const el=document.getElementById('userslist'); if(!el) return;
+  try{
+    const rows=await sbApi('app_users?select=*&order=added_at.asc');
+    el.innerHTML='<div class="scroll"><table><thead><tr><th>อีเมล</th><th>ชื่อ</th><th>สิทธิ์</th><th></th></tr></thead><tbody>'+
+      rows.map(u=>`<tr><td>${esc(u.email)}</td><td>${esc(u.name||'')}</td><td>${u.role==='admin'?'<span class="pill p-soon">แอดมิน</span>':(u.role==='viewer'?'<span class="pill p-none">ดูอย่างเดียว</span>':'<span class="pill p-paid">กรอกได้</span>')}</td><td>${u.email===USER.email?'<span class="mini">คุณ</span>':`<button class="btn sm danger" onclick="removeAppUser('${esc(u.email)}')">ลบสิทธิ์</button>`}</td></tr>`).join('')+
+      '</tbody></table></div>';
+  }catch(e){ el.textContent='โหลดรายชื่อไม่สำเร็จ: '+e.message; }
+}
+async function addAppUser(){
+  const em=document.getElementById('au_email').value.trim().toLowerCase();
+  const nm=document.getElementById('au_name').value.trim();
+  const rl=document.getElementById('au_role').value;
+  if(!em || !em.includes('@')){ toast('กรุณากรอกอีเมลให้ถูกต้อง'); return; }
+  try{
+    await sbApi('app_users?on_conflict=email',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify([{email:em,name:nm,role:rl}])});
+    toast('เพิ่มผู้ใช้ '+em+' แล้ว'); document.getElementById('au_email').value=''; document.getElementById('au_name').value=''; loadUsers();
+  }catch(e){ toast('เพิ่มไม่สำเร็จ: '+e.message); }
+}
+async function removeAppUser(em){
+  if(!confirm('ลบสิทธิ์ใช้งานของ '+em+' ?')) return;
+  try{ await sbApi('app_users?email=eq.'+encodeURIComponent(em),{method:'DELETE',prefer:'return=minimal'}); toast('ลบแล้ว'); loadUsers(); }
+  catch(e){ toast('ลบไม่สำเร็จ: '+e.message); }
+}
+async function authToken(){
+  if(!SBC) return SB_KEY;
+  try{ const {data}=await SBC.auth.getSession(); return (data&&data.session)?data.session.access_token:SB_KEY; }catch(e){ return SB_KEY; }
+}
+async function sbApi(path, opts={}){
+  const tok = await authToken();
+  const r = await fetch(SB_URL+'/rest/v1/'+path, Object.assign({}, opts, {headers:Object.assign({
+    apikey:SB_KEY, Authorization:'Bearer '+tok, 'Content-Type':'application/json',
+    Prefer:(opts.prefer||'')}, opts.headers||{})}));
+  if(!r.ok) throw new Error((await r.text()).slice(0,300));
+  if(r.status===204) return null;
+  const t = await r.text(); return t?JSON.parse(t):null;
+}
+async function fetchAllRows(table, order){
+  const out=[]; let off=0;
+  while(true){
+    const rows = await sbApi(table+'?select=*&order='+order+'.asc&limit=1000&offset='+off);
+    out.push(...rows); if(rows.length<1000) break; off+=1000;
+  }
+  return out;
+}
+async function pushPlan(cid){
+  try{
+    const p=OV.plans[cid]; if(!p) return;
+    await sbApi('payout_plans?on_conflict=contract_id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{contract_id:Number(cid),value:p.value,currency:p.currency,note:p.note||'',updated_by:USER&&USER.email}])});
+    const keep=(p.installments||[]).map(i=>i.id);
+    await sbApi('payout_installments?contract_id=eq.'+cid+(keep.length?('&id=not.in.('+keep.join(',')+')'):''),{method:'DELETE',prefer:'return=minimal'});
+    if((p.installments||[]).length)
+      await sbApi('payout_installments?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+        body:JSON.stringify(p.installments.map(i=>({id:i.id,contract_id:Number(cid),label:i.label||'',due:i.due,amount:i.amount,paid:!!i.paid,paid_date:i.paid_date||null,note:i.note||'',updated_by:USER&&USER.email})))});
+    toast('☁️ บันทึกลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function pushDeletePlan(cid){
+  try{ await sbApi('payout_plans?contract_id=eq.'+cid,{method:'DELETE',prefer:'return=minimal'}); toast('☁️ ลบจากฐานกลางแล้ว'); }
+  catch(e){ toast('⚠️ ลบจากฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function pushNewClient(code){
+  try{
+    const cl=OV.customClients.find(x=>x.code===code); if(!cl) return;
+    await sbApi('clients?on_conflict=code',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{code:cl.code,name:cl.name,alt_names:cl.alt_names||[],emails:cl.emails||[],nat:cl.nat||null,custom:true,updated_by:USER&&USER.email}])});
+    const cons=OV.customContracts.filter(x=>x.client===code);
+    if(cons.length)
+      await sbApi('contracts?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+        body:JSON.stringify(cons.map(c=>({id:c.id,client:c.client,sheet:c.sheet,product:c.product,pa:c.pa,name:c.name,nat:c.nat||null,plan:c.plan,term:c.term,suite:c.suite,season:c.season,status:c.status,status_note:c.status_note,comp_date:c.comp_date,fyo:c.fyo,lyo:c.lyo,row_no:null,custom:true,updated_by:USER&&USER.email})))});
+    toast('☁️ บันทึกลูกค้าใหม่ลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+/* บันทึกรับชำระค่าบำรุงรายปี (MFEE) */
+function promptFeeYear(cid){
+  const y=prompt('ปี ค.ศ. ที่ต้องการบันทึกค่าบำรุง', String(BASE.cur_year));
+  const yy=parseInt(y); if(yy>2000&&yy<2100) openFeeModal(cid,yy);
+}
+function openFeeModal(cid, year){
+  const c=contractById(cid); if(!c) return;
+  const f=(c.fees||[]).find(x=>x.year===year)||{};
+  openModal(`<h3>บันทึกค่าบำรุงรายปี (MFEE)</h3>
+  <div class="kv" style="margin-bottom:10px">${esc(c.name)} · ${esc(c.pa)} · ปี <b>${year}</b></div>
+  <div class="form">
+    <div><label>สถานะ</label><select id="fm_paid"><option value="1" ${f.paid?'selected':''}>ชำระแล้ว</option><option value="0" ${!f.paid?'selected':''}>ยังไม่ชำระ</option></select></div>
+    <div><label>ยอด (US$)</label><input type="number" step="any" id="fm_amt" value="${f.amount!=null?f.amount:''}"></div>
+    <div><label>วันที่ชำระ</label><input type="date" id="fm_date" value="${(f.paid_date&&/^\d{4}-\d{2}-\d{2}$/.test(f.paid_date))?f.paid_date:TODAY}"></div>
+    <div class="full"><label>หมายเหตุ (วิธีจ่าย/เลขอ้างอิง)</label><input type="text" id="fm_note" value="${esc(f.paid_note||'')}"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveFee(${cid},${year})">💾 บันทึก</button></div>`);
+}
+async function saveFee(cid, year){
+  const c=contractById(cid); if(!c) return;
+  const paid=document.getElementById('fm_paid').value==='1';
+  const amtV=document.getElementById('fm_amt').value;
+  const amount=amtV===''?null:parseFloat(amtV);
+  const paid_date=paid?(document.getElementById('fm_date').value||TODAY):null;
+  const paid_note=document.getElementById('fm_note').value.trim()||null;
+  let f=(c.fees||[]).find(x=>x.year===year);
+  if(!f){ f={year:year,amount:amount,amount_raw:null,paid:paid,paid_date:paid_date,paid_note:paid_note}; c.fees=c.fees||[]; c.fees.push(f); c.fees.sort((a,b)=>a.year-b.year); }
+  else Object.assign(f,{amount:amount,paid:paid,paid_date:paid_date,paid_note:paid_note});
+  closeModal(); render();
+  try{
+    await sbApi('mfee?on_conflict=contract_id,year',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{contract_id:cid,year:year,amount:amount,paid:paid,paid_date:paid_date,paid_note:paid_note,updated_by:USER&&USER.email}])});
+    toast('☁️ บันทึกค่าบำรุงลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function boot(){
+  if(AUTH_MODE !== 'off'){
+    /* รอ Supabase แลก session จาก redirect ของ Google (PKCE) ให้เสร็จก่อน */
+    let sess=null;
+    try{ sess=(await SBC.auth.getSession()).data.session; }catch(e){}
+    if(!sess && /[?&]code=/.test(location.search)){
+      for(let i=0;i<12 && !sess;i++){ await new Promise(r=>setTimeout(r,300)); try{ sess=(await SBC.auth.getSession()).data.session; }catch(e){} }
+    }
+    if(location.search.indexOf('code=')>-1){ history.replaceState({}, '', location.origin+location.pathname); }
+    if(!sess){ renderLogin(); return; }
+    const em=(sess.user.email||'').toLowerCase();
+    const gname=(sess.user.user_metadata&&sess.user.user_metadata.full_name)||em;
+    const isCompany = em.endsWith('@elite-escapes.club');
+    let rows=[];
+    try{ rows=await sbApi('app_users?select=*&email=eq.'+encodeURIComponent(em)); }catch(e){}
+    if(rows && rows.length){
+      USER=Object.assign({}, rows[0], {name:rows[0].name||gname});
+    } else if(isCompany){
+      USER={email:em, name:gname, role:'editor'};  /* พนักงานบริษัท @elite-escapes.club เข้าได้อัตโนมัติ (สิทธิ์กรอกได้) */
+    } else {
+      await SBC.auth.signOut(); renderLogin('เข้าได้เฉพาะ Gmail บริษัท @elite-escapes.club เท่านั้น'); return;
+    }
+    closeGate();
+  }
+  $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
+  try{
+    const [cls, cons, fees, plans, insts] = await Promise.all([
+      fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
+      fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id')
+    ]);
+    const feesBy={};
+    fees.forEach(f=>{ (feesBy[f.contract_id]=feesBy[f.contract_id]||[]).push({year:f.year,amount:f.amount!=null?Number(f.amount):null,amount_raw:f.amount_raw,paid:f.paid,paid_date:f.paid_date,paid_note:f.paid_note}); });
+    const contracts = cons.map(c=>({id:c.id,sheet:c.sheet,product:c.product,pa:c.pa,name:c.name,nat:c.nat,plan:c.plan,term:c.term,suite:c.suite,season:c.season,status:c.status,status_note:c.status_note,comp_date:c.comp_date,fyo:c.fyo,lyo:c.lyo,row:c.row_no,client:c.client,addons:c.addons||undefined,fees:(feesBy[c.id]||[]).sort((a,b)=>a.year-b.year),custom:c.custom}));
+    const consBy={};
+    contracts.forEach(c=>{ (consBy[c.client]=consBy[c.client]||[]).push(c.id); });
+    const clients = cls.map(k=>({code:k.code,name:k.name,alt_names:k.alt_names||[],emails:k.emails||[],nat:k.nat,contract_ids:consBy[k.code]||[],custom:k.custom}));
+    BASE = {cur_year:(new Date()).getFullYear(), generated:'ฐานข้อมูลกลาง (สด)', clients:clients.filter(x=>!x.custom), contracts:contracts.filter(x=>!x.custom)};
+    OV = {plans:{},customClients:clients.filter(x=>x.custom),customContracts:contracts.filter(x=>x.custom),nextCid:100000};
+    OV.customContracts.forEach(c=>{ if(c.id>=OV.nextCid) OV.nextCid=c.id+1; });
+    plans.forEach(p=>{ OV.plans[p.contract_id]={value:p.value!=null?Number(p.value):0,currency:p.currency||'THB',note:p.note||'',installments:[]}; });
+    insts.forEach(i=>{ const p=OV.plans[i.contract_id]; if(p) p.installments.push({id:i.id,label:i.label||'',due:i.due,amount:Number(i.amount),paid:i.paid,paid_date:i.paid_date,note:i.note||''}); });
+    document.body.classList.toggle('ro', !!(USER&&USER.role==='viewer'));
+    invalidate(); render();
+    LAST_SYNC=new Date(); updateSync();
+  }catch(e){
+    $main.innerHTML='<div class="note" style="margin-top:40px"><b>โหลดข้อมูลจากฐานกลางไม่สำเร็จ:</b> '+esc(e.message)+'<br>ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรชหน้า</div>';
+  }
+}
+
+function allClients(){ return BASE.clients.concat(OV.customClients); }
+function allContracts(){ return BASE.contracts.concat(OV.customContracts); }
+let _cmap=null,_kmap=null;
+function contractById(id){ if(!_cmap){_cmap={}; allContracts().forEach(c=>_cmap[c.id]=c);} return _cmap[id]; }
+function clientByCode(code){ if(!_kmap){_kmap={}; allClients().forEach(c=>_kmap[c.code]=c);} return _kmap[code]; }
+function invalidate(){ _cmap=null; _kmap=null; }
+
+/* ================= helpers ================= */
+const TH_M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const CURS = {THB:'฿',USD:'US$',EUR:'€',AUD:'A$',GBP:'£'};
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const TODAY = todayISO();
+function addDaysISO(iso,days){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+const SOON = addDaysISO(TODAY,30);
+function addMonthsISO(iso,m){
+  const [y,mo,da]=iso.split('-').map(Number);
+  const t=(mo-1)+m, ny=y+Math.floor(t/12), nm=t%12;
+  const last=new Date(ny,nm+1,0).getDate();
+  return ny+'-'+String(nm+1).padStart(2,'0')+'-'+String(Math.min(da,last)).padStart(2,'0');
+}
+function fmtD(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-').map(Number); return d+' '+TH_M[m-1]+' '+y; }
+function fmtM(v,cur){ const s=CURS[cur]||cur+' '; const n=Math.round(v*100)/100; return s+n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function fmtMap(map){ const ks=Object.keys(map).filter(k=>map[k]>0); if(!ks.length) return '0'; return ks.map(k=>fmtM(map[k],k)).join(' + '); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
+function uid(){ return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* installment status */
+function instStatus(inst){
+  if(inst.paid) return 'paid';
+  if(inst.due < TODAY) return 'over';
+  if(inst.due <= SOON) return 'soon';
+  return 'fut';
+}
+const ST_LABEL = {paid:'จ่ายแล้ว', over:'ค้างจ่าย', soon:'ครบใน 30 วัน', fut:'รอถึงกำหนด'};
+function stPill(st){ return '<span class="pill p-'+st+'">'+ST_LABEL[st]+'</span>'; }
+function statusPill(s){
+  const m={'Completed':'p-paid','Welcome':'p-welcome','Cancelled':'p-cancel','Upgraded':'p-up','Downgraded':'p-up'};
+  return '<span class="pill '+(m[s]||'p-none')+'">'+esc(s)+'</span>';
+}
+
+/* every installment flattened: {contract, client, plan, inst} */
+function allInstallments(){
+  const out=[];
+  for(const cid in OV.plans){
+    const plan=OV.plans[cid], c=contractById(Number(cid));
+    if(!c || !inBrand(c)) continue;
+    const cl=clientByCode(c.client);
+    (plan.installments||[]).forEach(inst=>out.push({c,cl,plan,inst}));
+  }
+  return out;
+}
+function planTotals(plan){
+  let paid=0,unpaid=0,over=0,np=0,npaid=0;
+  (plan.installments||[]).forEach(i=>{
+    if(i.paid){paid+=i.amount; npaid++;}
+    else {unpaid+=i.amount; np++; if(i.due<TODAY) over+=i.amount;}
+  });
+  return {paid,unpaid,over,np,npaid,n:(plan.installments||[]).length};
+}
+
+/* ================= view state ================= */
+const S = { view:'dash', q:'', clientCode:null, pf:'due', pm:'', pq:'', planEdit:null, from:'clients', ay:0, at:'all', aq:'', ry:'next5', rq:'', bp:'TCU', bq:'', bs:'all', brand:'all', iv:'all', ivq:'', bYear:'all', bNat:'all', cNat:'all', bTerm:'all' };
+function natOptions(sel){
+  const cnt={};
+  allContracts().forEach(c=>{ const n=(c.nat||'').trim(); if(n) cnt[n]=(cnt[n]||0)+1; });
+  const nats=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  return `<option value="all">ทุกสัญชาติ</option>`+nats.map(([n,v])=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)} (${v.toLocaleString()})</option>`).join('');
+}
+const $main = document.getElementById('main');
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ go(b.dataset.v); });
+function go(v){
+  S.view=v; S.clientCode=null; S.planEdit=null;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  render();
+}
+function openClient(code, from){ S.view='client'; S.clientCode=code; S.planEdit=null; S.from=from||S.view;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='clients'));
+  render(); window.scrollTo(0,0);
+}
+
+function render(){
+  updateBadge();
+  const ub=document.getElementById('userbox');
+  if(ub) ub.innerHTML = (USER&&USER.email&&USER.email!=='team')? `👤 <b>${esc(USER.name||USER.email)}</b><br><span style="opacity:.75">${esc(USER.email)} · ${USER.role==='admin'?'แอดมิน':(USER.role==='viewer'?'ดูอย่างเดียว':'กรอกได้')}</span><br><a href="#" style="color:#9fd0f0" onclick="logout();return false">ออกจากระบบ</a>` : '';
+  $main.classList.toggle('anim', render._lv!==S.view); render._lv=S.view;
+  if(S.view==='dash') return rDash();
+  if(S.view==='todo') return rTodo();
+  if(S.view==='clients') return rClients();
+  if(S.view==='client') return rClient();
+  if(S.view==='payouts') return rPayouts();
+  if(S.view==='ar') return rAR();
+  if(S.view==='interval') return rInterval();
+  if(S.view==='renew') return rRenew();
+  if(S.view==='bible') return rBible();
+  if(S.view==='backup') return rBackup();
+}
+
+/* ================= dashboard ================= */
+function bibleStats(){
+  const cur = BASE.cur_year || Number(TODAY.slice(0,4));
+  const act = allContracts().filter(c=>c.status!=='Cancelled' && inBrand(c));
+  const years=[]; for(let y=2021;y<=cur;y++) years.push(y);
+  const fee={}; years.forEach(y=>fee[y]={due:0,paid:0,billed:0,none:0});
+  let billedAmt=0,billedCnt=0; const lyo={},prod={};
+  act.forEach(c=>{
+    prod[c.product]=(prod[c.product]||0)+1;
+    if(c.lyo&&c.lyo>=cur) lyo[c.lyo]=(lyo[c.lyo]||0)+1;
+    const recs={}; (c.fees||[]).forEach(f=>{recs[f.year]=f; if(!f.paid&&f.amount){billedAmt+=f.amount;billedCnt++;}});
+    years.forEach(y=>{
+      const inR=c.fyo&&c.lyo&&y>=c.fyo&&y<=c.lyo, r=recs[y];
+      if(!inR&&!r) return;
+      fee[y].due++;
+      if(r&&r.paid) fee[y].paid++; else if(r) fee[y].billed++; else fee[y].none++;
+    });
+  });
+  const exp5=act.filter(c=>c.lyo&&c.lyo>=cur&&c.lyo<=cur+4).length;
+  return {cur,nAct:act.length,years,fee,billedAmt,billedCnt,lyo,prod,exp5};
+}
+const PRODC={Club:'#4a7ab5',TCU:'#ed7d31',Fractional:'#2e8b57',Kudo:'#c9a45c'};
+
+/* ===== แบรนด์: Elite Escapes (Kudo) vs Club Unique (TCU/CUG/VIP/Fractional) ===== */
+function brandOf(c){ return (c && (c.product==='Kudo' || /^(KUD|EE)/i.test(c.pa||''))) ? 'EE' : 'CU'; }
+function inBrand(c){ return S.brand==='all' || brandOf(c)===S.brand; }
+const BRAND_NAME={EE:'Elite Escapes',CU:'Club Unique'};
+function brandChip(c){ const b=brandOf(c); return `<span class="bchip ${b==='EE'?'ee':'cu'}">${BRAND_NAME[b]}</span>`; }
+function setBrand(b){ S.brand=b; document.querySelectorAll('.brandseg button').forEach(x=>x.classList.toggle('on',x.dataset.b===b)); render(); }
+
+/* ===== add-on programs (Interval / Holiday Plus / ETD / UDP) ===== */
+const ADDON_DEFS=[['iv','Interval International'],['hp','Holiday Plus'],['etd','ETD'],['udp','UDP']];
+function addonCell(p){
+  if(!p) return '<span style="color:var(--ink3)">—</span>';
+  if(p.pay==='owing') return `<span style="color:var(--s8);font-weight:700">US$${(p.owe||0).toLocaleString()}</span>`;
+  if(p.act==='enroll') return '<span style="color:#9c4d13;font-weight:600">รอเปิดใช้</span>';
+  if(p.act==='yes') return '<span style="color:#2e8b57;font-weight:700">✓</span>';
+  return '<span style="color:var(--ink2)">ยังไม่เปิด</span>';
+}
+function addonStats(){
+  const act=allContracts().filter(c=>c.status!=='Cancelled' && inBrand(c));
+  const o={}; ADDON_DEFS.forEach(([k])=>o[k]={n:0,paid:0,owe:0,oweAmt:0,enroll:0,exp:0,expSoon:0});
+  const soon=addDaysISO(TODAY,365);
+  act.forEach(c=>{ const a=c.addons; if(!a) return;
+    ADDON_DEFS.forEach(([k])=>{ const p=a[k]; if(!p) return; const t=o[k]; t.n++;
+      if(p.pay==='paid') t.paid++;
+      if(p.pay==='owing'){ t.owe++; t.oweAmt+=p.owe||0; }
+      if(p.act==='enroll') t.enroll++;
+      if(p.vu){ if(p.vu<TODAY) t.exp++; else if(p.vu<=soon) t.expSoon++; }
+    });
+  });
+  return o;
+}
+
+function rDash(){
+  const st = bibleStats();
+  const fc = st.fee[st.cur]||{due:0,paid:0,billed:0,none:0};
+  const dueUnrec = fc.billed+fc.none;
+  const duePct = fc.due? Math.round(dueUnrec/fc.due*100):0;
+
+  const insts = allInstallments();
+  const over={}, soon={}, paidThisYear={}, futAll={};
+  let nOver=0,nSoon=0,nPaidY=0;
+  const yr = TODAY.slice(0,4);
+  insts.forEach(x=>{
+    const s2=instStatus(x.inst), cur2=x.plan.currency||'THB';
+    if(s2==='over'){ over[cur2]=(over[cur2]||0)+x.inst.amount; nOver++; }
+    if(s2==='soon'){ soon[cur2]=(soon[cur2]||0)+x.inst.amount; nSoon++; }
+    if(x.inst.paid && (x.inst.paid_date||'').slice(0,4)===yr){ paidThisYear[cur2]=(paidThisYear[cur2]||0)+x.inst.amount; nPaidY++; }
+    if(!x.inst.paid){ futAll[cur2]=(futAll[cur2]||0)+x.inst.amount; }
+  });
+  const nPlans=Object.keys(OV.plans).length;
+  const months=[]; let mIso=TODAY.slice(0,7);
+  for(let i=0;i<12;i++){ months.push(mIso); mIso=addMonthsISO(mIso+'-01',1).slice(0,7); }
+  const byMonth={}; let maxM=0;
+  insts.forEach(x=>{ if(!x.inst.paid){ const m=x.inst.due.slice(0,7); if(months.includes(m)){ byMonth[m]=byMonth[m]||{}; const cur2=x.plan.currency||'THB'; byMonth[m][cur2]=(byMonth[m][cur2]||0)+x.inst.amount; } } });
+  months.forEach(m=>{ const t=Object.values(byMonth[m]||{}).reduce((a,b)=>a+b,0); if(t>maxM) maxM=t; });
+  const upcoming = insts.filter(x=>!x.inst.paid).sort((a,b)=>a.inst.due<b.inst.due?-1:1).slice(0,12);
+  const overdue = insts.filter(x=>instStatus(x.inst)==='over').sort((a,b)=>a.inst.due<b.inst.due?-1:1);
+
+  const lyoYears=[]; for(let y=st.cur;y<=st.cur+11;y++) lyoYears.push(y);
+  const mx=Math.max(1,...lyoYears.map(y=>st.lyo[y]||0));
+
+  /* สัญญาใหม่รายปี ตั้งแต่เปิดบริษัท */
+  const salesYr={}; let syNoDate=0;
+  allContracts().filter(inBrand).forEach(c=>{
+    const y=(c.comp_date&&/^\d{4}/.test(c.comp_date))?c.comp_date.slice(0,4):null;
+    if(!y){ syNoDate++; return; }
+    const d=salesYr[y]=salesYr[y]||{n:0,cx:0};
+    d.n++; if(c.status==='Cancelled') d.cx++;
+  });
+  const syYears=Object.keys(salesYr).sort();
+  const syMax=Math.max(1,...syYears.map(y=>salesYr[y].n));
+
+  $main.innerHTML = `
+  <div class="hero"><div class="hero-in">
+    <div>
+      <div class="hero-kick">${S.brand==='all'?'Elite Escapes Group':BRAND_NAME[S.brand]} · Portfolio Overview</div>
+      <h1>ภาพรวม</h1>
+      <p class="sub">ข้อมูลสดจากฐานข้อมูลกลาง (Supabase) · ปีปัจจุบัน ${st.cur} · ณ ${fmtD(TODAY)}</p>
+    </div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${st.nAct}">0</b><span>สัญญา Active</span></div>
+      <div><b class="cnt" data-n="${allClients().length}">0</b><span>ลูกค้าทั้งหมด</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(st.billedAmt)}">0</span></b><span>ยอดรอตามเก็บ</span></div>
+      <div><b class="cnt" data-n="${st.exp5}">0</b><span>หมดอายุใน 5 ปี</span></div>
+    </div>
+  </div></div>
+  <div class="cards">
+    <div class="card kpi blue"><div class="v">${st.nAct.toLocaleString()}</div><div class="l">สัญญา Active</div><div class="m">ลูกค้า ${allClients().length.toLocaleString()} ราย · สัญญาทั้งหมด ${allContracts().length.toLocaleString()}</div></div>
+    <div class="card kpi red"><div class="v">${dueUnrec.toLocaleString()}</div><div class="l">ถึงกำหนดค่าบำรุงปี ${st.cur} แต่ไม่มีบันทึก</div><div class="m">${duePct}% ของสัญญาที่ถึงกำหนด ${fc.due.toLocaleString()} สัญญา</div></div>
+    <div class="card kpi orange"><div class="v sm">US$${Math.round(st.billedAmt).toLocaleString()}</div><div class="l">ออกบิลแล้ว ยังไม่มีบันทึกชำระ</div><div class="m">${st.billedCnt.toLocaleString()} รายการ (ทุกปี)</div></div>
+    <div class="card kpi gold"><div class="v">${st.exp5.toLocaleString()}</div><div class="l">สัญญาหมดอายุปี ${st.cur}–${st.cur+4}</div><div class="m">ควรเริ่มแคมเปญต่ออายุ · ดูหน้า "ใกล้หมดอายุ"</div></div>
+  </div>
+  <div class="row2">
+    <div class="panel">
+      <h3><span class="idx">01</span>การบันทึกค่าบำรุงรายปี เทียบกับสัญญาที่ถึงกำหนด</h3>
+      <div class="cs">คลิกที่ปีเพื่อเปิดรายชื่อค้างชำระของปีนั้น</div>
+      <div class="lg"><span><i style="background:#2e8b57"></i>ชำระแล้ว</span><span><i style="background:#ed7d31"></i>ออกบิลแล้ว/ค้าง</span><span><i style="background:#c0392b"></i>ไม่มีบันทึก</span></div>
+      ${st.years.map(y=>{ const f=st.fee[y], un=f.billed+f.none, p=f.due?Math.round(un/f.due*100):0;
+        return `<div class="stack" onclick="S.ay=${y};S.at='all';go('ar')"><span>${y}</span><span class="tr"><i style="width:${f.due?f.paid/f.due*100:0}%;background:#2e8b57"></i><i style="width:${f.due?f.billed/f.due*100:0}%;background:#ed7d31"></i><i style="width:${f.due?f.none/f.due*100:0}%;background:#c0392b"></i></span><span class="rt"><b>${un.toLocaleString()}</b> · ${p}%</span></div>`; }).join('')}
+      <div class="mini">ตัวเลขขวา = สัญญาที่ยังไม่มีบันทึกชำระของปีนั้น (ออกบิลค้าง + ไม่มีบันทึก)</div>
+    </div>
+    <div class="panel">
+      <h3><span class="idx">02</span>สัญญาหมดอายุ (LYO) รายปี</h3>
+      <div class="cs">สีส้ม = ช่วง 5 ปีที่ควรเริ่มแคมเปญต่ออายุ · คลิกแท่งเพื่อดูรายชื่อ</div>
+      <div class="vwrap">${lyoYears.map(y=>`<div class="vb ${y<=st.cur+4?'hot':''}" onclick="S.ry='${y}';go('renew')"><span class="num">${st.lyo[y]||0}</span><div class="col" style="height:${Math.max(3,Math.round((st.lyo[y]||0)/mx*130))}px"></div><span class="yl">${y}</span></div>`).join('')}</div>
+    </div>
+  </div>
+  <div class="row2">
+  <div class="panel">
+    <h3><span class="idx">04</span>สัญญาใหม่รายปี — ตั้งแต่เปิดบริษัท</h3>
+    <div class="cs">นับจากปีที่ทำสัญญาเสร็จ (Completion date)${syNoDate?` · ไม่ระบุวันที่ ${syNoDate.toLocaleString()} สัญญา`:''} · คลิกปีเพื่อเปิดทะเบียนสัญญาของปีนั้น</div>
+    <div class="vwrap">${syYears.map(y=>{ const d=salesYr[y]; const act=d.n-d.cx;
+      const hA=Math.max(2,Math.round(act/syMax*130)), hC=Math.round(d.cx/syMax*130);
+      return `<div class="vb" onclick="S.bYear='${y}';go('bible')"><span class="num">${d.n.toLocaleString()}</span>${hC?`<div class="col" style="height:${hC}px;background:#c9d4de;border-radius:6px 6px 0 0"></div>`:''}<div class="col" style="height:${hA}px;background:#1c486b;${hC?'border-radius:0':''}"></div><span class="yl">${y.slice(2)}</span></div>`; }).join('')}</div>
+    <div class="lg" style="margin-top:12px"><span><i style="background:#1c486b"></i>คงอยู่</span><span><i style="background:#c9d4de"></i>ยกเลิกภายหลัง</span></div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">03</span>สัดส่วนผลิตภัณฑ์ (สัญญา active)</h3>
+    <div class="cs">สัดส่วนตามประเภทสินค้า — คลิกดูรายละเอียดที่หน้าทะเบียนสัญญา</div>
+    <div style="display:flex;gap:36px;align-items:center;flex-wrap:wrap;padding:8px 0 4px">
+      ${(function(){ const entries=Object.entries(st.prod); const tot=entries.reduce((s,e)=>s+e[1],0)||1;
+        let acc=0; const segs=entries.map(([k,v])=>{ const a0=acc/tot*100; acc+=v; const a1=acc/tot*100;
+          return `${PRODC[k]||'#8a9994'} ${a0.toFixed(2)}% ${a1.toFixed(2)}%`; }).join(', ');
+        return `<div class="donut" style="background:conic-gradient(${segs})"><i><b class="cnt" data-n="${tot}">0</b><small>สัญญา active</small></i></div>`; })()}
+      <div class="lg" style="flex-direction:column;align-items:flex-start;gap:10px;margin:0">
+        ${Object.entries(st.prod).map(([k,v])=>`<span style="cursor:pointer" onclick="S.bp='${esc(k)}';go('bible')"><i style="background:${PRODC[k]||'#8a9994'}"></i>${esc(k)} <b>${v.toLocaleString()}</b> · ${Math.round(v/(st.nAct||1)*100)}%</span>`).join('')}
+      </div>
+    </div>
+    ${(function(){
+      const acts=allContracts().filter(c=>c.status!=='Cancelled'&&inBrand(c));
+      const tset=new Set(), m={};
+      acts.forEach(c=>{ const t=((c.term||'').trim())||'ไม่ระบุ'; tset.add(t);
+        (m[c.product]=m[c.product]||{})[t]=(m[c.product][t]||0)+1; });
+      const tlist=[...tset].sort((a,b)=>(parseInt(a)||99)-(parseInt(b)||99));
+      return `<div class="mini" style="margin-top:14px;margin-bottom:4px"><b>แยกตามระยะสัญญา (กี่ปี)</b></div>
+      <div class="scroll"><table><thead><tr><th>ประเภท</th>${tlist.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">รวม</th></tr></thead><tbody>
+      ${Object.keys(m).map(p=>`<tr><td><b>${esc(p)}</b></td>${tlist.map(t=>`<td class="n">${m[p][t]?m[p][t].toLocaleString():'—'}</td>`).join('')}<td class="n"><b>${Object.values(m[p]).reduce((a,b)=>a+b,0).toLocaleString()}</b></td></tr>`).join('')}
+      </tbody></table></div>`;
+    })()}
+  </div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">05</span>โปรแกรมเสริม (สัญญา active)</h3>
+    <div class="cs">โปรแกรมสิทธิประโยชน์ที่ขายพ่วงกับสัญญา — Interval = สมาชิกเครือข่ายแลกเปลี่ยนวันพัก Interval International · Holiday Plus = แพ็กเกจวันหยุดเสริม (มีวันหมดอายุ) · ETD / UDP = สิทธิประโยชน์เสริมตามสัญญา</div>
+    <div class="scroll"><table><thead><tr><th>โปรแกรม</th><th class="n">มีในสัญญา</th><th class="n">จ่ายแล้ว</th><th class="n">ค้างจ่าย</th><th class="n">ยอดค้างรวม (US$)</th><th class="n">รอเปิดใช้</th><th>วันหมดอายุ (เฉพาะ H.Plus)</th></tr></thead><tbody>
+    ${(function(){ const ast=addonStats(); return ADDON_DEFS.map(([k,nm])=>{ const t=ast[k];
+      return `<tr><td><b>${nm}</b></td><td class="n">${t.n.toLocaleString()}</td><td class="n" style="color:#2e8b57">${t.paid.toLocaleString()}</td><td class="n" style="color:var(--s8);font-weight:600">${t.owe.toLocaleString()}</td><td class="n">${Math.round(t.oweAmt).toLocaleString()}</td><td class="n" style="color:#9c4d13">${t.enroll.toLocaleString()}</td><td>${k==='hp'?`<b style="color:var(--s8)">หมดแล้ว ${t.exp.toLocaleString()}</b> · จะหมดภายใน 1 ปี ${t.expSoon.toLocaleString()}`:'—'}</td></tr>`; }).join(''); })()}
+    </tbody></table></div>
+    <div class="mini">"ค้างจ่าย" = ลูกค้ายังไม่ชำระค่าโปรแกรม (จากคอลัมน์ Cost เช่น US$388) · "รอเปิดใช้" = สถานะ For Enrollment คือชำระ/พร้อมแล้วแต่ยังไม่ได้ลงทะเบียนกับผู้ให้บริการ · ดูรายละเอียดรายสัญญาได้ในโปรไฟล์ลูกค้า และหน้าทะเบียนสัญญา</div>
+  </div>
+
+  <h2 class="sechead"><small>Payout Tracker</small>การจ่ายคืนลูกค้า${nPlans?` · มีแผนแล้ว ${nPlans} สัญญา`:''}</h2>
+  ${nPlans===0?`<div class="note blue"><b>ยังไม่มีแผนจ่ายคืนในระบบ</b> — ไปที่ <b>ลูกค้า</b> → ค้นหา → เปิดโปรไฟล์ → กด <b>สร้างแผนจ่ายคืน</b> ที่สัญญาที่ต้องการ ระบบจะสร้างงวดจ่ายอัตโนมัติ แล้วสรุปยอดที่หน้านี้ให้เอง</div>`:`
+  <div class="cards">
+    <div class="card kpi red"><div class="v sm">${fmtMap(over)}</div><div class="l">ค้างจ่าย · เลยกำหนด</div><div class="m">${nOver} งวด — จัดการก่อนเป็นอันดับแรก</div></div>
+    <div class="card kpi orange"><div class="v sm">${fmtMap(soon)}</div><div class="l">ครบกำหนดใน 30 วัน</div><div class="m">${nSoon} งวดที่ต้องเตรียมจ่าย</div></div>
+    <div class="card kpi green"><div class="v sm">${fmtMap(paidThisYear)}</div><div class="l">จ่ายแล้วปีนี้ (${yr})</div><div class="m">${nPaidY} งวดที่บันทึกจ่ายสำเร็จ</div></div>
+    <div class="card kpi blue"><div class="v sm">${fmtMap(futAll)}</div><div class="l">ภาระจ่ายคงเหลือทั้งหมด</div><div class="m">รวมทุกงวดที่ยังไม่จ่าย</div></div>
+  </div>
+  <div class="row2">
+    <div class="panel">
+      <h3><span class="idx">06</span>งวดที่ต้องจ่ายเร็ว ๆ นี้</h3>
+      <div class="cs">เรียงตามวันครบกำหนด (คลิกแถวเพื่อเปิดโปรไฟล์ลูกค้า)</div>
+      ${upcoming.length? `<div class="scroll"><table><thead><tr><th>กำหนดจ่าย</th><th>ลูกค้า</th><th>สัญญา</th><th class="n">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>
+      ${upcoming.map(x=>`<tr class="click" onclick="openClient('${x.c.client}','dash')">
+        <td>${fmtD(x.inst.due)}</td><td>${esc(x.cl?x.cl.name:x.c.name)}</td><td>${esc(x.c.pa)}</td>
+        <td class="n">${fmtM(x.inst.amount,x.plan.currency)}</td><td>${stPill(instStatus(x.inst))}</td>
+        <td><button class="btn sm paybtn" onclick="event.stopPropagation();openPayModal(${x.c.id},'${x.inst.id}')">บันทึกจ่าย</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="mini">ไม่มีงวดค้างจ่าย</div>'}
+    </div>
+    <div class="panel">
+      <h3><span class="idx">07</span>ประมาณการจ่าย 12 เดือนข้างหน้า</h3>
+      <div class="cs">ยอดงวดที่ยังไม่จ่าย แยกตามเดือนที่ครบกำหนด</div>
+      ${(function(){
+        const vals=months.map(m=>Object.values(byMonth[m]||{}).reduce((a,b)=>a+b,0));
+        const labs=months.map(m=>{const [y2,mo]=m.split('-');return TH_M[Number(mo)-1];});
+        return areaChart(vals,labs);
+      })()}
+    </div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">08</span>รายการค้างจ่ายทั้งหมด (${overdue.length} งวด)</h3>
+    <div class="cs">งวดที่เลยวันครบกำหนดแล้วแต่ยังไม่บันทึกว่าจ่าย — จัดการก่อนเป็นอันดับแรก</div>
+    ${overdue.length? `<div class="scroll"><table><thead><tr><th>กำหนดจ่าย</th><th>เลยมาแล้ว</th><th>ลูกค้า</th><th>สัญญา</th><th>งวด</th><th class="n">จำนวน</th><th></th></tr></thead><tbody>
+    ${overdue.map(x=>{ const days=Math.round((new Date(TODAY)-new Date(x.inst.due))/86400000);
+      return `<tr class="click" onclick="openClient('${x.c.client}','dash')">
+      <td>${fmtD(x.inst.due)}</td><td><b style="color:var(--s8)">${days} วัน</b></td><td>${esc(x.cl?x.cl.name:x.c.name)}</td>
+      <td>${esc(x.c.pa)}</td><td>${esc(x.inst.label||'')}</td><td class="n">${fmtM(x.inst.amount,x.plan.currency)}</td>
+      <td><button class="btn sm paybtn" onclick="event.stopPropagation();openPayModal(${x.c.id},'${x.inst.id}')">บันทึกจ่าย</button></td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="mini">🎉 ไม่มีรายการค้างจ่าย</div>'}
+  </div>`}`;
+  runCounters();
+}
+function runCounters(){
+  document.querySelectorAll('.cnt').forEach(el=>{
+    const target=Number(el.dataset.n)||0;
+    if(el._done===target){ el.textContent=target.toLocaleString(); return; }
+    el._done=target;
+    const t0=performance.now(), dur=900;
+    const step=(t)=>{ const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+      el.textContent=Math.round(target*e).toLocaleString();
+      if(p<1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+    setTimeout(()=>{ if(document.body.contains(el)) el.textContent=target.toLocaleString(); }, dur+250);
+  });
+}
+function areaChart(vals,labs){
+  const W=640,H=200,P=26,BW=W-P*2,BH=H-P*2;
+  const mx=Math.max(1,...vals);
+  const pts=vals.map((v,i)=>[P+BW*i/(vals.length-1), P+BH*(1-v/mx)]);
+  const line=pts.map((p,i)=>(i?'L ':'M ')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const area=line+` L ${P+BW} ${P+BH} L ${P} ${P+BH} Z`;
+  const grid=[0,0.25,0.5,0.75].map(g=>`<line x1="${P}" x2="${P+BW}" y1="${(P+BH*g).toFixed(1)}" y2="${(P+BH*g).toFixed(1)}" stroke="#e9eef4" stroke-dasharray="3 4"/>`).join('');
+  return `<div class="scroll"><svg viewBox="0 0 ${W} ${H+16}" style="width:100%;height:auto;min-width:480px">
+    <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f7cab" stop-opacity=".28"/><stop offset="1" stop-color="#3f7cab" stop-opacity="0"/></linearGradient></defs>
+    ${grid}
+    <line x1="${P}" x2="${P+BW}" y1="${P+BH}" y2="${P+BH}" stroke="#dfe6ee"/>
+    <path d="${area}" fill="url(#ag)"/>
+    <path d="${line}" fill="none" stroke="#1c486b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${vals[i]?4:2.5}" fill="#fff" stroke="#1c486b" stroke-width="2"><title>${labs[i]} · ${vals[i].toLocaleString()}</title></circle>`).join('')}
+    ${labs.map((l,i)=>`<text x="${(P+BW*i/(vals.length-1)).toFixed(1)}" y="${H+10}" font-size="10.5" text-anchor="middle" fill="#8a97a5" font-family="Sarabun,sans-serif">${l}</text>`).join('')}
+  </svg></div>
+  <div class="mini">ยอดรวมทุกสกุลเงิน แยกตามเดือนที่ครบกำหนด — ชี้ที่จุดเพื่อดูตัวเลข</div>`;
+}
+
+/* ================= clients ================= */
+function norm(s){ return String(s||'').toLowerCase(); }
+function searchClients(q){
+  q=norm(q.trim());
+  if(!q) return [];
+  const toks=q.split(/\s+/);
+  return allClients().filter(cl=>{
+    const hay = norm(cl.name)+' '+norm((cl.alt_names||[]).join(' '))+' '+norm((cl.emails||[]).join(' '))+' '+norm(cl.code)+' '+
+      (cl.contract_ids||[]).map(id=>{const c=contractById(id);return c?norm(c.pa):'';}).join(' ');
+    return toks.every(t=>hay.includes(t));
+  });
+}
+function rClients(){
+  const res = S.q? searchClients(S.q).slice(0,60) : [];
+  $main.innerHTML = `
+  <div class="pk">Operations · Clients</div>
+  <h1>ลูกค้า</h1>
+  <p class="sub">ค้นหาด้วยชื่อ, อีเมล, เลขสัญญา (เช่น FR1/1001) หรือรหัสลูกค้า (EE-xxxx)</p>
+  <div class="search">
+    <input type="text" id="cq" placeholder="🔍 พิมพ์ชื่อลูกค้า / อีเมล / เลขสัญญา…" value="${esc(S.q)}" autocomplete="off">
+    <select class="flt" onchange="S.cNat=this.value;renderClientResults()">${natOptions(S.cNat)}</select>
+    <button class="btn sec" onclick="openNewClientModal()">➕ เพิ่มลูกค้าใหม่</button>
+  </div>
+  <div id="cres"></div>`;
+  const inp=document.getElementById('cq');
+  inp.oninput=()=>{ S.q=inp.value; renderClientResults(); };
+  inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);
+  renderClientResults();
+}
+function renderClientResults(){
+  const el=document.getElementById('cres'); if(!el) return;
+  if(!S.q.trim() && S.cNat==='all'){ el.innerHTML='<div class="hint">พิมพ์คำค้น หรือเลือกสัญชาติ — มีลูกค้าทั้งหมด '+allClients().length.toLocaleString()+' ราย</div>'; return; }
+  let all = S.q.trim()? searchClients(S.q) : allClients();
+  if(S.cNat!=='all') all=all.filter(cl=>(cl.nat||'').trim()===S.cNat);
+  const total=all.length;
+  const res=all.slice(0,100);
+  if(!res.length){ el.innerHTML='<div class="hint">ไม่พบลูกค้าตามเงื่อนไขที่เลือก</div>'; return; }
+  el.innerHTML = `<div class="panel"><div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่อลูกค้า</th><th>สัญชาติ</th><th>สัญญา</th><th>แผนจ่ายคืน</th></tr></thead><tbody>
+  ${res.map(cl=>{
+    const cons=(cl.contract_ids||[]).map(id=>contractById(id)).filter(Boolean);
+    const plans=cons.filter(c=>OV.plans[c.id]);
+    let planTxt='<span class="pill p-none">ยังไม่มี</span>';
+    if(plans.length){
+      let over=0; plans.forEach(c=>{ over+=planTotals(OV.plans[c.id]).over>0?1:0; });
+      planTxt = over? '<span class="pill p-over">มีค้างจ่าย</span>' : '<span class="pill p-paid">มีแผน '+plans.length+' สัญญา</span>';
+    }
+    return `<tr class="click" onclick="openClient('${cl.code}','clients')"><td>${esc(cl.code)}</td><td><b>${esc(cl.name)}</b><br><span class="mini">${esc((cl.emails||[])[0]||'')}</span></td><td>${esc(cl.nat||'')}</td>
+    <td>${cons.map(c=>'<span class="chip">'+esc(c.pa)+'</span>').join('')}</td><td>${planTxt}</td></tr>`; }).join('')}
+  </tbody></table></div>${total>100?'<div class="mini" style="margin-top:8px">พบ '+total.toLocaleString()+' ราย — แสดง 100 รายการแรก พิมพ์ค้นเพิ่มเพื่อจำกัดผล</div>':''}</div>`;
+}
+
+/* ================= client profile ================= */
+function rClient(){
+  const cl = clientByCode(S.clientCode);
+  if(!cl){ go('clients'); return; }
+  const cons=(cl.contract_ids||[]).map(id=>contractById(id)).filter(Boolean);
+  /* client-level totals */
+  const totOver={}, totUnpaid={}, totPaid={};
+  cons.forEach(c=>{ const p=OV.plans[c.id]; if(!p) return; const t=planTotals(p); const cur=p.currency||'THB';
+    totOver[cur]=(totOver[cur]||0)+t.over; totUnpaid[cur]=(totUnpaid[cur]||0)+t.unpaid; totPaid[cur]=(totPaid[cur]||0)+t.paid; });
+  const hasPlan = cons.some(c=>OV.plans[c.id]);
+
+  $main.innerHTML = `
+  <button class="bk" onclick="go('${['dash','todo','payouts','ar','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
+  <div class="profile-head">
+    <div>
+      <h2>${esc(cl.name)}</h2>
+      <div class="kv">${esc(cl.code)} · ${esc(cl.nat||'-')} ${(cl.emails||[]).map(e=>'· <a href="mailto:'+esc(e)+'">'+esc(e)+'</a>').join(' ')}</div>
+      ${(cl.alt_names||[]).length?'<div class="mini">ชื่ออื่นในระบบ: '+cl.alt_names.map(esc).join(', ')+'</div>':''}
+    </div>
+    ${hasPlan?`<div class="balance">
+      <div class="mini">ยอดค้างจ่าย (เลยกำหนด)</div>
+      <div class="v" style="color:${Object.values(totOver).some(v=>v>0)?'var(--s8)':'#0f6b4c'}">${fmtMap(totOver)}</div>
+      <div class="mini">คงเหลือต้องจ่ายทั้งหมด ${fmtMap(totUnpaid)} · จ่ายไปแล้ว ${fmtMap(totPaid)}</div>
+    </div>`:''}
+  </div>
+  <p class="sub">สัญญาทั้งหมด ${cons.length} ฉบับ</p>
+  ${cons.map(c=>contractCard(c)).join('')}`;
+}
+
+function contractCard(c){
+  const plan=OV.plans[c.id];
+  let payoutHtml;
+  if(S.planEdit===c.id){ payoutHtml = planFormHtml(c); }
+  else if(!plan){
+    payoutHtml = `<button class="btn sec" onclick="S.planEdit=${c.id};render()">➕ สร้างแผนจ่ายคืน</button>
+    <span class="mini" style="margin-left:10px">กำหนดมูลค่าสัญญาและงวดที่บริษัทต้องจ่ายคืนลูกค้า</span>`;
+  } else {
+    const t=planTotals(plan);
+    const insts=(plan.installments||[]).slice().sort((a,b)=>a.due<b.due?-1:1);
+    payoutHtml = `
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:baseline">
+      <div><b>แผนจ่ายคืน</b> · มูลค่าสัญญา <b>${fmtM(plan.value||0,plan.currency)}</b>
+        ${plan.note?'<span class="mini"> · '+esc(plan.note)+'</span>':''}</div>
+      <div>
+        <button class="btn sm ghost" onclick="openInstModal(${c.id},null)">➕ เพิ่มงวด</button>
+        <button class="btn sm ghost" onclick="S.planEdit=${c.id};render()">✏️ แก้ไขแผน</button>
+        <button class="btn sm danger" onclick="delPlan(${c.id})">🗑 ลบแผน</button>
+      </div>
+    </div>
+    <div class="mini" style="margin:4px 0 8px">จ่ายแล้ว ${t.npaid}/${t.n} งวด (${fmtM(t.paid,plan.currency)}) · คงเหลือ ${fmtM(t.unpaid,plan.currency)}${t.over>0?' · <b style="color:var(--s8)">ค้างจ่าย '+fmtM(t.over,plan.currency)+'</b>':''}</div>
+    <div class="scroll"><table><thead><tr><th>งวด</th><th>กำหนดจ่าย</th><th class="n">จำนวน</th><th>สถานะ</th><th>วันที่จ่ายจริง</th><th>หมายเหตุ</th><th></th></tr></thead><tbody>
+    ${insts.map(i=>{ const st=instStatus(i);
+      return `<tr><td>${esc(i.label||'')}</td><td>${fmtD(i.due)}</td><td class="n">${fmtM(i.amount,plan.currency)}</td>
+      <td>${stPill(st)}</td><td>${i.paid?fmtD(i.paid_date):'—'}</td><td class="mini">${esc(i.note||'')}</td>
+      <td style="white-space:nowrap">${i.paid? `<button class="btn sm ghost" onclick="unpay(${c.id},'${i.id}')">↩︎ ยกเลิกจ่าย</button>`
+        : `<button class="btn sm paybtn" onclick="openPayModal(${c.id},'${i.id}')">บันทึกจ่าย</button>`}
+      <button class="btn sm ghost" onclick="openInstModal(${c.id},'${i.id}')">✏️</button>
+      <button class="btn sm danger" onclick="delInst(${c.id},'${i.id}')">🗑</button></td></tr>`; }).join('')}
+    </tbody></table></div>`;
+  }
+  const fees=(c.fees||[]);
+  return `<div class="contract-card">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div><h4>${esc(c.pa)} <span class="chip">${esc(c.product)}</span>${brandChip(c)}</h4>
+      <div class="kv">ระยะสัญญา <b>${esc(c.term||'-')}</b> · Suite <b>${esc(c.suite||'-')}</b> · Season <b>${esc(c.season||'-')}</b> · ทำสัญญาเสร็จ <b>${c.comp_date?fmtD(c.comp_date):'-'}</b> · ใช้สิทธิ์ปี ${c.fyo||'?'}–${c.lyo||'?'}</div>
+      ${c.status_note?'<div class="mini">'+esc(c.status_note)+'</div>':''}</div>
+      <div>${statusPill(c.status)}</div>
+    </div>
+    ${1?`<div class="feegrid">${fees.map(f=>`<div class="fy ${f.paid?'paid':'due'}" style="cursor:pointer" title="คลิกเพื่อบันทึก/แก้ไขการชำระ" onclick="openFeeModal(${c.id},${f.year})"><b>${f.year}</b>${f.amount?'$'+f.amount:''}<br>${f.paid?'จ่ายแล้ว':'ไม่มีบันทึก'}</div>`).join('')}<div class="fy" style="cursor:pointer;border-style:dashed" onclick="promptFeeYear(${c.id})"><b>＋</b>บันทึก<br>ปีอื่น</div></div>
+    <div class="mini" style="margin-top:2px">ค่าบำรุงรายปีที่ลูกค้าจ่ายเข้าบริษัท — คลิกช่องปีเพื่อบันทึก/แก้ไขการชำระ</div>`:''}
+    ${c.addons?`<div style="margin-top:12px"><b style="font-size:13px">โปรแกรมเสริมของสัญญานี้</b>
+    <div class="scroll"><table><thead><tr><th>โปรแกรม</th><th>แพ็กเกจ</th><th>การชำระ</th><th>การเปิดใช้</th><th>ID No.</th><th>ใช้ได้ถึง</th></tr></thead><tbody>
+    ${ADDON_DEFS.map(([k,nm])=>{ const p=c.addons[k]; if(!p) return '';
+      const pay=p.pay==='paid'?'<span class="pill p-paid">จ่ายแล้ว</span>':p.pay==='owing'?`<span class="pill p-over">ค้างจ่าย US$${(p.owe||0).toLocaleString()}</span>`:'<span class="pill p-none">ไม่ระบุ</span>';
+      const act=p.act==='yes'?('เปิดใช้แล้ว'+(p.ad?' · '+esc(p.ad):'')):p.act==='enroll'?'<span class="pill p-soon">รอเปิดใช้ (For Enrollment)</span>':'<span class="pill p-none">ยังไม่เปิดใช้</span>';
+      const vu=p.vuRaw?((p.vu&&p.vu<TODAY)?`<b style="color:var(--s8)">${esc(p.vuRaw)} · หมดอายุแล้ว</b>`:esc(p.vuRaw)):'—';
+      return `<tr><td><b>${nm}</b></td><td>${esc(p.t)}</td><td>${pay}</td><td>${act}</td><td>${esc(p.id||'—')}</td><td>${vu}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`:''}
+    <div class="payout-sec">${payoutHtml}</div>
+  </div>`;
+}
+
+/* ================= plan form ================= */
+function planFormHtml(c){
+  const p=OV.plans[c.id]||{};
+  return `<div style="background:var(--surface2);border-radius:10px;padding:14px 16px">
+  <b>${p.value?'แก้ไข':'สร้าง'}แผนจ่ายคืน — ${esc(c.pa)}</b>
+  <div class="form">
+    <div><label>มูลค่าสัญญา *</label><input type="number" id="pf_value" min="0" step="any" value="${p.value||''}"></div>
+    <div><label>สกุลเงิน</label><select id="pf_cur">${Object.keys(CURS).map(k=>`<option ${((p.currency||'THB')===k)?'selected':''}>${k}</option>`).join('')}</select></div>
+    <div class="full"><label>หมายเหตุแผน (เช่น "Rental return 7%/ปี 5 ปี")</label><input type="text" id="pf_note" value="${esc(p.note||'')}"></div>
+  </div>
+  ${p.installments && p.installments.length ? '<div class="mini" style="margin-bottom:8px">แผนนี้มีงวดอยู่แล้ว '+p.installments.length+' งวด — บันทึกด้านล่างจะแก้เฉพาะข้อมูลแผน ไม่กระทบงวดเดิม (เพิ่ม/แก้งวดได้จากตาราง)</div>' : `
+  <div style="border-top:1px dashed var(--line);padding-top:10px"><b style="font-size:13.5px">สร้างงวดจ่ายอัตโนมัติ</b>
+  <div class="form">
+    <div><label>วิธีคำนวณ</label><select id="pf_mode" onchange="document.getElementById('pf_rate_w').style.display=this.value==='rate'?'':'none';document.getElementById('pf_fix_w').style.display=this.value==='rate'?'none':''"><option value="rate">% ผลตอบแทนต่อปี จากมูลค่าสัญญา</option><option value="fixed">จำนวนเงินคงที่ต่องวด</option></select></div>
+    <div id="pf_rate_w"><label>อัตรา % ต่อปี</label><input type="number" id="pf_rate" step="any" placeholder="เช่น 7"></div>
+    <div id="pf_fix_w" style="display:none"><label>จำนวนเงินต่องวด</label><input type="number" id="pf_fix" step="any"></div>
+    <div><label>ความถี่</label><select id="pf_freq"><option value="12">รายปี</option><option value="6">ทุก 6 เดือน</option><option value="3">รายไตรมาส</option><option value="1">รายเดือน</option></select></div>
+    <div><label>จำนวนงวด</label><input type="number" id="pf_count" min="1" value="5"></div>
+    <div><label>วันครบกำหนดงวดแรก</label><input type="date" id="pf_first" value="${TODAY}"></div>
+  </div></div>`}
+  <div class="right">
+    <button class="btn ghost" onclick="S.planEdit=null;render()">ยกเลิก</button>
+    <button class="btn" onclick="savePlan(${c.id})">💾 บันทึกแผน</button>
+  </div></div>`;
+}
+function savePlan(cid){
+  const val=parseFloat(document.getElementById('pf_value').value);
+  if(!(val>=0)){ toast('กรุณาใส่มูลค่าสัญญา'); return; }
+  const cur=document.getElementById('pf_cur').value, note=document.getElementById('pf_note').value.trim();
+  let plan=OV.plans[cid];
+  if(!plan){ plan=OV.plans[cid]={value:val,currency:cur,note:note,installments:[]}; }
+  else { plan.value=val; plan.currency=cur; plan.note=note; }
+  /* auto-generate only when no installments yet and form present */
+  const modeEl=document.getElementById('pf_mode');
+  if(modeEl && (!plan.installments || !plan.installments.length)){
+    const mode=modeEl.value, freq=parseInt(document.getElementById('pf_freq').value), count=parseInt(document.getElementById('pf_count').value)||0;
+    const first=document.getElementById('pf_first').value||TODAY;
+    let per=0;
+    if(mode==='rate'){ const r=parseFloat(document.getElementById('pf_rate').value)||0; per=val*r/100*(freq/12); }
+    else { per=parseFloat(document.getElementById('pf_fix').value)||0; }
+    per=Math.round(per*100)/100;
+    if(per>0 && count>0){
+      plan.installments=[];
+      for(let i=0;i<count;i++){
+        plan.installments.push({id:uid(),label:'งวด '+(i+1)+'/'+count,due:addMonthsISO(first,freq*i),amount:per,paid:false,paid_date:null,note:''});
+      }
+    }
+  }
+  save(); pushPlan(cid); S.planEdit=null; render(); toast('บันทึกแผนจ่ายคืนแล้ว');
+}
+function delPlan(cid){
+  const c=contractById(cid);
+  if(!confirm('ลบแผนจ่ายคืนของสัญญา '+(c?c.pa:cid)+' ทั้งหมด? (รวมประวัติงวดที่จ่ายแล้ว)')) return;
+  delete OV.plans[cid]; save(); pushDeletePlan(cid); render(); toast('ลบแผนแล้ว');
+}
+function delInst(cid,iid){
+  const p=OV.plans[cid]; if(!p) return;
+  const i=p.installments.find(x=>x.id===iid);
+  if(!confirm('ลบงวด '+(i?i.label:'')+' ?')) return;
+  p.installments=p.installments.filter(x=>x.id!==iid); save(); pushPlan(cid); render(); toast('ลบงวดแล้ว');
+}
+function unpay(cid,iid){
+  const p=OV.plans[cid]; if(!p) return;
+  const i=p.installments.find(x=>x.id===iid); if(!i) return;
+  i.paid=false; i.paid_date=null; save(); pushPlan(cid); render(); toast('ยกเลิกสถานะจ่ายแล้ว');
+}
+
+/* ================= modals ================= */
+const $mw=document.getElementById('modalwrap'), $m=document.getElementById('modal');
+$mw.onclick=e=>{ if(e.target===$mw) closeModal(); };
+function openModal(html){ $m.innerHTML=html; $mw.classList.remove('hide'); }
+function closeModal(){ $mw.classList.add('hide'); $m.innerHTML=''; }
+
+function openPayModal(cid,iid){
+  const p=OV.plans[cid], c=contractById(cid);
+  const i=p.installments.find(x=>x.id===iid); if(!i) return;
+  openModal(`<h3>บันทึกการจ่ายคืน</h3>
+  <div class="kv" style="margin-bottom:10px">${esc(c.name)} · ${esc(c.pa)}<br><b>${esc(i.label||'')}</b> กำหนดจ่าย ${fmtD(i.due)} · จำนวน <b>${fmtM(i.amount,p.currency)}</b></div>
+  <div class="form">
+    <div><label>วันที่จ่ายจริง</label><input type="date" id="pm_date" value="${TODAY}"></div>
+    <div><label>จำนวนที่จ่ายจริง</label><input type="number" step="any" id="pm_amt" value="${i.amount}"></div>
+    <div class="full"><label>หมายเหตุ (วิธีจ่าย/เลขอ้างอิง)</label><input type="text" id="pm_note" value="${esc(i.note||'')}" placeholder="เช่น โอน SCB, ref 12345"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn paybtn" onclick="confirmPay(${cid},'${iid}')">✅ ยืนยันจ่ายแล้ว</button></div>`);
+}
+function confirmPay(cid,iid){
+  const p=OV.plans[cid]; const i=p.installments.find(x=>x.id===iid); if(!i) return;
+  i.paid=true; i.paid_date=document.getElementById('pm_date').value||TODAY;
+  const a=parseFloat(document.getElementById('pm_amt').value); if(a>0) i.amount=a;
+  i.note=document.getElementById('pm_note').value.trim();
+  save(); pushPlan(cid); closeModal(); render(); toast('บันทึกจ่ายแล้ว ✅');
+}
+
+function openInstModal(cid,iid){
+  const p=OV.plans[cid]; if(!p) return;
+  const i=iid? p.installments.find(x=>x.id===iid) : null;
+  openModal(`<h3>${i?'แก้ไขงวด':'เพิ่มงวดใหม่'}</h3>
+  <div class="form">
+    <div class="full"><label>ชื่องวด</label><input type="text" id="im_label" value="${esc(i?i.label:'งวด '+(p.installments.length+1))}"></div>
+    <div><label>วันครบกำหนด</label><input type="date" id="im_due" value="${i?i.due:TODAY}"></div>
+    <div><label>จำนวนเงิน (${p.currency})</label><input type="number" step="any" id="im_amt" value="${i?i.amount:''}"></div>
+    <div class="full"><label>หมายเหตุ</label><input type="text" id="im_note" value="${esc(i?i.note||'':'')}"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveInst(${cid},${i?`'${iid}'`:'null'})">💾 บันทึก</button></div>`);
+}
+function saveInst(cid,iid){
+  const p=OV.plans[cid]; if(!p) return;
+  const due=document.getElementById('im_due').value, amt=parseFloat(document.getElementById('im_amt').value);
+  if(!due || !(amt>0)){ toast('กรุณาใส่วันครบกำหนดและจำนวนเงิน'); return; }
+  const label=document.getElementById('im_label').value.trim(), note=document.getElementById('im_note').value.trim();
+  if(iid){ const i=p.installments.find(x=>x.id===iid); Object.assign(i,{due,amount:amt,label,note}); }
+  else p.installments.push({id:uid(),label,due,amount:amt,paid:false,paid_date:null,note});
+  save(); pushPlan(cid); closeModal(); render(); toast('บันทึกงวดแล้ว');
+}
+
+function openNewClientModal(){
+  openModal(`<h3>เพิ่มลูกค้า + สัญญาใหม่</h3>
+  <div class="mini" style="margin-bottom:8px">สำหรับลูกค้าที่ไม่อยู่ในฐาน Sales Bible (เช่น ผู้ซื้อรายใหม่)</div>
+  <div class="form">
+    <div class="full"><label>ชื่อลูกค้า *</label><input type="text" id="nc_name"></div>
+    <div><label>สัญชาติ</label><input type="text" id="nc_nat"></div>
+    <div><label>อีเมล</label><input type="text" id="nc_email"></div>
+    <div><label>เลขสัญญา *</label><input type="text" id="nc_pa" placeholder="เช่น FR2/2001/15/AH/T1"></div>
+    <div><label>ประเภท</label><select id="nc_prod"><option>Fractional</option><option>Property</option><option>TCU</option><option>Club</option><option>Kudo</option><option>อื่นๆ</option></select></div>
+    <div><label>ระยะสัญญา</label><input type="text" id="nc_term" placeholder="เช่น 15 ปี"></div>
+    <div><label>วันที่ทำสัญญา</label><input type="date" id="nc_date" value="${TODAY}"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveNewClient()">💾 บันทึก</button></div>`);
+}
+function saveNewClient(){
+  const name=document.getElementById('nc_name').value.trim(), pa=document.getElementById('nc_pa').value.trim();
+  if(!name||!pa){ toast('กรุณาใส่ชื่อลูกค้าและเลขสัญญา'); return; }
+  const email=document.getElementById('nc_email').value.trim();
+  const maxN = Math.max(...allClients().map(c=>{const m=/^EE-(\d+)$/.exec(c.code); return m?Number(m[1]):0;}));
+  const code='EE-'+String(maxN+1).padStart(4,'0');
+  const cid=OV.nextCid++;
+  OV.customClients.push({code,name,alt_names:[],emails:email?[email]:[],nat:document.getElementById('nc_nat').value.trim(),contract_ids:[cid]});
+  OV.customContracts.push({id:cid,sheet:'(เพิ่มเอง)',product:document.getElementById('nc_prod').value,pa,name,
+    nat:document.getElementById('nc_nat').value.trim(),plan:null,term:document.getElementById('nc_term').value.trim(),
+    suite:null,season:null,status:'Welcome',status_note:'เพิ่มในระบบนี้',comp_date:document.getElementById('nc_date').value||TODAY,
+    fyo:null,lyo:null,fees:[],row:null,client:code});
+  invalidate(); save(); pushNewClient(code); closeModal(); openClient(code,'clients'); toast('เพิ่มลูกค้า '+code+' แล้ว');
+}
+
+/* ================= payouts view ================= */
+function rPayouts(){
+  let insts = allInstallments();
+  /* month options from data */
+  const monthSet=[...new Set(insts.map(x=>x.inst.due.slice(0,7)))].sort();
+  if(S.pf!=='all') insts=insts.filter(x=>instStatus(x.inst)===S.pf || (S.pf==='due' && !x.inst.paid));
+  if(S.pm) insts=insts.filter(x=>x.inst.due.slice(0,7)===S.pm);
+  if(S.pq.trim()){ const q=norm(S.pq); insts=insts.filter(x=>norm(x.c.name).includes(q)||norm(x.c.pa).includes(q)); }
+  insts.sort((a,b)=>a.inst.due<b.inst.due?-1:1);
+  const tot={}; insts.forEach(x=>{ const cur=x.plan.currency||'THB'; tot[cur]=(tot[cur]||0)+x.inst.amount; });
+
+  const FB=[['due','ยังไม่จ่าย (ทั้งหมด)'],['over','🔴 ค้างจ่าย'],['soon','🟠 ครบใน 30 วัน'],['fut','รอถึงกำหนด'],['paid','✅ จ่ายแล้ว'],['all','ทุกสถานะ']];
+  $main.innerHTML=`
+  <div class="pk">Operations · Payouts</div>
+  <h1>การจ่ายคืน</h1>
+  <p class="sub">ทุกงวดจ่ายคืนจากทุกสัญญา — กรอง ค้นหา และบันทึกการจ่ายได้จากหน้านี้</p>
+  <div class="tabbtns">${FB.map(([k,l])=>`<button class="${S.pf===k?'on':''}" onclick="S.pf='${k}';render()">${l}</button>`).join('')}</div>
+  <div class="search">
+    <input type="text" id="pq" placeholder="🔍 กรองด้วยชื่อลูกค้า / เลขสัญญา…" value="${esc(S.pq)}">
+    <select class="flt" id="pm" onchange="S.pm=this.value;render()"><option value="">ทุกเดือน</option>
+      ${monthSet.map(m=>{const [y,mo]=m.split('-');return `<option value="${m}" ${S.pm===m?'selected':''}>${TH_M[Number(mo)-1]} ${y}</option>`;}).join('')}</select>
+    <button class="btn sec" onclick="exportCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <div class="cs">${insts.length} งวด · รวม <b>${fmtMap(tot)}</b></div>
+    ${insts.length?`<div class="scroll"><table><thead><tr><th>กำหนดจ่าย</th><th>ลูกค้า</th><th>สัญญา</th><th>งวด</th><th class="n">จำนวน</th><th>สถานะ</th><th>จ่ายจริง</th><th></th></tr></thead><tbody>
+    ${insts.map(x=>`<tr class="click" onclick="openClient('${x.c.client}','payouts')">
+      <td>${fmtD(x.inst.due)}</td><td>${esc(x.cl?x.cl.name:x.c.name)}</td><td>${esc(x.c.pa)}</td><td>${esc(x.inst.label||'')}</td>
+      <td class="n">${fmtM(x.inst.amount,x.plan.currency)}</td><td>${stPill(instStatus(x.inst))}</td>
+      <td>${x.inst.paid?fmtD(x.inst.paid_date):'—'}</td>
+      <td>${x.inst.paid?'':`<button class="btn sm paybtn" onclick="event.stopPropagation();openPayModal(${x.c.id},'${x.inst.id}')">บันทึกจ่าย</button>`}</td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="mini">ไม่มีรายการตามเงื่อนไขที่เลือก'+(Object.keys(OV.plans).length===0?' — ยังไม่มีแผนจ่ายคืนในระบบ (สร้างได้จากหน้าลูกค้า)':'')+'</div>'}
+  </div>`;
+  const inp=document.getElementById('pq');
+  inp.oninput=()=>{ S.pq=inp.value; render(); const el=document.getElementById('pq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function exportCSV(){
+  let insts=allInstallments();
+  if(S.pf!=='all') insts=insts.filter(x=>instStatus(x.inst)===S.pf || (S.pf==='due' && !x.inst.paid));
+  if(S.pm) insts=insts.filter(x=>x.inst.due.slice(0,7)===S.pm);
+  if(S.pq.trim()){ const q=norm(S.pq); insts=insts.filter(x=>norm(x.c.name).includes(q)||norm(x.c.pa).includes(q)); }
+  insts.sort((a,b)=>a.inst.due<b.inst.due?-1:1);
+  const rows=[['กำหนดจ่าย','ลูกค้า','รหัสลูกค้า','สัญญา','งวด','จำนวน','สกุลเงิน','สถานะ','วันที่จ่ายจริง','หมายเหตุ']];
+  insts.forEach(x=>rows.push([x.inst.due,x.cl?x.cl.name:x.c.name,x.c.client,x.c.pa,x.inst.label||'',x.inst.amount,x.plan.currency||'THB',ST_LABEL[instStatus(x.inst)],x.inst.paid_date||'',x.inst.note||'']));
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='payouts-'+TODAY+'.csv'; a.click();
+}
+
+/* ================= ค้างชำระ (MFEE AR) ================= */
+function rAR(){
+  const st=bibleStats();
+  if(!S.ay) S.ay=st.cur;
+  const act=allContracts().filter(c=>c.status!=='Cancelled' && inBrand(c));
+  let rows=[];
+  act.forEach(c=>{
+    const recs={}; (c.fees||[]).forEach(f=>recs[f.year]=f);
+    const inR=c.fyo&&c.lyo&&S.ay>=c.fyo&&S.ay<=c.lyo, r=recs[S.ay];
+    if(!inR&&!r) return;
+    if(r&&r.paid) return;
+    const cat=r?'billed':'none';
+    if(S.at!=='all'&&S.at!==cat) return;
+    const paidYears=(c.fees||[]).filter(f=>f.paid).map(f=>f.year);
+    rows.push({c,cat,amt:r?(r.amount||0):0,lastPaid:paidYears.length?Math.max(...paidYears):0});
+  });
+  if(S.aq.trim()){ const q=norm(S.aq); rows=rows.filter(x=>norm(x.c.name).includes(q)||norm(x.c.pa).includes(q)); }
+  rows.sort((a,b)=>a.c.pa<b.c.pa?-1:1);
+  const sum=rows.reduce((s,x)=>s+x.amt,0);
+  $main.innerHTML=`
+  <div class="pk">Operations · Receivables</div>
+  <h1>ค้างชำระ / ไม่มีบันทึก</h1>
+  <p class="sub">สัญญา active ที่ถึงกำหนดค่าบำรุงรายปี (MFEE) ปี ${S.ay} แต่ยังไม่มีบันทึกการชำระ</p>
+  <div class="tabbtns">
+    ${[['all','ทั้งหมด'],['billed','ออกบิลแล้ว/ค้าง'],['none','ไม่มีบันทึก']].map(([k,l])=>`<button class="${S.at===k?'on':''}" onclick="S.at='${k}';render()">${l}</button>`).join('')}
+  </div>
+  <div class="search">
+    <input type="text" id="aq" placeholder="🔍 กรองด้วยชื่อลูกค้า / เลขสัญญา…" value="${esc(S.aq)}">
+    <select class="flt" onchange="S.ay=Number(this.value);render()">${st.years.map(y=>`<option value="${y}" ${S.ay===y?'selected':''}>ปี ${y}</option>`).join('')}</select>
+  </div>
+  <div class="panel">
+    <div class="cs">${rows.length.toLocaleString()} สัญญา${sum?` · ยอดออกบิลค้างรวม US$${Math.round(sum).toLocaleString()}`:''} · คลิกแถวเพื่อเปิดโปรไฟล์ลูกค้า</div>
+    <div class="scroll"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th>ผลิตภัณฑ์</th><th>สถานะปี ${S.ay}</th><th class="n">ยอดบิล (US$)</th><th>ชำระล่าสุดปี</th><th>สถานะสัญญา</th></tr></thead><tbody>
+    ${rows.map(x=>`<tr class="click" onclick="openClient('${x.c.client}','ar')">
+      <td>${esc(x.c.pa)}</td><td>${esc(x.c.name)}</td><td>${esc(x.c.product)}</td>
+      <td>${x.cat==='billed'?'<span class="pill p-soon">ออกบิลแล้ว/ค้าง</span>':'<span class="pill p-over">ไม่มีบันทึก</span>'}</td>
+      <td class="n">${x.amt?x.amt.toLocaleString():'—'}</td><td>${x.lastPaid||'—'}</td><td>${statusPill(x.c.status)}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+  const inp=document.getElementById('aq');
+  inp.oninput=()=>{ S.aq=inp.value; render(); const el=document.getElementById('aq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+
+/* ================= ใกล้หมดอายุ ================= */
+function rRenew(){
+  const st=bibleStats();
+  const act=allContracts().filter(c=>c.status!=='Cancelled'&&c.lyo&&c.lyo>=st.cur&&inBrand(c));
+  const years=[...new Set(act.map(c=>c.lyo))].sort((a,b)=>a-b);
+  let list = S.ry==='next5'? act.filter(c=>c.lyo<=st.cur+4) : act.filter(c=>String(c.lyo)===String(S.ry));
+  if(S.rq.trim()){ const q=norm(S.rq); list=list.filter(c=>norm(c.name).includes(q)||norm(c.pa).includes(q)); }
+  list.sort((a,b)=>(a.lyo-b.lyo)||(a.pa<b.pa?-1:1));
+  $main.innerHTML=`
+  <div class="pk">Registry · Expiring</div>
+  <h1>สัญญาใกล้หมดอายุ</h1>
+  <p class="sub">เรียงตามปีสุดท้ายที่ใช้สิทธิ์ได้ (LYO) — ใช้วางแผนแคมเปญต่ออายุ / เสนอขายใหม่</p>
+  <div class="tabbtns">
+    <button class="${S.ry==='next5'?'on':''}" onclick="S.ry='next5';render()">ภายใน 5 ปี (${st.cur}–${st.cur+4})</button>
+    ${years.map(y=>`<button class="${String(S.ry)===String(y)?'on':''}" onclick="S.ry='${y}';render()">${y}</button>`).join('')}
+  </div>
+  <div class="search"><input type="text" id="rq" placeholder="🔍 กรองด้วยชื่อลูกค้า / เลขสัญญา…" value="${esc(S.rq)}"></div>
+  <div class="panel">
+    <div class="cs">${list.length.toLocaleString()} สัญญา · คลิกแถวเพื่อเปิดโปรไฟล์ลูกค้า</div>
+    <div class="scroll"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th>ผลิตภัณฑ์</th><th>ระยะสัญญา</th><th>ใช้สิทธิ์ปีแรก</th><th>หมดอายุปี (LYO)</th><th>สถานะ</th></tr></thead><tbody>
+    ${list.map(c=>`<tr class="click" onclick="openClient('${c.client}','renew')">
+      <td>${esc(c.pa)}</td><td>${esc(c.name)}</td><td>${esc(c.product)}</td><td>${esc(c.term||'-')}</td>
+      <td>${c.fyo||'—'}</td><td><b>${c.lyo}</b></td><td>${statusPill(c.status)}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+  const inp=document.getElementById('rq');
+  inp.oninput=()=>{ S.rq=inp.value; render(); const el=document.getElementById('rq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+
+/* ================= งานที่ต้องทำ ================= */
+function rTodo(){
+  const st=bibleStats();
+  const insts=allInstallments();
+  const over=insts.filter(x=>instStatus(x.inst)==='over').sort((a,b)=>a.inst.due<b.inst.due?-1:1);
+  const soon=insts.filter(x=>instStatus(x.inst)==='soon').sort((a,b)=>a.inst.due<b.inst.due?-1:1);
+  const act=allContracts().filter(c=>c.status!=='Cancelled' && inBrand(c));
+  const enroll=[], hpSoon=[];
+  const yearAhead=addDaysISO(TODAY,365);
+  act.forEach(c=>{const a=c.addons; if(!a) return;
+    ADDON_DEFS.forEach(([k,nm])=>{const p=a[k]; if(p&&p.act==='enroll') enroll.push({c,nm,p});});
+    if(a.hp&&a.hp.vu&&a.hp.vu>=TODAY&&a.hp.vu<=yearAhead) hpSoon.push({c,p:a.hp});
+  });
+  hpSoon.sort((a,b)=>a.p.vu<b.p.vu?-1:1);
+  const lyoNow=act.filter(c=>c.lyo===st.cur);
+  const fc=st.fee[st.cur]||{billed:0,none:0,due:0};
+  const payRow=(x)=>`<tr class="click" onclick="openClient('${x.c.client}','todo')">
+    <td>${fmtD(x.inst.due)}</td><td>${esc(x.cl?x.cl.name:x.c.name)}</td><td>${esc(x.c.pa)}</td>
+    <td class="n">${fmtM(x.inst.amount,x.plan.currency)}</td><td>${stPill(instStatus(x.inst))}</td>
+    <td><button class="btn sm paybtn" onclick="event.stopPropagation();openPayModal(${x.c.id},'${x.inst.id}')">บันทึกจ่าย</button></td></tr>`;
+  $main.innerHTML=`
+  <div class="pk">Overview · Action Center</div>
+  <h1>งานที่ต้องทำ</h1>
+  <p class="sub">รวมทุกเรื่องที่ต้องจัดการ เรียงตามความเร่งด่วน · ณ ${fmtD(TODAY)}</p>
+  <div class="cards">
+    <div class="card kpi red"><div class="v">${over.length}</div><div class="l">งวดจ่ายคืนค้างจ่าย</div><div class="m">เลยกำหนดแล้ว — ทำก่อนเป็นอันดับแรก</div></div>
+    <div class="card kpi orange"><div class="v">${soon.length}</div><div class="l">งวดครบกำหนดใน 30 วัน</div><div class="m">เตรียมเงิน/เอกสารล่วงหน้า</div></div>
+    <div class="card kpi gold"><div class="v">${hpSoon.length}</div><div class="l">Holiday Plus จะหมดใน 1 ปี</div><div class="m">ติดต่อลูกค้าต่ออายุ/แจ้งสิทธิ์</div></div>
+    <div class="card kpi blue"><div class="v">${enroll.length}</div><div class="l">โปรแกรมรอเปิดใช้ (Enrollment)</div><div class="m">งานค้างฝั่งเรา — ต้องลงทะเบียนให้ลูกค้า</div></div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">01</span>งวดจ่ายคืนที่ต้องจัดการ (${over.length+soon.length})</h3>
+    <div class="cs">ค้างจ่าย + ครบกำหนดใน 30 วัน · จัดการทั้งหมดที่หน้า <a href="#" onclick="go('payouts');return false">การจ่ายคืน</a></div>
+    ${(over.length+soon.length)?`<div class="scroll"><table><thead><tr><th>กำหนดจ่าย</th><th>ลูกค้า</th><th>สัญญา</th><th class="n">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>
+    ${over.concat(soon).slice(0,15).map(payRow).join('')}</tbody></table></div>`:'<div class="mini">🎉 ไม่มีงวดที่ต้องจัดการ</div>'}
+  </div>
+  <div class="row2">
+    <div class="panel">
+      <h3><span class="idx">02</span>Holiday Plus ใกล้หมดอายุ (${hpSoon.length})</h3>
+      <div class="cs">เรียงตามวันหมดอายุ — โอกาสเสนอต่ออายุ</div>
+      ${hpSoon.length?`<div class="scroll"><table><thead><tr><th>หมดอายุ</th><th>ลูกค้า</th><th>สัญญา</th></tr></thead><tbody>
+      ${hpSoon.slice(0,12).map(x=>`<tr class="click" onclick="openClient('${x.c.client}','todo')"><td><b style="color:#9c4d13">${esc(x.p.vuRaw||x.p.vu)}</b></td><td>${esc(x.c.name)}</td><td>${esc(x.c.pa)}</td></tr>`).join('')}</tbody></table></div>${hpSoon.length>12?'<div class="mini" style="margin-top:8px">และอีก '+(hpSoon.length-12)+' ราย</div>':''}`:'<div class="mini">ไม่มีที่จะหมดอายุภายใน 1 ปี</div>'}
+    </div>
+    <div class="panel">
+      <h3><span class="idx">03</span>โปรแกรมรอเปิดใช้ — For Enrollment (${enroll.length})</h3>
+      <div class="cs">ลูกค้าจ่าย/พร้อมแล้ว รอเราลงทะเบียนกับผู้ให้บริการ</div>
+      ${enroll.length?`<div class="scroll"><table><thead><tr><th>โปรแกรม</th><th>ลูกค้า</th><th>สัญญา</th></tr></thead><tbody>
+      ${enroll.slice(0,12).map(x=>`<tr class="click" onclick="openClient('${x.c.client}','todo')"><td><b>${esc(x.nm)}</b> <span class="mini">${esc(x.p.t)}</span></td><td>${esc(x.c.name)}</td><td>${esc(x.c.pa)}</td></tr>`).join('')}</tbody></table></div>${enroll.length>12?'<div class="mini" style="margin-top:8px">และอีก '+(enroll.length-12)+' รายการ</div>':''}`:'<div class="mini">ไม่มีรายการรอเปิดใช้</div>'}
+    </div>
+  </div>
+  <div class="row2">
+    <div class="panel">
+      <h3><span class="idx">04</span>ค่าบำรุงปี ${st.cur} ยังไม่เข้า</h3>
+      <div class="cs">ถึงกำหนด ${fc.due.toLocaleString()} สัญญา — ออกบิลแล้วค้าง ${fc.billed.toLocaleString()} · ไม่มีบันทึก ${fc.none.toLocaleString()}</div>
+      <button class="btn sec" onclick="S.ay=${st.cur};S.at='all';go('ar')">เปิดรายชื่อค้างชำระ →</button>
+    </div>
+    <div class="panel">
+      <h3><span class="idx">05</span>สัญญาหมดอายุปีนี้ (${lyoNow.length})</h3>
+      <div class="cs">LYO = ${st.cur} ปีสุดท้ายที่ลูกค้าใช้สิทธิ์ได้ — ควรติดต่อเสนอต่ออายุ</div>
+      <button class="btn sec" onclick="S.ry='${st.cur}';go('renew')">เปิดรายชื่อ →</button>
+    </div>
+  </div>`;
+}
+function updateBadge(){
+  let n=0; allInstallments().forEach(x=>{const s=instStatus(x.inst); if(s==='over'||s==='soon')n++;});
+  const b=document.getElementById('todobadge');
+  if(b){ b.textContent=n>99?'99+':String(n||''); b.style.display=n?'':'none'; }
+}
+
+/* ================= Interval International ================= */
+function rInterval(){
+  const act=allContracts().filter(c=>c.status!=='Cancelled' && inBrand(c));
+  const rows=[];
+  act.forEach(c=>{ const p=c.addons&&c.addons.iv; if(!p) return;
+    const st = p.pay==='owing'?'owing':(p.act==='enroll'?'enroll':(p.act==='yes'?'active':'notact'));
+    rows.push({c,p,st});
+  });
+  const n=rows.length;
+  const cnt={owing:0,enroll:0,active:0,notact:0}; let oweAmt=0;
+  rows.forEach(r=>{ cnt[r.st]++; if(r.p.pay==='owing') oweAmt+=r.p.owe||0; });
+  const tiers={};
+  rows.forEach(r=>{ const k=(r.p.t||'').toLowerCase().replace(/\s+/g,' ').trim(); if(k) tiers[k]=(tiers[k]||0)+1; });
+  const tierList=Object.entries(tiers).sort((a,b)=>b[1]-a[1]);
+  let list=rows;
+  if(S.iv!=='all') list=list.filter(r=>r.st===S.iv);
+  if(S.ivq.trim()){ const q=norm(S.ivq); list=list.filter(r=>norm(r.c.name).includes(q)||norm(r.c.pa).includes(q)||norm(r.p.id||'').includes(q)); }
+  list.sort((a,b)=>a.c.pa<b.c.pa?-1:1);
+  const ivPill=(s)=>({owing:'<span class="pill p-over">ค้างจ่าย</span>',enroll:'<span class="pill p-soon">รอเปิดใช้</span>',active:'<span class="pill p-paid">ใช้งานแล้ว</span>',notact:'<span class="pill p-none">ยังไม่เปิดใช้</span>'})[s];
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div>
+      <div class="hero-kick">Member Benefit · Exchange Network</div>
+      <h1 style="font-size:36px;font-weight:500;letter-spacing:.02em">Interval International</h1>
+      <p class="sub">เครือข่ายแลกเปลี่ยนวันพักระดับโลก — สมาชิกนำวันพักของตนไปแลกพักรีสอร์ทกว่า 3,000 แห่งในเครือ Interval ได้ทั่วโลก</p>
+    </div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${n}">0</b><span>สมาชิกทั้งหมด</span></div>
+      <div><b class="cnt" data-n="${cnt.active}">0</b><span>ใช้งานแล้ว</span></div>
+      <div><b class="cnt" data-n="${cnt.owing}">0</b><span>ค้างจ่าย</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(oweAmt)}">0</span></b><span>ยอดค้างรวม</span></div>
+    </div>
+  </div></div>
+  <div class="panel">
+    <h3><span class="idx">01</span>แพ็กเกจสมาชิกที่ขายพ่วงสัญญา</h3>
+    <div class="cs">ทอง = ระดับ Gold · น้ำเงิน = ระดับ Platinum</div>
+    <div class="lg">${tierList.map(([k,v])=>`<span><i style="background:${/platinum/.test(k)?'#7d99b4':'#c9a45c'}"></i>${esc(k)} <b>${v.toLocaleString()}</b></span>`).join('')}</div>
+  </div>
+  <div class="tabbtns">
+    ${[['all','ทั้งหมด ('+n.toLocaleString()+')'],['owing','ค้างจ่าย ('+cnt.owing+')'],['enroll','รอเปิดใช้ ('+cnt.enroll+')'],['notact','ยังไม่เปิดใช้ ('+cnt.notact+')'],['active','ใช้งานแล้ว ('+cnt.active.toLocaleString()+')']].map(([k,l])=>`<button class="${S.iv===k?'on':''}" onclick="S.iv='${k}';render()">${l}</button>`).join('')}
+  </div>
+  <div class="search"><input type="text" id="ivq" placeholder="🔍 กรองด้วยชื่อลูกค้า / เลขสัญญา / เลขสมาชิก Interval…" value="${esc(S.ivq)}"></div>
+  <div class="panel">
+    <div class="cs">${list.length.toLocaleString()} รายการ · คลิกแถวเพื่อเปิดโปรไฟล์ลูกค้า</div>
+    <div class="scroll"><table><thead><tr><th>ลูกค้า</th><th>สัญญา</th><th>แพ็กเกจ</th><th>สถานะ</th><th class="n">ยอดค้าง (US$)</th><th>เปิดใช้เมื่อ</th><th>เลขสมาชิก Interval</th></tr></thead><tbody>
+    ${list.map(r=>`<tr class="click" onclick="openClient('${r.c.client}','interval')">
+      <td>${esc(r.c.name)}</td><td>${esc(r.c.pa)}</td><td>${esc(r.p.t)}</td><td>${ivPill(r.st)}</td>
+      <td class="n">${r.p.pay==='owing'?(r.p.owe||0).toLocaleString():'—'}</td>
+      <td>${r.p.ad?esc(r.p.ad):(r.p.act==='yes'?'เปิดแล้ว':'—')}</td><td>${esc(r.p.id||'—')}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="note blue"><b>วิธีอธิบายให้ลูกค้า:</b> สมาชิกภาพ Interval ขายพ่วงกับสัญญา (เช่น 5 Yrs Gold) ลูกค้าใช้เลขสมาชิกล็อกอินที่ intervalworld.com เพื่อฝากวันพัก/แลกพักรีสอร์ทอื่นทั่วโลก · <b>รอเปิดใช้ (For Enrollment)</b> = ทีมเราต้องลงทะเบียนให้ก่อนลูกค้าจึงใช้ได้ · <b>ค้างจ่าย</b> = ลูกค้ายังไม่ชำระค่าสมาชิก (ส่วนใหญ่ US$388)</div>`;
+  runCounters();
+  const inp=document.getElementById('ivq');
+  inp.oninput=()=>{ S.ivq=inp.value; render(); const el=document.getElementById('ivq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+
+/* ================= ทะเบียนสัญญา (Bible) ================= */
+function rBible(){
+  const prods=['TCU','Club','Fractional','Kudo'];
+  let list=allContracts().filter(c=>c.product===S.bp && inBrand(c));
+  const sts=[['all','ทุกสถานะ'],['Completed','Completed'],['Welcome','Welcome'],['Upgraded','Upgraded'],['Downgraded','Downgraded'],['Cancelled','Cancelled']];
+  const bYears=[...new Set(allContracts().filter(c=>c.comp_date&&/^\d{4}/.test(c.comp_date)).map(c=>c.comp_date.slice(0,4)))].sort();
+  if(S.bs!=='all') list=list.filter(c=>c.status===S.bs);
+  if(S.bYear!=='all') list=list.filter(c=>(c.comp_date||'').slice(0,4)===S.bYear);
+  if(S.bNat!=='all') list=list.filter(c=>(c.nat||'').trim()===S.bNat);
+  if(S.bTerm!=='all') list=list.filter(c=>((c.term||'').trim()||'ไม่ระบุ')===S.bTerm);
+  if(S.bq.trim()){const q=norm(S.bq);list=list.filter(c=>norm(c.name).includes(q)||norm(c.pa).includes(q)||norm(c.nat||'').includes(q));}
+  list.sort((a,b)=>a.pa<b.pa?-1:1);
+  const shown=list;
+  const bTerms=[...new Set(allContracts().map(c=>((c.term||'').trim())||'ไม่ระบุ'))].sort((a,b)=>(parseInt(a)||99)-(parseInt(b)||99));
+  $main.innerHTML=`
+  <div class="pk">Registry · Contract Registry</div>
+  <h1>ทะเบียนสัญญา (Bible)</h1>
+  <p class="sub">ข้อมูลสัญญาทั้งหมดตามชีทต้นฉบับใน Sales Bible — คลิกแถวเพื่อเปิดโปรไฟล์ลูกค้า</p>
+  <div class="tabbtns">${prods.map(p=>`<button class="${S.bp===p?'on':''}" onclick="S.bp='${p}';render()">${p.toUpperCase()} BIBLE</button>`).join('')}</div>
+  <div class="search">
+    <input type="text" id="bq" placeholder="🔍 กรองด้วยชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.bq)}">
+    <select class="flt" onchange="S.bs=this.value;render()">${sts.map(([k,l])=>`<option value="${k}" ${S.bs===k?'selected':''}>${l}</option>`).join('')}</select>
+    <select class="flt" onchange="S.bYear=this.value;render()"><option value="all">ทุกปีที่ทำสัญญา</option>${bYears.map(y=>`<option value="${y}" ${S.bYear===y?'selected':''}>ปี ${y}</option>`).join('')}</select>
+    <select class="flt" onchange="S.bNat=this.value;render()">${natOptions(S.bNat)}</select>
+    <select class="flt" onchange="S.bTerm=this.value;render()"><option value="all">ทุกระยะสัญญา</option>${bTerms.map(t=>`<option value="${esc(t)}" ${S.bTerm===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+    <button class="btn sec" onclick="exportBibleCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <div class="cs">${list.length.toLocaleString()} สัญญา (แสดงครบทุกรายการ) · คอลัมน์โปรแกรมเสริม: <b style="color:#2e8b57">✓</b> เปิดใช้แล้ว · <b style="color:#9c4d13">รอเปิดใช้</b> = For Enrollment · <b style="color:var(--s8)">US$…</b> = ค้างจ่าย · — = ไม่มีโปรแกรม</div>
+    <div class="scroll"><table><thead><tr><th>สัญญา</th><th>แบรนด์</th><th>ลูกค้า</th><th>สัญชาติ</th><th>แผน</th><th>ระยะ</th><th>Suite</th><th>Season</th><th>สถานะ</th><th>ทำสัญญา</th><th>ใช้สิทธิ์</th><th>ค่าบำรุงชำระแล้ว</th><th>Interval</th><th>H.Plus</th><th>ETD</th><th>UDP</th></tr></thead><tbody>
+    ${shown.map(c=>{
+      const paidY=(c.fees||[]).filter(f=>f.paid).map(f=>f.year);
+      const a=c.addons||{};
+      return `<tr class="click" onclick="openClient('${c.client}','bible')">
+      <td>${esc(c.pa)}</td><td style="white-space:nowrap">${brandChip(c).replace('margin-left:6px','')}</td><td>${esc(c.name)}</td><td>${esc(c.nat||'-')}</td><td>${esc(c.plan||'-')}</td><td>${esc(c.term||'-')}</td>
+      <td>${esc(c.suite||'-')}</td><td>${esc(c.season||'-')}</td><td>${statusPill(c.status)}</td>
+      <td>${c.comp_date?fmtD(c.comp_date):'—'}</td><td>${c.fyo||'?'}–${c.lyo||'?'}</td>
+      <td>${paidY.length?paidY.length+' ปี · ล่าสุด '+Math.max(...paidY):'—'}</td>
+      <td>${addonCell(a.iv)}</td><td>${addonCell(a.hp)}</td><td>${addonCell(a.etd)}</td><td>${addonCell(a.udp)}</td></tr>`;}).join('')}
+    </tbody></table></div>
+  </div>`;
+  const inp=document.getElementById('bq');
+  inp.oninput=()=>{ S.bq=inp.value; render(); const el=document.getElementById('bq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function exportBibleCSV(){
+  let list=allContracts().filter(c=>c.product===S.bp && inBrand(c));
+  if(S.bs!=='all') list=list.filter(c=>c.status===S.bs);
+  if(S.bYear!=='all') list=list.filter(c=>(c.comp_date||'').slice(0,4)===S.bYear);
+  if(S.bNat!=='all') list=list.filter(c=>(c.nat||'').trim()===S.bNat);
+  if(S.bTerm!=='all') list=list.filter(c=>((c.term||'').trim()||'ไม่ระบุ')===S.bTerm);
+  if(S.bq.trim()){const q=norm(S.bq);list=list.filter(c=>norm(c.name).includes(q)||norm(c.pa).includes(q)||norm(c.nat||'').includes(q));}
+  list.sort((a,b)=>a.pa<b.pa?-1:1);
+  const rows=[['สัญญา','แบรนด์','ลูกค้า','รหัสลูกค้า','สัญชาติ','แผน','ระยะ','Suite','Season','สถานะ','หมายเหตุสถานะ','วันทำสัญญา','FYO','LYO','ปีที่ชำระค่าบำรุงแล้ว','Interval','Holiday Plus','H.Plus ใช้ได้ถึง','ETD','UDP']];
+  const atxt=p=>{ if(!p) return '';
+    let t=p.t+' | '+(p.pay==='paid'?'จ่ายแล้ว':p.pay==='owing'?('ค้างจ่าย US$'+(p.owe||0)):'ไม่ระบุ');
+    t+=' | '+(p.act==='yes'?('เปิดใช้ '+(p.ad||'')):p.act==='enroll'?'รอเปิดใช้':'ยังไม่เปิดใช้');
+    if(p.id) t+=' | ID '+p.id;
+    return t; };
+  list.forEach(c=>{
+    const paidY=(c.fees||[]).filter(f=>f.paid).map(f=>f.year).join(' ');
+    const a=c.addons||{};
+    rows.push([c.pa,BRAND_NAME[brandOf(c)],c.name,c.client,c.nat||'',c.plan||'',c.term||'',c.suite||'',c.season||'',c.status,c.status_note||'',c.comp_date||'',c.fyo||'',c.lyo||'',paidY,atxt(a.iv),atxt(a.hp),(a.hp&&a.hp.vuRaw)||'',atxt(a.etd),atxt(a.udp)]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='bible-'+S.bp+'-'+TODAY+'.csv'; a.click();
+}
+
+/* ================= backup ================= */
+function rBackup(){
+  const nPlans=Object.keys(OV.plans).length;
+  let nInst=0,nPaid=0; allInstallments().forEach(x=>{nInst++; if(x.inst.paid)nPaid++;});
+  $main.innerHTML=`
+  <div class="pk">Registry · Central Data</div>
+  <h1>ข้อมูลกลาง</h1>
+  <p class="sub">เชื่อมต่อฐานข้อมูลกลาง Supabase (โปรเจกต์ Elite-Escapes) — ทุกคนเห็นและกรอกข้อมูลชุดเดียวกัน</p>
+  <div class="note blue"><b>วิธีทำงานร่วมกัน:</b> ทุกการบันทึก (แผนจ่ายคืน · การจ่ายงวด · ค่าบำรุงรายปี · ลูกค้าใหม่) ถูกเขียนลงฐานกลางทันที เพื่อนร่วมทีมรีเฟรชหน้าหรือกด "โหลดข้อมูลใหม่" จะเห็นข้อมูลล่าสุด · ขั้นถัดไปที่แนะนำ: เพิ่มระบบล็อกอินรายบุคคล เพื่อบันทึกว่าใครเป็นคนแก้</div>
+  <div class="cards">
+    <div class="card"><div class="v">${allClients().length.toLocaleString()}</div><div class="l">ลูกค้าในฐานกลาง</div></div>
+    <div class="card"><div class="v">${allContracts().length.toLocaleString()}</div><div class="l">สัญญาในฐานกลาง</div></div>
+    <div class="card"><div class="v">${nPlans}</div><div class="l">สัญญาที่มีแผนจ่ายคืน</div></div>
+    <div class="card"><div class="v">${nInst}</div><div class="l">งวดจ่ายคืนทั้งหมด (จ่ายแล้ว ${nPaid})</div></div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">01</span>เครื่องมือ</h3>
+    <div class="cs">ดึงข้อมูลล่าสุดจากฐานกลาง หรือสำรองสำเนาแผนจ่ายคืน ณ เวลานี้</div>
+    <button class="btn" onclick="boot();toast('กำลังโหลดข้อมูลใหม่…')">🔄 โหลดข้อมูลใหม่จากฐานกลาง</button>
+    <button class="btn sec" onclick="exportOV()">⬇️ สำรองแผนจ่ายคืน (JSON)</button>
+  </div>
+  ${USER&&USER.role==='admin'?`<div class="panel">
+    <h3><span class="idx">02</span>ผู้ใช้งานระบบ</h3>
+    <div class="cs">อีเมลที่ได้รับสิทธิ์เข้าใช้งาน — ทุกการแก้ไขจะบันทึกอีเมลผู้ทำรายการ (updated_by)</div>
+    <div id="userslist" class="mini">กำลังโหลดรายชื่อ…</div>
+    <div class="form" style="max-width:620px;margin-top:14px">
+      <div><label>อีเมล</label><input type="text" id="au_email" placeholder="somchai@elite-escapes.club"></div>
+      <div><label>ชื่อ</label><input type="text" id="au_name"></div>
+      <div><label>สิทธิ์</label><select id="au_role"><option value="editor">กรอกได้</option><option value="viewer">ดูอย่างเดียว</option><option value="admin">แอดมิน</option></select></div>
+    </div>
+    <button class="btn sec" onclick="addAppUser()">➕ เพิ่มผู้ใช้</button>
+  </div>`:''}
+  <div class="panel">
+    <h3><span class="idx">${USER&&USER.role==='admin'?'03':'02'}</span>ความเคลื่อนไหวล่าสุด</h3>
+    <div class="cs">ใครแก้อะไรเมื่อไหร่ — จากทุกเครื่องที่ใช้ระบบนี้ (คลิกแถวเพื่อเปิดโปรไฟล์)</div>
+    <div id="actfeed" class="mini">กำลังโหลด…</div>
+  </div>`;
+  if(USER&&USER.role==='admin') loadUsers();
+  loadActivity();
+}
+function exportOV(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({exported:TODAY,app:'ee_care_v1',data:OV},null,1)],{type:'application/json'}));
+  a.download='ee-payout-backup-'+TODAY+'.json'; a.click(); toast('ส่งออกแล้ว');
+}
+function importOV(inp){
+  const f=inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    const j=JSON.parse(r.result); const d=j.data||j;
+    if(!d.plans){ toast('ไฟล์ไม่ถูกต้อง'); return; }
+    if(!confirm('นำเข้าจะแทนที่ข้อมูลที่กรอกในเครื่องนี้ทั้งหมด — ดำเนินการต่อ?')) return;
+    OV=Object.assign({plans:{},customClients:[],customContracts:[],nextCid:100000},d);
+    invalidate(); save(); render(); toast('นำเข้าข้อมูลแล้ว ✅');
+  }catch(e){ toast('อ่านไฟล์ไม่ได้: '+e.message); } };
+  r.readAsText(f);
+}
+function resetOV(){
+  if(!confirm('ลบแผนจ่ายคืน บันทึกการจ่าย และลูกค้าที่เพิ่มใหม่ทั้งหมดในเครื่องนี้?')) return;
+  if(!confirm('ยืนยันอีกครั้ง — การลบนี้ย้อนกลับไม่ได้ (ถ้ายังไม่ได้ส่งออกสำรอง กด Cancel)')) return;
+  OV={plans:{},customClients:[],customContracts:[],nextCid:100000}; invalidate(); save(); render(); toast('ล้างข้อมูลแล้ว');
+}
+
+/* ===== LIVE: viewer role guards ===== */
+function canEdit(){ return USER && USER.role!=='viewer'; }
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee'].forEach(fn=>{
+  const orig=window[fn];
+  if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('บัญชีของคุณมีสิทธิ์ดูอย่างเดียว'); return; } return orig.apply(this,arguments); };
+});
+/* ===== LIVE: activity feed ===== */
+async function loadActivity(){
+  const el=document.getElementById('actfeed'); if(!el) return;
+  try{
+    const flt='updated_by=not.is.null&updated_by=neq.migration&order=updated_at.desc&limit=12';
+    const [fees,insts,plans]=await Promise.all([
+      sbApi('mfee?select=contract_id,year,paid,updated_by,updated_at&'+flt),
+      sbApi('payout_installments?select=contract_id,label,paid,updated_by,updated_at&'+flt),
+      sbApi('payout_plans?select=contract_id,updated_by,updated_at&'+flt)
+    ]);
+    const items=[];
+    fees.forEach(f=>{const c=contractById(f.contract_id); items.push({at:f.updated_at,by:f.updated_by,txt:'บันทึกค่าบำรุงปี '+f.year+' ('+(f.paid?'ชำระแล้ว':'ยังไม่ชำระ')+') — '+(c?c.pa:f.contract_id),code:c&&c.client});});
+    insts.forEach(i=>{const c=contractById(i.contract_id); items.push({at:i.updated_at,by:i.updated_by,txt:(i.paid?'บันทึกจ่าย ':'อัปเดต ')+(i.label||'งวด')+' — '+(c?c.pa:i.contract_id),code:c&&c.client});});
+    plans.forEach(p=>{const c=contractById(p.contract_id); items.push({at:p.updated_at,by:p.updated_by,txt:'แก้ไขแผนจ่ายคืน — '+(c?c.pa:p.contract_id),code:c&&c.client});});
+    items.sort((a,b)=>a.at<b.at?1:-1);
+    const fmtT=(iso)=>{const d=new Date(iso); return d.getDate()+' '+TH_M[d.getMonth()]+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
+    el.innerHTML = items.length? '<div class="scroll"><table><thead><tr><th>เมื่อ</th><th>ผู้ทำรายการ</th><th>รายการ</th></tr></thead><tbody>'+
+      items.slice(0,15).map(x=>`<tr class="${x.code?'click':''}" ${x.code?`onclick="openClient('${x.code}','backup')"`:''}><td style="white-space:nowrap">${fmtT(x.at)}</td><td>${x.by==='team'?'ทีมงาน':esc(x.by)}</td><td>${esc(x.txt)}</td></tr>`).join('')+'</tbody></table></div>'
+      : '<div class="mini">ยังไม่มีความเคลื่อนไหวจากทีม</div>';
+  }catch(e){ el.textContent='โหลดไม่สำเร็จ: '+e.message; }
+}
+/* ===== LIVE: command palette + sync clock ===== */
+let LAST_SYNC=null;
+function updateSync(){
+  const el=document.getElementById('synctag'); if(!el) return;
+  const t=LAST_SYNC? LAST_SYNC.getHours().toString().padStart(2,'0')+':'+LAST_SYNC.getMinutes().toString().padStart(2,'0') : '—';
+  el.innerHTML='🟢 ฐานข้อมูลกลาง Supabase<br>ข้อมูล ณ '+t+' น. · <a href="#" style="color:#9fd0f0" onclick="boot();toast(\'กำลังโหลดข้อมูลใหม่…\');return false">รีเฟรช</a>';
+}
+let PAL={q:'',idx:0,items:[]};
+function openPalette(){
+  if(!USER) return;
+  document.getElementById('pal').classList.remove('hide');
+  const inp=document.getElementById('palq'); inp.value=''; PAL.q=''; PAL.idx=0; palRender(); inp.focus();
+}
+function closePalette(){ document.getElementById('pal').classList.add('hide'); }
+function palRender(){
+  const q=norm(PAL.q.trim()); let items=[];
+  if(q){
+    searchClients(PAL.q).slice(0,7).forEach(cl=>items.push({t:'👤 '+cl.name,s:cl.code+(cl.nat?' · '+cl.nat:''),code:cl.code}));
+    if(items.length<9){
+      const have=new Set(items.map(x=>x.code));
+      allContracts().filter(c=>norm(c.pa).includes(q)&&!have.has(c.client)).slice(0,9-items.length)
+        .forEach(c=>items.push({t:'📄 '+c.pa,s:c.name,code:c.client}));
+    }
+  } else {
+    items=[{t:'📊 ภาพรวม',s:'',view:'dash'},{t:'💸 การจ่ายคืน',s:'',view:'payouts'},{t:'💳 ค้างชำระ',s:'',view:'ar'},{t:'⏳ ใกล้หมดอายุ',s:'',view:'renew'},{t:'📒 ทะเบียนสัญญา',s:'',view:'bible'}];
+  }
+  PAL.items=items; if(PAL.idx>=items.length) PAL.idx=Math.max(0,items.length-1);
+  document.getElementById('palres').innerHTML = items.length?
+    items.map((it,i)=>`<div class="pal-item ${i===PAL.idx?'on':''}" onmousedown="palGo(${i})"><span>${esc(it.t)}</span><small>${esc(it.s)}</small></div>`).join('')
+    : '<div class="pal-empty">ไม่พบ "'+esc(PAL.q)+'"</div>';
+}
+function palGo(i){
+  const it=PAL.items[i]; if(!it) return;
+  closePalette();
+  if(it.view) go(it.view); else openClient(it.code,'clients');
+}
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openPalette(); return; }
+  const pal=document.getElementById('pal');
+  if(pal && !pal.classList.contains('hide')){
+    if(e.key==='Escape') closePalette();
+    else if(e.key==='ArrowDown'){ e.preventDefault(); PAL.idx=Math.min(PAL.idx+1,PAL.items.length-1); palRender(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); PAL.idx=Math.max(PAL.idx-1,0); palRender(); }
+    else if(e.key==='Enter'){ palGo(PAL.idx); }
+  } else if(e.key==='Escape'){ closeModal(); }
+});
+boot();
+</script>
+</body>
+</html>
