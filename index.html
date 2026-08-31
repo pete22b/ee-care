@@ -274,6 +274,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button data-v="payouts">การจ่ายคืน</button>
     <button data-v="ar">ค้างชำระ</button>
     <button data-v="recv">ลูกหนี้ (AR)</button>
+    <button data-v="weeks">การเข้าพัก</button>
     <button data-v="interval">Interval</button>
     <div class="navlab">Registry</div>
     <button data-v="renew">ใกล้หมดอายุ</button>
@@ -473,12 +474,13 @@ async function boot(){
   }
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
-    const [cls, cons, fees, plans, insts, recs] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs, wus] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
-      fetchAllRows('receivables','contract_no')
+      fetchAllRows('receivables','contract_no'), fetchAllRows('week_usage','id')
     ]);
     REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:r.price!=null?Number(r.price):null,deposit:r.deposit!=null?Number(r.deposit):null,balance:r.balance!=null?Number(r.balance):null,status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note}));
+    WU = wus.map(w=>({id:w.id,client_code:w.client_code,contract_no:w.contract_no,client_name:w.client_name,use_year:w.use_year,check_in:w.check_in,check_out:w.check_out,nights:w.nights,room:w.room,note:w.note,updated_by:w.updated_by}));
     const feesBy={};
     fees.forEach(f=>{ (feesBy[f.contract_id]=feesBy[f.contract_id]||[]).push({year:f.year,amount:f.amount!=null?Number(f.amount):null,amount_raw:f.amount_raw,paid:f.paid,paid_date:f.paid_date,paid_note:f.paid_note}); });
     const contracts = cons.map(c=>({id:c.id,sheet:c.sheet,product:c.product,pa:c.pa,name:c.name,nat:c.nat,plan:c.plan,term:c.term,suite:c.suite,season:c.season,status:c.status,status_note:c.status_note,comp_date:c.comp_date,fyo:c.fyo,lyo:c.lyo,row:c.row_no,client:c.client,addons:c.addons||undefined,fees:(feesBy[c.id]||[]).sort((a,b)=>a.year-b.year),custom:c.custom}));
@@ -560,7 +562,8 @@ function planTotals(plan){
 }
 
 /* ================= view state ================= */
-const S = { view:'dash', q:'', clientCode:null, pf:'due', pm:'', pq:'', planEdit:null, from:'clients', ay:0, at:'all', aq:'', ry:'next5', rq:'', bp:'TCU', bq:'', bs:'all', brand:'all', iv:'all', ivq:'', bYear:'all', bNat:'all', cNat:'all', bTerm:'all', rf:'owing', rp:'all', rq2:'' };
+const S = { view:'dash', q:'', clientCode:null, pf:'due', pm:'', pq:'', planEdit:null, from:'clients', ay:0, at:'all', aq:'', ry:'next5', rq:'', bp:'TCU', bq:'', bs:'all', brand:'all', iv:'all', ivq:'', bYear:'all', bNat:'all', cNat:'all', bTerm:'all', rf:'owing', rp:'all', rq2:'', wq:'', wy:'all' };
+let WU=[];
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
   const cnt={};
@@ -593,6 +596,7 @@ function render(){
   if(S.view==='payouts') return rPayouts();
   if(S.view==='ar') return rAR();
   if(S.view==='recv') return rRecv();
+  if(S.view==='weeks') return rWeeks();
   if(S.view==='interval') return rInterval();
   if(S.view==='renew') return rRenew();
   if(S.view==='bible') return rBible();
@@ -620,10 +624,11 @@ function bibleStats(){
   const exp5=act.filter(c=>c.lyo&&c.lyo>=cur&&c.lyo<=cur+4).length;
   return {cur,nAct:act.length,years,fee,billedAmt,billedCnt,lyo,prod,exp5};
 }
-const PRODC={Club:'#4a7ab5',TCU:'#ed7d31',Fractional:'#2e8b57',Kudo:'#c9a45c'};
+const PRODC={Club:'#4a7ab5',TCU:'#ed7d31',Fractional:'#2e8b57',Kudo:'#c9a45c',KUD:'#c9a45c',EST:'#6d8bc9',ESG:'#b08d3e',EVIP:'#7d5ba6',ESP:'#2a9c8c',EX:'#c96b6b',KUDO:'#8a6db1'};
 
-/* ===== แบรนด์: Elite Escapes (Kudo) vs Club Unique (TCU/CUG/VIP/Fractional) ===== */
-function brandOf(c){ return (c && (c.product==='Kudo' || /^(KUD|EE)/i.test(c.pa||''))) ? 'EE' : 'CU'; }
+/* ===== แบรนด์: Club Unique (Club/TCU/Fractional เดิม) vs Elite Escapes (สินค้าใหม่ทั้งหมด) ===== */
+const CU_PRODS={Club:1,TCU:1,Fractional:1};
+function brandOf(c){ return (c && (CU_PRODS[c.product] || /^(TCU|CUG|VIP|FR1)\//.test(c.pa||''))) ? 'CU' : 'EE'; }
 function inBrand(c){ return S.brand==='all' || brandOf(c)===S.brand; }
 const BRAND_NAME={EE:'Elite Escapes',CU:'Club Unique'};
 function brandChip(c){ const b=brandOf(c); return `<span class="bchip ${b==='EE'?'ee':'cu'}">${BRAND_NAME[b]}</span>`; }
@@ -909,7 +914,7 @@ function rClient(){
   const hasPlan = cons.some(c=>OV.plans[c.id]);
 
   $main.innerHTML = `
-  <button class="bk" onclick="go('${['dash','todo','payouts','ar','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
+  <button class="bk" onclick="go('${['dash','todo','payouts','ar','recv','weeks','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
   <div class="profile-head">
     <div>
       <h2>${esc(cl.name)}</h2>
@@ -923,6 +928,11 @@ function rClient(){
     </div>`:''}
   </div>
   <p class="sub">สัญญาทั้งหมด ${cons.length} ฉบับ</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:-4px 0 16px">
+    <button class="btn sec sm" onclick="openStatement('${esc(cl.code)}')">🖨 Statement ค่าบำรุง</button>
+    <button class="btn sec sm" onclick="openWeekModal('${esc(cl.code)}')">🛏 บันทึกการเข้าพัก</button>
+  </div>
+  ${(()=>{const st=WU.filter(w=>w.client_code===cl.code).slice(0,5); return st.length?`<div class="panel" style="margin-bottom:16px"><div class="cs">การเข้าพักล่าสุด</div><div class="scroll"><table><thead><tr><th>Check-in</th><th>Check-out</th><th class="n">คืน</th><th>สัญญา</th><th class="n">Week ปี</th><th>ห้อง</th></tr></thead><tbody>${st.map(w=>`<tr><td>${w.check_in?fmtD(w.check_in):'—'}</td><td>${w.check_out?fmtD(w.check_out):'—'}</td><td class="n">${w.nights||''}</td><td>${esc(w.contract_no||'')}</td><td class="n">${w.use_year||''}</td><td>${esc(w.room||'')}</td></tr>`).join('')}</tbody></table></div></div>`:'';})()}
   ${cons.map(c=>contractCard(c)).join('')}`;
 }
 
@@ -1374,6 +1384,126 @@ function rInterval(){
   inp.oninput=()=>{ S.ivq=inp.value; render(); const el=document.getElementById('ivq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
 }
 
+/* ================= การเข้าพัก / Week Usage (สำหรับบัญชีรับรู้รายได้) ================= */
+async function pushWeek(rec){
+  try{
+    await sbApi('week_usage?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{id:rec.id,client_code:rec.client_code,contract_no:rec.contract_no,client_name:rec.client_name,
+        use_year:rec.use_year,check_in:rec.check_in,check_out:rec.check_out,nights:rec.nights,room:rec.room,note:rec.note,
+        updated_by:USER&&USER.email}])});
+    toast('☁️ บันทึกลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function deleteWeekPush(id){
+  try{ await sbApi('week_usage?id=eq.'+encodeURIComponent(id),{method:'DELETE'}); }
+  catch(e){ toast('⚠️ ลบจากฐานกลางไม่สำเร็จ: '+e.message); }
+}
+function openWeekModal(code){
+  const cl=code?clientByCode(code):null;
+  const cons=cl?(cl.contract_ids||[]).map(id=>contractById(id)).filter(Boolean):[];
+  openModal(`<h3>บันทึกการเข้าพัก (Week Usage)</h3>
+  <div class="mini" style="margin-bottom:8px">ใช้อ้างอิงการรับรู้รายได้ทางบัญชี — กรอกโดยฝ่ายจอง/คุณนาตาลี</div>
+  <div class="form">
+    <div class="full"><label>ลูกค้า</label><input id="wu_name" type="text" value="${cl?esc(cl.name):''}" ${cl?'readonly style="background:var(--surface2)"':''} placeholder="ชื่อลูกค้า"></div>
+    <div class="full"><label>สัญญา</label>${cons.length?`<select id="wu_cno">${cons.map(c=>`<option>${esc(c.pa)}</option>`).join('')}</select>`:'<input id="wu_cno" type="text" placeholder="เช่น EST/1000/5/AH/T1">'}</div>
+    <div><label>ใช้ Week ของปี</label><input id="wu_year" type="number" value="${Number(TODAY.slice(0,4))}"></div>
+    <div><label>Check-in</label><input id="wu_in" type="date" value="${TODAY}"></div>
+    <div><label>Check-out</label><input id="wu_out" type="date"></div>
+    <div><label>ห้อง/ประเภท</label><input id="wu_room" type="text" placeholder="เช่น T1"></div>
+    <div class="full"><label>หมายเหตุ</label><input id="wu_note" type="text"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveWeek('${cl?esc(cl.code):''}')">💾 บันทึก</button></div>`);
+}
+function saveWeek(code){
+  const g=id=>document.getElementById(id);
+  const cin=g('wu_in').value, cout=g('wu_out').value;
+  if(!cin||!cout){ toast('กรุณาใส่วัน check-in และ check-out'); return; }
+  if(cout<cin){ toast('วัน check-out ต้องหลัง check-in'); return; }
+  const nights=Math.max(0,Math.round((new Date(cout)-new Date(cin))/86400000));
+  const cnoEl=g('wu_cno'); const cno=(cnoEl.tagName==='SELECT'?cnoEl.value:cnoEl.value).trim();
+  const rec={id:'w'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), client_code:code||null,
+    client_name:g('wu_name').value.trim(), contract_no:cno, use_year:parseInt(g('wu_year').value)||null,
+    check_in:cin, check_out:cout, nights:nights, room:g('wu_room').value.trim(), note:g('wu_note').value.trim(),
+    updated_by:(typeof USER!=='undefined'&&USER)?USER.email:null};
+  WU.unshift(rec); pushWeek(rec); closeModal(); render(); toast('บันทึกการเข้าพักแล้ว ✅');
+}
+function deleteWeek(id){
+  if(!confirm('ลบรายการเข้าพักนี้?')) return;
+  WU=WU.filter(w=>w.id!==id); deleteWeekPush(id); render(); toast('ลบแล้ว');
+}
+function exportWeeksCSV(){
+  const rows=[['Check-in','Check-out','คืน','ลูกค้า','สัญญา','ใช้ Week ปี','ห้อง','หมายเหตุ','ผู้บันทึก']];
+  WU.forEach(w=>rows.push([w.check_in||'',w.check_out||'',w.nights||'',w.client_name||'',w.contract_no||'',w.use_year||'',w.room||'',w.note||'',w.updated_by||'']));
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='week-usage-'+TODAY+'.csv'; a.click();
+}
+function rWeeks(){
+  let list=WU.slice();
+  const years=[...new Set(WU.map(w=>w.use_year).filter(Boolean))].sort();
+  if(S.wy!=='all') list=list.filter(w=>String(w.use_year)===String(S.wy));
+  if(S.wq.trim()){ const q=norm(S.wq); list=list.filter(w=>norm(w.client_name||'').includes(q)||norm(w.contract_no||'').includes(q)); }
+  list.sort((a,b)=>(a.check_in||'')<(b.check_in||'')?1:-1);
+  const nights=list.reduce((s,w)=>s+(w.nights||0),0);
+  $main.innerHTML=`
+  <div class="pk">Accounting · Week Usage</div>
+  <h1>การเข้าพัก / ใช้ Week</h1>
+  <p class="sub">บันทึกการใช้สิทธิ์เข้าพักของสมาชิก — ใช้อ้างอิงการรับรู้รายได้ทางบัญชี (ทั้งหมด ${WU.length.toLocaleString()} รายการ)</p>
+  <div class="search">
+    <input type="text" id="wq" placeholder="🔍 ชื่อลูกค้า / เลขสัญญา…" value="${esc(S.wq)}">
+    <select class="flt" onchange="S.wy=this.value;render()"><option value="all">ทุกปี</option>${years.map(y=>`<option ${String(S.wy)===String(y)?'selected':''}>${y}</option>`).join('')}</select>
+    <button class="btn" onclick="openWeekModal('')">＋ บันทึกการเข้าพัก</button>
+    <button class="btn sec" onclick="exportWeeksCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <div class="cs">${list.length} รายการ · รวม ${nights.toLocaleString()} คืน · เคล็ดลับ: บันทึกจากโปรไฟล์ลูกค้าจะผูกชื่อ/สัญญาให้อัตโนมัติ</div>
+    ${list.length?`<div class="scroll"><table><thead><tr><th>Check-in</th><th>Check-out</th><th class="n">คืน</th><th>ลูกค้า</th><th>สัญญา</th><th class="n">Week ปี</th><th>ห้อง</th><th>หมายเหตุ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
+    ${list.map(w=>`<tr><td>${w.check_in?fmtD(w.check_in):'—'}</td><td>${w.check_out?fmtD(w.check_out):'—'}</td><td class="n">${w.nights||''}</td>
+      <td>${w.client_code?`<a href="#" onclick="openClient('${esc(w.client_code)}','weeks');return false">${esc(w.client_name||'')}</a>`:esc(w.client_name||'')}</td>
+      <td>${esc(w.contract_no||'')}</td><td class="n">${w.use_year||''}</td><td>${esc(w.room||'')}</td><td class="mini">${esc(w.note||'')}</td><td class="mini">${esc(w.updated_by||'')}</td>
+      <td><button class="btn sm danger" onclick="deleteWeek('${esc(w.id)}')">🗑</button></td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="mini">ยังไม่มีบันทึกการเข้าพัก — กด "＋ บันทึกการเข้าพัก" หรือบันทึกจากโปรไฟล์ลูกค้า</div>'}
+  </div>`;
+  const inp=document.getElementById('wq');
+  if(inp) inp.oninput=()=>{ S.wq=inp.value; render(); const el=document.getElementById('wq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+
+/* ================= Statement ค่าบำรุง (พิมพ์/PDF) ================= */
+function openStatement(code){
+  const cl=clientByCode(code); if(!cl) return;
+  const cons=(cl.contract_ids||[]).map(id=>contractById(id)).filter(Boolean);
+  let rowsHtml='', totalDue=0, totalPaid=0;
+  cons.forEach(c=>{ (c.fees||[]).forEach(f=>{
+    if(f.amount){ if(f.paid) totalPaid+=f.amount; else totalDue+=f.amount; }
+    rowsHtml+=`<tr><td>${esc(c.pa)}</td><td>${f.year}</td><td style="text-align:right">${f.amount?'US$'+f.amount.toLocaleString():'—'}</td><td>${f.paid?('ชำระแล้ว'+(f.paid_date?' · '+f.paid_date:'')):'<b style=color:#c0392b>ค้างชำระ</b>'}</td></tr>`;
+  }); });
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>Statement — ${esc(cl.name)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=EB+Garamond:wght@600&display=swap" rel="stylesheet">
+  <style>body{font:14px/1.7 'Sarabun',sans-serif;color:#1c2436;max-width:800px;margin:36px auto;padding:0 24px}
+  .wm{font-family:'EB Garamond',Georgia,serif;font-size:26px;letter-spacing:.15em;color:#102e4c;font-weight:600}
+  .kick{letter-spacing:.3em;font-size:10px;color:#b08d3e;text-transform:uppercase;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:8px 12px;border-bottom:1px solid #e8e8e8;text-align:left;font-size:13px}
+  th{background:#f2f5f7;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#5b6b7a}
+  .tot{display:flex;gap:36px;margin-top:20px;font-size:15px}
+  .btn{margin-top:28px;padding:11px 26px;font:600 14px 'Sarabun';border:none;border-radius:99px;background:#102e4c;color:#fff;cursor:pointer}
+  @media print{.btn{display:none}body{margin:10mm auto}}</style></head><body>
+  <div class="wm">ELITE ESCAPES</div>
+  <div class="kick">Statement of Management Fees</div>
+  <hr style="border:none;border-top:2px solid #b08d3e;margin:14px 0 18px">
+  <table style="margin:0"><tr><td style="border:none;padding:0">
+    <b>${esc(cl.name)}</b> (${esc(cl.code)})<br>${esc((cl.emails||[]).join(', ')||'-')}<br>${esc(cl.nat||'')}
+  </td><td style="border:none;padding:0;text-align:right">วันที่ออกเอกสาร<br><b>${fmtD(TODAY)}</b></td></tr></table>
+  <table><thead><tr><th>สัญญา</th><th>ปี</th><th style="text-align:right">ค่าบำรุง</th><th>สถานะ</th></tr></thead>
+  <tbody>${rowsHtml||'<tr><td colspan="4">ไม่มีรายการค่าบำรุงในระบบ</td></tr>'}</tbody></table>
+  <div class="tot"><div>ชำระแล้วรวม: <b style="color:#0e8c5a">US$${totalPaid.toLocaleString()}</b></div>
+  <div>ค้างชำระรวม: <b style="color:#c0392b">US$${totalDue.toLocaleString()}</b></div></div>
+  <p style="font-size:11px;color:#8a97a5;margin-top:26px">เอกสารนี้ออกโดยระบบ Elite Escapes Customer Care · สอบถาม: memberservice@elite-escapes.club</p>
+  <button class="btn" onclick="print()">🖨 พิมพ์ / บันทึก PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+
 /* ================= ลูกหนี้ / ยอดค้างรับ (Accounts Receivable) ================= */
 async function pushRecv(cno){
   try{
@@ -1502,7 +1632,9 @@ function exportRecvCSV(){
 
 /* ================= ทะเบียนสัญญา (Bible) ================= */
 function rBible(){
-  const prods=['TCU','Club','Fractional','Kudo'];
+  const pcnt={}; allContracts().forEach(c=>{pcnt[c.product]=(pcnt[c.product]||0)+1;});
+  const prods=Object.keys(pcnt).sort((a,b)=>pcnt[b]-pcnt[a]);
+  if(!pcnt[S.bp]) S.bp=prods[0]||'TCU';
   let list=allContracts().filter(c=>c.product===S.bp && inBrand(c));
   const sts=[['all','ทุกสถานะ'],['Completed','Completed'],['Welcome','Welcome'],['Upgraded','Upgraded'],['Downgraded','Downgraded'],['Cancelled','Cancelled']];
   const bYears=[...new Set(allContracts().filter(c=>c.comp_date&&/^\d{4}/.test(c.comp_date)).map(c=>c.comp_date.slice(0,4)))].sort();
@@ -1634,7 +1766,7 @@ function resetOV(){
 
 /* ===== LIVE: viewer role guards ===== */
 function canEdit(){ return USER && USER.role!=='viewer'; }
-['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee'].forEach(fn=>{
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openWeekModal','saveWeek','deleteWeek'].forEach(fn=>{
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('บัญชีของคุณมีสิทธิ์ดูอย่างเดียว'); return; } return orig.apply(this,arguments); };
 });
