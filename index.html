@@ -273,6 +273,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button data-v="clients">ลูกค้า</button>
     <button data-v="payouts">การจ่ายคืน</button>
     <button data-v="ar">ค้างชำระ</button>
+    <button data-v="recv">ลูกหนี้ (AR)</button>
     <button data-v="interval">Interval</button>
     <div class="navlab">Registry</div>
     <button data-v="renew">ใกล้หมดอายุ</button>
@@ -472,10 +473,12 @@ async function boot(){
   }
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
-    const [cls, cons, fees, plans, insts] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
-      fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id')
+      fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
+      fetchAllRows('receivables','contract_no')
     ]);
+    REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:r.price!=null?Number(r.price):null,deposit:r.deposit!=null?Number(r.deposit):null,balance:r.balance!=null?Number(r.balance):null,status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note}));
     const feesBy={};
     fees.forEach(f=>{ (feesBy[f.contract_id]=feesBy[f.contract_id]||[]).push({year:f.year,amount:f.amount!=null?Number(f.amount):null,amount_raw:f.amount_raw,paid:f.paid,paid_date:f.paid_date,paid_note:f.paid_note}); });
     const contracts = cons.map(c=>({id:c.id,sheet:c.sheet,product:c.product,pa:c.pa,name:c.name,nat:c.nat,plan:c.plan,term:c.term,suite:c.suite,season:c.season,status:c.status,status_note:c.status_note,comp_date:c.comp_date,fyo:c.fyo,lyo:c.lyo,row:c.row_no,client:c.client,addons:c.addons||undefined,fees:(feesBy[c.id]||[]).sort((a,b)=>a.year-b.year),custom:c.custom}));
@@ -557,7 +560,8 @@ function planTotals(plan){
 }
 
 /* ================= view state ================= */
-const S = { view:'dash', q:'', clientCode:null, pf:'due', pm:'', pq:'', planEdit:null, from:'clients', ay:0, at:'all', aq:'', ry:'next5', rq:'', bp:'TCU', bq:'', bs:'all', brand:'all', iv:'all', ivq:'', bYear:'all', bNat:'all', cNat:'all', bTerm:'all' };
+const S = { view:'dash', q:'', clientCode:null, pf:'due', pm:'', pq:'', planEdit:null, from:'clients', ay:0, at:'all', aq:'', ry:'next5', rq:'', bp:'TCU', bq:'', bs:'all', brand:'all', iv:'all', ivq:'', bYear:'all', bNat:'all', cNat:'all', bTerm:'all', rf:'owing', rp:'all', rq2:'' };
+let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
   const cnt={};
   allContracts().forEach(c=>{ const n=(c.nat||'').trim(); if(n) cnt[n]=(cnt[n]||0)+1; });
@@ -588,6 +592,7 @@ function render(){
   if(S.view==='client') return rClient();
   if(S.view==='payouts') return rPayouts();
   if(S.view==='ar') return rAR();
+  if(S.view==='recv') return rRecv();
   if(S.view==='interval') return rInterval();
   if(S.view==='renew') return rRenew();
   if(S.view==='bible') return rBible();
@@ -1367,6 +1372,132 @@ function rInterval(){
   runCounters();
   const inp=document.getElementById('ivq');
   inp.oninput=()=>{ S.ivq=inp.value; render(); const el=document.getElementById('ivq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+
+/* ================= ลูกหนี้ / ยอดค้างรับ (Accounts Receivable) ================= */
+async function pushRecv(cno){
+  try{
+    const r=REC.find(x=>x.contract_no===cno); if(!r) return;
+    await sbApi('receivables?on_conflict=contract_no',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{contract_no:r.contract_no,deposit:r.deposit,balance:r.balance,paid_note:r.paid_note||'',updated_by:USER&&USER.email}])});
+    toast('☁️ บันทึกลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+function recStatus(r){
+  const st=(r.status||'').toLowerCase();
+  if(st.includes('cancel')) return 'cancel';
+  if((r.balance||0)>0) return 'owing';
+  return 'paid';   /* balance 0 = จ่ายครบ / cash out */
+}
+function recStats(list){
+  let price=0,dep=0,bal=0,nOwe=0,nCancel=0,nPaid=0;
+  const prod={};
+  list.forEach(r=>{ const s2=recStatus(r);
+    if(s2==='cancel'){ nCancel++; return; }
+    price+=r.price||0; dep+=r.deposit||0; bal+=r.balance||0;
+    if(s2==='owing') nOwe++; else nPaid++;
+    const p=prod[r.product]=prod[r.product]||{n:0,price:0,bal:0};
+    p.n++; p.price+=r.price||0; p.bal+=r.balance||0;
+  });
+  return {price,dep,bal,nOwe,nCancel,nPaid,prod,n:list.length};
+}
+function usd(v){ return 'US$'+Math.round(v||0).toLocaleString('en-US'); }
+function rRecv(){
+  const all=REC.slice();
+  const products=[...new Set(all.map(r=>r.product))].sort();
+  const stAll=recStats(all);
+  let list=all;
+  if(S.rf==='owing') list=list.filter(r=>recStatus(r)==='owing');
+  else if(S.rf==='paid') list=list.filter(r=>recStatus(r)==='paid');
+  else if(S.rf==='cancel') list=list.filter(r=>recStatus(r)==='cancel');
+  if(S.rp!=='all') list=list.filter(r=>r.product===S.rp);
+  if(S.rq2.trim()){ const q=norm(S.rq2); list=list.filter(r=>norm(r.client_name).includes(q)||norm(r.contract_no).includes(q)||norm(r.rep||'').includes(q)); }
+  list.sort((a,b)=>(b.balance||0)-(a.balance||0));
+  const listStat=recStats(list);
+  const canEd = (typeof canEdit==='function')? canEdit() : true;
+
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div>
+      <div class="hero-kick">Accounting · Accounts Receivable</div>
+      <h1>ลูกหนี้ / ยอดค้างรับ</h1>
+      <p class="sub">ยอดขายสัญญาใหม่ปี 2026 · เงินมัดจำที่รับแล้ว และยอดที่ลูกค้ายังค้างชำระ (${all.length} สัญญา)</p>
+    </div>
+    <div class="hero-stats">
+      <div><b>$<span class="cnt" data-n="${Math.round(stAll.price)}">0</span></b><span>มูลค่าขายรวม</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(stAll.dep)}">0</span></b><span>รับแล้ว (มัดจำ)</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(stAll.bal)}">0</span></b><span>ยอดค้างรับ</span></div>
+      <div><b class="cnt" data-n="${stAll.nOwe}">0</b><span>สัญญาค้างชำระ</span></div>
+    </div>
+  </div></div>
+  ${all.length===0?`<div class="note blue">ยังไม่มีข้อมูลลูกหนี้ในระบบ — ข้อมูลจะแสดงเมื่อเปิดผ่านฐานข้อมูลกลาง (แอปเวอร์ชัน Live)</div>`:`
+  <div class="panel">
+    <h3><span class="idx">01</span>ยอดค้างรับแยกตามผลิตภัณฑ์</h3>
+    <div class="cs">คลิกเพื่อกรองเฉพาะผลิตภัณฑ์นั้น</div>
+    <div class="scroll"><table><thead><tr><th>ผลิตภัณฑ์</th><th class="n">จำนวน</th><th class="n">มูลค่าขาย</th><th class="n">ยอดค้างรับ</th></tr></thead><tbody>
+    ${Object.entries(stAll.prod).sort((a,b)=>b[1].bal-a[1].bal).map(([p,d])=>`<tr class="click" onclick="S.rp='${esc(p)}';S.rf='all';render()"><td><b>${esc(p)}</b></td><td class="n">${d.n}</td><td class="n">${usd(d.price)}</td><td class="n" style="color:${d.bal>0?'var(--s8)':'var(--ink3)'};font-weight:600">${usd(d.bal)}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="tabbtns">
+    ${[['owing','ค้างชำระ ('+stAll.nOwe+')'],['paid','จ่ายครบ/Cash Out ('+stAll.nPaid+')'],['cancel','ยกเลิก ('+stAll.nCancel+')'],['all','ทั้งหมด ('+all.length+')']].map(([k,l])=>`<button class="${S.rf===k?'on':''}" onclick="S.rf='${k}';render()">${l}</button>`).join('')}
+  </div>
+  <div class="search">
+    <input type="text" id="rq2" placeholder="🔍 ชื่อลูกค้า / เลขสัญญา / พนักงานขาย…" value="${esc(S.rq2)}">
+    <select class="flt" onchange="S.rp=this.value;render()"><option value="all">ทุกผลิตภัณฑ์</option>${products.map(p=>`<option value="${esc(p)}" ${S.rp===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+    <button class="btn sec" onclick="exportRecvCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <div class="cs">${list.length} สัญญา · ยอดค้างรวมที่กรอง <b style="color:var(--s8)">${usd(listStat.bal)}</b></div>
+    <div class="scroll"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th>ผลิตภัณฑ์</th><th class="n">ราคา</th><th class="n">มัดจำ/รับแล้ว</th><th class="n">ยอดค้าง</th><th>สถานะ</th><th>ขายโดย</th>${canEd?'<th></th>':''}</tr></thead><tbody>
+    ${list.map(r=>{ const st=recStatus(r);
+      const pill=st==='owing'?'<span class="pill p-over">ค้างชำระ</span>':st==='cancel'?'<span class="pill p-cancel">ยกเลิก</span>':'<span class="pill p-paid">จ่ายครบ</span>';
+      return `<tr><td>${esc(r.contract_no)}</td><td>${esc(r.client_name)}${r.email?'<br><span class="mini">'+esc((r.email||'').split(';')[0])+'</span>':''}</td>
+      <td>${esc(r.product)}${r.term?' <span class="mini">'+esc(r.term)+'</span>':''}</td>
+      <td class="n">${usd(r.price)}</td><td class="n">${usd(r.deposit)}</td>
+      <td class="n" style="color:${(r.balance||0)>0?'var(--s8)':'var(--ink3)'};font-weight:600">${r.balance==null?'—':usd(r.balance)}</td>
+      <td>${pill}</td><td>${esc(r.rep||'—')}</td>
+      ${canEd?`<td>${st==='owing'?`<button class="btn sm paybtn" onclick="openRecvPay('${esc(r.contract_no)}')">รับเงิน</button>`:''}</td>`:''}</tr>`; }).join('')}
+    </tbody></table></div>
+  </div>`}`;
+  runCounters();
+  const inp=document.getElementById('rq2');
+  if(inp) inp.oninput=()=>{ S.rq2=inp.value; render(); const el=document.getElementById('rq2'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function openRecvPay(cno){
+  const r=REC.find(x=>x.contract_no===cno); if(!r) return;
+  openModal(`<h3>บันทึกรับเงิน (ลูกหนี้)</h3>
+  <div class="kv" style="margin-bottom:10px">${esc(r.client_name)} · ${esc(r.contract_no)}<br>ราคา <b>${usd(r.price)}</b> · รับแล้ว <b>${usd(r.deposit)}</b> · คงค้าง <b style="color:var(--s8)">${usd(r.balance)}</b></div>
+  <div class="form">
+    <div><label>จำนวนที่รับเพิ่ม (US$)</label><input type="number" step="any" id="rp_amt" placeholder="เช่น 1000"></div>
+    <div><label>วันที่รับ</label><input type="date" id="rp_date" value="${TODAY}"></div>
+    <div class="full"><label>หมายเหตุ (วิธีรับ/เลขอ้างอิง)</label><input type="text" id="rp_note" value="${esc(r.paid_note||'')}"></div>
+  </div>
+  <div class="right"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn paybtn" onclick="confirmRecvPay('${esc(cno)}')">✅ บันทึกรับเงิน</button></div>`);
+}
+function confirmRecvPay(cno){
+  const r=REC.find(x=>x.contract_no===cno); if(!r) return;
+  const amt=parseFloat(document.getElementById('rp_amt').value);
+  if(!(amt>0)){ toast('กรุณาใส่จำนวนเงิน'); return; }
+  r.deposit=(r.deposit||0)+amt;
+  r.balance=Math.max(0,(r.price||0)-r.deposit);
+  const note=document.getElementById('rp_note').value.trim();
+  r.paid_note=(note?note+' · ':'')+'รับเพิ่ม '+usd(amt)+' ('+document.getElementById('rp_date').value+')';
+  pushRecv(cno); closeModal(); render(); toast('บันทึกรับเงินแล้ว ✅');
+}
+function exportRecvCSV(){
+  let list=REC.slice();
+  if(S.rf==='owing') list=list.filter(r=>recStatus(r)==='owing');
+  else if(S.rf==='paid') list=list.filter(r=>recStatus(r)==='paid');
+  else if(S.rf==='cancel') list=list.filter(r=>recStatus(r)==='cancel');
+  if(S.rp!=='all') list=list.filter(r=>r.product===S.rp);
+  list.sort((a,b)=>(b.balance||0)-(a.balance||0));
+  const rows=[['สัญญา','วันที่','ลูกค้า','อีเมล','สัญชาติ','ผลิตภัณฑ์','ระยะ','ราคา','มัดจำ/รับแล้ว','ยอดค้าง','สถานะ','ขายโดย','หมายเหตุ']];
+  list.forEach(r=>rows.push([r.contract_no,r.contract_date||'',r.client_name,r.email||'',r.nationality||'',r.product,r.term||'',r.price||0,r.deposit||0,r.balance==null?'':r.balance,r.status||'',r.rep||'',r.paid_note||'']));
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='receivables-'+TODAY+'.csv'; a.click();
 }
 
 /* ================= ทะเบียนสัญญา (Bible) ================= */
