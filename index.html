@@ -1865,7 +1865,8 @@ function openCase(cno){
     <div class="full"><b style="font-size:13px">ลูกค้า</b>${k?`<div class="kv" style="margin-top:4px"><b>${esc(custName(k))}</b>${k.email?' · '+esc(k.email):''}${k.mobile?' · 📱 '+esc(k.mobile):''}<br>${esc([k.address,k.city,k.state,k.zip,k.country].filter(Boolean).join(', '))}${k.notes?'<br><span class="mini">'+esc(k.notes)+'</span>':''}</div>`:'<div class="mini">ไม่มีข้อมูลติดต่อ</div>'}
       ${c?`<div style="margin-top:6px"><a href="#" onclick="closeModal();openClient('${esc(c.client)}','cases');return false">↗ เปิดโปรไฟล์ในทะเบียน (${esc(c.product)} · ${esc(c.status||'')})</a></div>`:'<div class="mini" style="margin-top:6px">สัญญานี้ยังไม่อยู่ในทะเบียน Bible</div>'}</div>
     <div class="full"><b style="font-size:13px">สรุปดีล / แผนชำระ (Description)</b>${pre(f.description)}</div>
-    <div class="full"><b style="font-size:13px">ไฟล์แนบ (${(f.attachments||[]).length})</b><div class="mini">${(f.attachments||[]).map(esc).join(' · ')||'—'}</div></div>
+    <div class="full"><b style="font-size:13px">ไฟล์แนบ (${(f.attachments||[]).length})</b><div class="mini">${(f.attachments||[]).map(esc).join(' · ')||'—'}</div>
+      ${(f.attachments||[]).length?`<a class="btn sm sec" style="margin-top:6px;display:inline-block" target="_blank" rel="noopener" href="https://drive.google.com/drive/search?q=${encodeURIComponent('"'+f.contract_no.replace(/\//g,'-')+'"')}">📂 เปิดไฟล์สัญญาใน Google Drive</a> <span class="mini">(Google Drive › DB Elite Escape › Contracts › ${esc(f.contract_no.replace(/\//g,'-'))} — ต้องล็อกอิน Google บริษัทและได้รับสิทธิ์โฟลเดอร์)</span>`:''}</div>
     ${canEd?`
     <div><label>หมวด (Category)</label><select id="cs_cat">${cats.map(x=>`<option ${caseCat(f)===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
     <div><label>Priority</label><input type="text" id="cs_pri" value="${esc(f.priority||'')}" placeholder="เช่น (1) Welcome Call"></div>
