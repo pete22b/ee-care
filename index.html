@@ -477,6 +477,7 @@ async function boot(){
   }
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
+    const N=v=>v!=null?Number(v):null;
     const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
@@ -489,7 +490,6 @@ async function boot(){
     MW = mws.map(w=>({id:w.id,week_no:w.week_no,year:w.year,dates:w.dates,role:w.role,staff_code:w.staff_code,name:w.name,q:N(w.q),qplus:N(w.qplus),ct:N(w.ct),pack_q:N(w.pack_q),pack_ct:N(w.pack_ct),full_q:N(w.full_q),full_ct:N(w.full_ct),bonus_total:N(w.bonus_total),total:N(w.total),extra:w.extra,note:w.note,updated_by:w.updated_by}));
     CF = cfs.map(f=>({contract_no:f.contract_no,status:f.status,category:f.category,priority:f.priority,opened_date:f.opened_date,due_date:f.due_date,resolved_date:f.resolved_date,description:f.description,comments:f.comments,attachments:f.attachments||[],assigned_to:f.assigned_to,opened_by:f.opened_by,customer_id:f.customer_id,source_db:f.source_db,source_ids:f.source_ids||{},updated_by:f.updated_by}));
     CK = cks;
-    const N=v=>v!=null?Number(v):null;
     REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:N(r.price),deposit:N(r.deposit),balance:N(r.balance),status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note,admin_fee:N(r.admin_fee),mfee_cost:N(r.mfee_cost),sale_type:r.sale_type,generator:r.generator,list_price:N(r.list_price),gift:N(r.gift),trade_in:N(r.trade_in),refund:N(r.refund),deal_nett:N(r.deal_nett),overprice:N(r.overprice),team:r.team||null}));
     WU = wus.map(w=>({id:w.id,client_code:w.client_code,contract_no:w.contract_no,client_name:w.client_name,use_year:w.use_year,check_in:w.check_in,check_out:w.check_out,nights:w.nights,room:w.room,note:w.note,week_type:w.week_type||'own',rate_per_night:N(w.rate_per_night),updated_by:w.updated_by}));
     RP = rps.map(p=>({id:p.id,contract_no:p.contract_no,amount:N(p.amount)||0,paid_date:p.paid_date,pay_type:p.pay_type,source:p.source,note:p.note,updated_by:p.updated_by}));
