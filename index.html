@@ -276,6 +276,8 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button data-v="recv">ลูกหนี้ (AR)</button>
     <button data-v="weeks">การเข้าพัก</button>
 <button data-v="cases">แฟ้มสัญญา</button>
+<button data-v="comm">ค่าคอมมิชชั่น</button>
+<button data-v="mkt">ทีมการตลาด</button>
     <button data-v="interval">Interval</button>
     <div class="navlab">Registry</div>
     <button data-v="renew">ใกล้หมดอายุ</button>
@@ -475,16 +477,20 @@ async function boot(){
   }
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
-    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
       fetchAllRows('receivables','contract_no'), fetchAllRows('week_usage','id'), fetchAllRows('ar_payments','id'),
-      fetchAllRows('case_files','contract_no'), fetchAllRows('case_customers','id')
+      fetchAllRows('case_files','contract_no'), fetchAllRows('case_customers','id'),
+      fetchAllRows('commission_periods','period'), fetchAllRows('commission_lines','id'), fetchAllRows('mkt_weekly','id')
     ]);
+    CP = cps.map(p=>({period:p.period,period_start:p.period_start,period_end:p.period_end,pay_day:p.pay_day,fx_rate:p.fx_rate!=null?Number(p.fx_rate):null,blocks:p.blocks||[],staff_pay:p.staff_pay||[],note:p.note}));
+    CL = cls2.map(l=>({id:l.id,period:l.period,contract_no:l.contract_no,customer:l.customer,sale_type:l.sale_type,status:l.status,purchase_price:N(l.purchase_price),paid_to_date:N(l.paid_to_date),new_payment:N(l.new_payment),total_instalments:N(l.total_instalments),balance:N(l.balance),cash_in_pct:N(l.cash_in_pct),roles:l.roles||{},blocks:l.blocks||{},remark:l.remark}));
+    MW = mws.map(w=>({id:w.id,week_no:w.week_no,year:w.year,dates:w.dates,role:w.role,staff_code:w.staff_code,name:w.name,q:N(w.q),qplus:N(w.qplus),ct:N(w.ct),pack_q:N(w.pack_q),pack_ct:N(w.pack_ct),full_q:N(w.full_q),full_ct:N(w.full_ct),bonus_total:N(w.bonus_total),total:N(w.total),extra:w.extra,note:w.note,updated_by:w.updated_by}));
     CF = cfs.map(f=>({contract_no:f.contract_no,status:f.status,category:f.category,priority:f.priority,opened_date:f.opened_date,due_date:f.due_date,resolved_date:f.resolved_date,description:f.description,comments:f.comments,attachments:f.attachments||[],assigned_to:f.assigned_to,opened_by:f.opened_by,customer_id:f.customer_id,source_db:f.source_db,source_ids:f.source_ids||{},updated_by:f.updated_by}));
     CK = cks;
     const N=v=>v!=null?Number(v):null;
-    REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:N(r.price),deposit:N(r.deposit),balance:N(r.balance),status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note,admin_fee:N(r.admin_fee),mfee_cost:N(r.mfee_cost)}));
+    REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:N(r.price),deposit:N(r.deposit),balance:N(r.balance),status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note,admin_fee:N(r.admin_fee),mfee_cost:N(r.mfee_cost),sale_type:r.sale_type,generator:r.generator,list_price:N(r.list_price),gift:N(r.gift),trade_in:N(r.trade_in),refund:N(r.refund),deal_nett:N(r.deal_nett),overprice:N(r.overprice),team:r.team||null}));
     WU = wus.map(w=>({id:w.id,client_code:w.client_code,contract_no:w.contract_no,client_name:w.client_name,use_year:w.use_year,check_in:w.check_in,check_out:w.check_out,nights:w.nights,room:w.room,note:w.note,week_type:w.week_type||'own',rate_per_night:N(w.rate_per_night),updated_by:w.updated_by}));
     RP = rps.map(p=>({id:p.id,contract_no:p.contract_no,amount:N(p.amount)||0,paid_date:p.paid_date,pay_type:p.pay_type,source:p.source,note:p.note,updated_by:p.updated_by}));
     const feesBy={};
@@ -573,7 +579,10 @@ let WU=[];   /* การเข้าพัก (week_usage) */
 let RP=[];   /* รายการรับเงินลูกหนี้ (ar_payments) */
 let CF=[];   /* แฟ้มสัญญาจากห้องสัญญา (case_files) */
 let CK=[];   /* ข้อมูลติดต่อลูกค้าจากแฟ้มสัญญา (case_customers) */
-Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all'});
+let CP=[];   /* รอบจ่ายคอมมิชชั่น (commission_periods) */
+let CL=[];   /* รายการคอมมิชชั่นต่อสัญญา (commission_lines) */
+let MW=[];   /* ผลงาน/ค่าจ้างทีมการตลาดรายสัปดาห์ (mkt_weekly) */
+Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:''});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
   const cnt={};
@@ -608,6 +617,8 @@ function render(){
   if(S.view==='recv') return rRecv();
   if(S.view==='weeks') return rWeeks();
   if(S.view==='cases') return rCases();
+  if(S.view==='comm') return rComm();
+  if(S.view==='mkt') return rMkt();
   if(S.view==='interval') return rInterval();
   if(S.view==='renew') return rRenew();
   if(S.view==='bible') return rBible();
@@ -925,7 +936,7 @@ function rClient(){
   const hasPlan = cons.some(c=>OV.plans[c.id]);
 
   $main.innerHTML = `
-  <button class="bk" onclick="go('${['dash','todo','payouts','ar','recv','weeks','cases','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
+  <button class="bk" onclick="go('${['dash','todo','payouts','ar','recv','weeks','cases','comm','mkt','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
   <div class="profile-head">
     <div>
       <h2>${esc(cl.name)}</h2>
@@ -1700,7 +1711,9 @@ function openRecvHistory(cno){
   openModal(`<h3>ประวัติการรับเงิน (AR History)</h3>
   <div class="kv" style="margin-bottom:10px">${esc(r.client_name)} · ${esc(r.contract_no)} · ${esc(r.product)}${r.term?' '+esc(r.term):''}<br>
     ราคา <b>${usd(r.price)}</b> · รับแล้ว <b>${usd(r.deposit)}</b> · คงค้าง <b style="color:var(--s8)">${usd(r.balance)}</b>
-    ${r.mfee_cost!=null?' · เรท Mfee <b>'+usd(r.mfee_cost)+'</b>':''}${r.admin_fee!=null?' · Admin Fee <b>'+usd(r.admin_fee)+'</b>':''}</div>
+    ${r.mfee_cost!=null?' · เรท Mfee <b>'+usd(r.mfee_cost)+'</b>':''}${r.admin_fee!=null?' · Admin Fee <b>'+usd(r.admin_fee)+'</b>':''}
+    ${r.sale_type?'<br><span class="mini">'+esc(r.sale_type)+(r.generator?' · ที่มา '+esc(r.generator):'')+(r.gift?' · Gift '+usd(r.gift):'')+(r.overprice?' · Overprice '+usd(r.overprice):'')+'</span>':''}
+    ${r.team?'<br><span class="mini">ทีมขาย: '+Object.entries(r.team).filter(([k,v])=>v).map(([k,v])=>(ROLE_TH[k]||k)+' '+esc(v)).join(' · ')+'</span>':''}</div>
   <div class="scroll"><table><thead><tr><th>วันที่</th><th class="n">จำนวน</th><th>Type</th><th>Source</th><th>หมายเหตุ</th><th>บันทึกโดย</th>${canEd?'<th></th>':''}</tr></thead><tbody>
   ${initial>0?`<tr><td>${r.contract_date?fmtD(r.contract_date):'—'}</td><td class="n">${usd(initial)}</td><td colspan="3" class="mini">มัดจำ/ยอดรับก่อนเริ่มใช้ระบบ (จากไฟล์ AR Excel)</td><td class="mini">Excel</td>${canEd?'<td></td>':''}</tr>`:''}
   ${ps.map(p=>`<tr><td>${p.paid_date?fmtD(p.paid_date):'—'}</td><td class="n"><b>${usd(p.amount)}</b></td><td>${esc(p.pay_type||'—')}</td><td>${esc(p.source||'—')}</td><td class="mini">${esc(p.note||'')}</td><td class="mini">${esc(p.updated_by||'')}</td>${canEd?`<td><button class="btn sm danger" onclick="deletePayment('${esc(p.id)}')">🗑</button></td>`:''}</tr>`).join('')}
@@ -1887,6 +1900,183 @@ function saveCase(cno){
   pushCase(cno); closeModal(); render(); toast('บันทึกแฟ้มสัญญาแล้ว ✅');
 }
 
+/* ================= ค่าคอมมิชชั่นทีมขาย (Commission — snapshot ต่อรอบจ่าย) ================= */
+const ROLE_TH={director:'Director',gm:'GM',sales_rep:'Sales Rep',to:'T/O',support:'Support',line_manager:'Line Mgr',button_up:'Button-Up',follow_up:'Follow-Up'};
+function commToPay(l){ return Object.values(l.blocks||{}).reduce((s,b)=>s+((b&&b.to_pay)||0),0); }
+function commPeriodLabel(p){ return (p.period_start?fmtD(p.period_start):'')+' – '+(p.period_end?fmtD(p.period_end):''); }
+function rComm(){
+  if(!CP.length){ $main.innerHTML=`<div class="pk">Sales · Commission</div><h1>ค่าคอมมิชชั่นทีมขาย</h1><div class="note blue">ยังไม่มีรอบจ่ายคอมมิชชั่นในไฟล์นี้ — ข้อมูลจะแสดงเมื่อเปิดผ่านฐานข้อมูลกลาง (แอปเวอร์ชัน Live)</div>`; return; }
+  const periods=CP.slice().sort((a,b)=>a.period<b.period?1:-1);
+  if(!periods.some(p=>p.period===S.cmp)) S.cmp=periods[0].period;
+  const P=periods.find(p=>p.period===S.cmp);
+  const allLines=CL.filter(l=>l.period===S.cmp);
+  const staffNames=[...new Set(allLines.flatMap(l=>Object.values(l.roles||{}).filter(Boolean)))].sort();
+  let lines=allLines;
+  if(S.cms!=='all') lines=lines.filter(l=>Object.values(l.roles||{}).includes(S.cms));
+  if(S.cmq.trim()){ const q=norm(S.cmq); lines=lines.filter(l=>norm(l.contract_no).includes(q)||norm(l.customer||'').includes(q)); }
+  lines.sort((a,b)=>commToPay(b)-commToPay(a)||(b.new_payment||0)-(a.new_payment||0));
+  const sumNewAll=allLines.reduce((s,l)=>s+(l.new_payment||0),0), sumBal=allLines.reduce((s,l)=>s+(l.balance||0),0);
+  const staffPay=(P.staff_pay||[]).slice().sort((a,b)=>(b.usd||0)-(a.usd||0)); const staffTot=staffPay.reduce((s,x)=>s+(x.usd||0),0);
+  const fx=P.fx_rate||0;
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div><div class="hero-kick">Sales · Commission</div><h1>ค่าคอมมิชชั่นทีมขาย</h1>
+    <p class="sub">รอบจ่าย ${commPeriodLabel(P)} · จ่ายวันที่ ${P.pay_day?fmtD(P.pay_day):'—'} · อัตรา ${fx} THB/USD — คอมมิชชั่นคิดจากเงินที่ลูกค้าชำระเข้าจริงในรอบ (นำเข้าจากไฟล์ CU Sales Commission Master)</p></div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${allLines.length}">0</b><span>สัญญาผ่อนในรอบ</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(sumNewAll)}">0</span></b><span>เงินรับเข้ารอบนี้</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(staffTot)}">0</span></b><span>คอมฯ จ่ายรวม (฿${Math.round(staffTot*fx).toLocaleString()})</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(sumBal)}">0</span></b><span>ยอดผ่อนคงค้างทั้งหมด</span></div>
+    </div>
+  </div></div>
+  <div class="search">
+    <select class="flt" onchange="S.cmp=this.value;S.cms='all';render()">${periods.map(p=>`<option value="${esc(p.period)}" ${p.period===S.cmp?'selected':''}>รอบ ${commPeriodLabel(p)}</option>`).join('')}</select>
+    <select class="flt" onchange="S.cms=this.value;render()"><option value="all">ทุกคนในทีมขาย</option>${staffNames.map(s=>`<option ${S.cms===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+    <input type="text" id="cmq" placeholder="🔍 เลขสัญญา / ชื่อลูกค้า…" value="${esc(S.cmq)}">
+  </div>
+  <div class="panel">
+    <h3><span class="idx">01</span>ยอดคอมมิชชั่นจ่ายพนักงาน รอบนี้</h3>
+    <div class="cs">${staffPay.length} คน · รวม <b>${usd(staffTot)}</b> = <b>฿${Math.round(staffTot*fx).toLocaleString()}</b> · คลิกชื่อเพื่อดูสัญญาที่เกี่ยวข้อง</div>
+    <div class="scroll"><table><thead><tr><th>พนักงาน</th><th>ตำแหน่ง</th><th class="n">USD</th><th class="n">THB</th><th class="n">สัญญาที่มีชื่อ</th></tr></thead><tbody>
+    ${staffPay.map(x=>{ const n=allLines.filter(l=>Object.values(l.roles||{}).includes(x.name)).length;
+      return `<tr class="click" onclick="S.cms='${esc(x.name)}';render()"><td><b>${esc(x.name)}</b>${x.full?'<br><span class="mini">'+esc(x.full)+'</span>':''}</td><td class="mini">${esc(x.position||'')}</td><td class="n"><b>${usd(x.usd)}</b></td><td class="n">฿${Math.round((x.usd||0)*fx).toLocaleString()}</td><td class="n">${n||'—'}</td></tr>`; }).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">02</span>รายสัญญา${S.cms!=='all'?' — '+esc(S.cms):''}</h3>
+    <div class="cs">${lines.length} สัญญา · เงินรับรอบนี้ <b>${usd(lines.reduce((s,l)=>s+(l.new_payment||0),0))}</b> · คอมฯ ค้างจ่ายรวม <b>${usd(lines.reduce((s,l)=>s+commToPay(l),0))}</b> · คลิกแถวเพื่อดูการแบ่งคอมฯ ทุกตำแหน่ง</div>
+    <div class="scroll"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th>ประเภท</th><th class="n">ราคาขาย</th><th class="n">รับรอบนี้</th><th class="n">ผ่อนแล้วรวม</th><th class="n">คงค้าง</th><th class="n">Cash-in</th><th>Sales Rep</th><th>T/O</th><th class="n">คอมฯ รอบนี้</th></tr></thead><tbody>
+    ${lines.slice(0,400).map(l=>`<tr class="click" onclick="openCommLine('${esc(l.id)}')"><td><b>${esc(l.contract_no)}</b></td><td>${esc(l.customer||'')}</td><td class="mini">${esc(l.sale_type||'')}</td>
+      <td class="n">${usd(l.purchase_price)}</td><td class="n" style="font-weight:600;color:${(l.new_payment||0)>0?'var(--s2,#0e8c5a)':'var(--ink3)'}">${(l.new_payment||0)>0?usd(l.new_payment):'—'}</td>
+      <td class="n">${usd(l.total_instalments)}</td><td class="n" style="color:var(--s8)">${usd(l.balance)}</td><td class="n">${l.cash_in_pct!=null?Math.round(l.cash_in_pct*100)+'%':'—'}</td>
+      <td>${esc((l.roles||{}).sales_rep||'—')}</td><td>${esc((l.roles||{}).to||'—')}</td><td class="n"><b>${commToPay(l)?usd(commToPay(l)):'—'}</b></td></tr>`).join('')}
+    </tbody></table></div>${lines.length>400?'<div class="mini" style="margin-top:8px">แสดง 400 รายการแรก</div>':''}
+  </div>`;
+  runCounters();
+  const inp=document.getElementById('cmq');
+  if(inp) inp.oninput=()=>{ S.cmq=inp.value; render(); const el=document.getElementById('cmq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function openCommLine(id){
+  const l=CL.find(x=>x.id===id); if(!l) return;
+  const P=CP.find(p=>p.period===l.period)||{}; const fx=P.fx_rate||0;
+  const blocks=Object.entries(l.blocks||{}).filter(([k,b])=>b&&(b.pct||b.total_paid||b.to_pay||b.new_payment));
+  const r=REC.find(x=>x.contract_no===l.contract_no);
+  openModal(`<h3>คอมมิชชั่น ${esc(l.contract_no)}</h3>
+  <div class="kv" style="margin-bottom:10px"><b>${esc(l.customer||'')}</b> · ${esc(l.sale_type||'')} · ${esc(l.status||'')}<br>
+    ราคาขาย <b>${usd(l.purchase_price)}</b> · ผ่อนแล้ว <b>${usd(l.total_instalments)}</b> (รับรอบนี้ ${usd(l.new_payment)}) · คงค้าง <b style="color:var(--s8)">${usd(l.balance)}</b> · Cash-in ${l.cash_in_pct!=null?Math.round(l.cash_in_pct*100)+'%':'—'}<br>
+    <span class="mini">ทีม: ${Object.entries(l.roles||{}).filter(([k,v])=>v).map(([k,v])=>(ROLE_TH[k]||k)+' <b>'+esc(v)+'</b>').join(' · ')||'—'}</span>
+    ${l.remark?'<br><span class="mini">หมายเหตุ: '+esc(l.remark)+'</span>':''}</div>
+  <div class="scroll"><table><thead><tr><th>ตำแหน่ง</th><th class="n">%</th><th class="n">จ่ายแล้วก่อนรอบ</th><th class="n">คอมฯ รอบนี้</th><th class="n">รวมจ่าย</th><th class="n">ค้างจ่าย</th><th class="n">THB ค้างจ่าย</th></tr></thead><tbody>
+  ${blocks.length?blocks.map(([k,b])=>`<tr><td>${esc(k.replace(' Commission','').replace(' Comm',''))}</td><td class="n">${b.pct!=null?(b.pct*100).toFixed(2)+'%':'—'}</td><td class="n">${b.paid_to_date!=null?usd(b.paid_to_date):'—'}</td><td class="n">${b.new_payment?usd(b.new_payment):'—'}</td><td class="n">${b.total_paid!=null?usd(b.total_paid):'—'}</td><td class="n"><b>${b.to_pay?usd(b.to_pay):'—'}</b></td><td class="n">${b.to_pay?'฿'+Math.round(b.to_pay*fx).toLocaleString():'—'}</td></tr>`).join(''):'<tr><td colspan="7" class="mini">ไม่มีการแบ่งคอมฯ ในรอบนี้</td></tr>'}
+  </tbody></table></div>
+  <div class="right" style="margin-top:12px">${r?`<button class="btn sec" onclick="closeModal();openRecvHistory('${esc(r.contract_no)}')">📜 ประวัติรับเงินลูกหนี้</button>`:''}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+
+/* ================= ทีมการตลาด OPC — ผลงาน/ค่าจ้างรายสัปดาห์ ================= */
+async function pushMkt(rec){
+  try{
+    await sbApi('mkt_weekly?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{id:rec.id,week_no:rec.week_no,year:rec.year,dates:rec.dates,role:rec.role,staff_code:rec.staff_code,name:rec.name,q:rec.q,qplus:rec.qplus,ct:rec.ct,pack_q:rec.pack_q,pack_ct:rec.pack_ct,full_q:rec.full_q,full_ct:rec.full_ct,bonus_total:rec.bonus_total,total:rec.total,note:rec.note,updated_by:USER&&USER.email}])});
+    toast('☁️ บันทึกลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function deleteMktPush(id){
+  try{ await sbApi('mkt_weekly?id=eq.'+encodeURIComponent(id),{method:'DELETE'}); }
+  catch(e){ toast('⚠️ ลบจากฐานกลางไม่สำเร็จ: '+e.message); }
+}
+const MKT_RATES={staff:{q:3000,qplus:3500,ct:1500,pack_q:1000,pack_ct:2000,full_q:3000,full_ct:6000}, manager:{q:500,qplus:500,ct:250,pack_q:1000,pack_ct:1000,full_q:2000,full_ct:2000}};
+function mktCalc(role,v){ const R=MKT_RATES[role]||MKT_RATES.staff; return Object.keys(R).reduce((s,k)=>s+((v[k]||0)*R[k]),0); }
+function mktWeekKey(w){ return w.year+'-W'+String(w.week_no).padStart(2,'0'); }
+function rMkt(){
+  const weeks=[...new Set(MW.map(mktWeekKey))].sort().reverse();
+  const canEd=(typeof canEdit==='function')?canEdit():true;
+  if(!weeks.length){ $main.innerHTML=`<div class="pk">Marketing · OPC</div><h1>ทีมการตลาด (OPC)</h1><div class="note blue">ยังไม่มีข้อมูลรายสัปดาห์ — ${canEd?'<a href="#" onclick="openMktModal(&quot;&quot;);return false">เพิ่มสัปดาห์แรก</a> หรือ':''}ข้อมูลจะแสดงเมื่อเปิดผ่านฐานข้อมูลกลาง</div>`; return; }
+  if(!weeks.includes(S.mw)) S.mw=weeks[0];
+  const rows=MW.filter(w=>mktWeekKey(w)===S.mw);
+  const staff=rows.filter(w=>w.role!=='manager').sort((a,b)=>String(a.staff_code||a.name).localeCompare(String(b.staff_code||b.name)));
+  const mgrs=rows.filter(w=>w.role==='manager');
+  const sum=(arr,k)=>arr.reduce((s,w)=>s+(w[k]||0),0);
+  const dates=(rows[0]&&rows[0].dates)||'';
+  const trend=weeks.slice(0,12).map(k=>{ const rs=MW.filter(w=>mktWeekKey(w)===k); return {k, dates:(rs[0]&&rs[0].dates)||'', q:sum(rs.filter(w=>w.role!=='manager'),'q'), qplus:sum(rs.filter(w=>w.role!=='manager'),'qplus'), ct:sum(rs.filter(w=>w.role!=='manager'),'ct'), staff:sum(rs.filter(w=>w.role!=='manager'),'total'), mgr:sum(rs.filter(w=>w.role==='manager'),'total')}; });
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div><div class="hero-kick">Marketing · OPC Weekly</div><h1>ทีมการตลาด (OPC)</h1>
+    <p class="sub">ผลงานและค่าจ้างรายสัปดาห์ของทีมการตลาด — Q = คู่ที่ผ่านเกณฑ์ (Qualified couple), Q+ = คู่พรีเมียม, CT = ทัวร์ที่ปิดได้ · โบนัสดีล Pack/Full · ค่าจ้างเป็นบาท</p></div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${sum(staff,'q')+sum(staff,'qplus')}">0</b><span>Q + Q+ สัปดาห์นี้</span></div>
+      <div><b class="cnt" data-n="${sum(staff,'ct')}">0</b><span>CT</span></div>
+      <div><b>฿<span class="cnt" data-n="${Math.round(sum(staff,'total'))}">0</span></b><span>ค่าจ้างทีม</span></div>
+      <div><b>฿<span class="cnt" data-n="${Math.round(sum(mgrs,'total'))}">0</span></b><span>ค่าจ้างผู้จัดการ</span></div>
+    </div>
+  </div></div>
+  <div class="search">
+    <select class="flt" onchange="S.mw=this.value;render()">${weeks.map(k=>{ const r0=MW.find(w=>mktWeekKey(w)===k); return `<option value="${k}" ${k===S.mw?'selected':''}>สัปดาห์ ${r0.week_no}/${r0.year}${r0.dates?' · '+esc(r0.dates):''}</option>`; }).join('')}</select>
+    ${canEd?`<button class="btn" onclick="openMktModal('')">＋ เพิ่มรายการ/สัปดาห์ใหม่</button>`:''}
+    <button class="btn sec" onclick="exportMktCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">01</span>สัปดาห์ ${rows[0].week_no}/${rows[0].year} ${dates?'· '+esc(dates):''} — พนักงานการตลาด</h3>
+    <div class="cs">อัตรา: Q ฿3,000 · Q+ ฿3,500 · CT ฿1,500 · โบนัส Pack Q ฿1,000 / Pack CT ฿2,000 / Full Q ฿3,000 / Full CT ฿6,000 ${canEd?'· คลิกแถวเพื่อแก้ไข':''}</div>
+    <div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่อ</th><th class="n">Q</th><th class="n">Q+</th><th class="n">CT</th><th class="n">Pack Q</th><th class="n">Pack CT</th><th class="n">Full Q</th><th class="n">Full CT</th><th class="n">โบนัส</th><th class="n">รวม (฿)</th></tr></thead><tbody>
+    ${staff.map(w=>`<tr class="${canEd?'click':''}" ${canEd?`onclick="openMktModal('${esc(w.id)}')"`:''}><td>${esc(w.staff_code||'')}</td><td><b>${esc(w.name||'')}</b></td><td class="n">${w.q||''}</td><td class="n">${w.qplus||''}</td><td class="n">${w.ct||''}</td><td class="n">${w.pack_q||''}</td><td class="n">${w.pack_ct||''}</td><td class="n">${w.full_q||''}</td><td class="n">${w.full_ct||''}</td><td class="n">${w.bonus_total?'฿'+w.bonus_total.toLocaleString():''}</td><td class="n"><b>฿${Math.round(w.total||0).toLocaleString()}</b></td></tr>`).join('')}
+    <tr style="font-weight:700;background:var(--surface2)"><td></td><td>รวม ${staff.length} คน</td><td class="n">${sum(staff,'q')}</td><td class="n">${sum(staff,'qplus')}</td><td class="n">${sum(staff,'ct')}</td><td class="n">${sum(staff,'pack_q')}</td><td class="n">${sum(staff,'pack_ct')}</td><td class="n">${sum(staff,'full_q')}</td><td class="n">${sum(staff,'full_ct')}</td><td class="n">฿${Math.round(sum(staff,'bonus_total')).toLocaleString()}</td><td class="n">฿${Math.round(sum(staff,'total')).toLocaleString()}</td></tr>
+    </tbody></table></div>
+    ${mgrs.length?`<h4 style="margin-top:16px">ผู้จัดการ (Override)</h4><div class="scroll"><table><thead><tr><th>ชื่อ</th><th class="n">Q (คู่)</th><th class="n">รวม (฿)</th></tr></thead><tbody>
+    ${mgrs.map(w=>`<tr class="${canEd?'click':''}" ${canEd?`onclick="openMktModal('${esc(w.id)}')"`:''}><td><b>${esc(w.name)}</b></td><td class="n">${w.q||''}</td><td class="n"><b>฿${Math.round(w.total||0).toLocaleString()}</b></td></tr>`).join('')}
+    </tbody></table></div>`:''}
+    <div class="kv" style="margin-top:12px">ค่าจ้างสัปดาห์นี้รวม <b>฿${Math.round(sum(staff,'total')+sum(mgrs,'total')).toLocaleString()}</b> (ทีม ฿${Math.round(sum(staff,'total')).toLocaleString()} + ผู้จัดการ ฿${Math.round(sum(mgrs,'total')).toLocaleString()})</div>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">02</span>แนวโน้มรายสัปดาห์</h3>
+    <div class="scroll"><table><thead><tr><th>สัปดาห์</th><th>ช่วงวันที่</th><th class="n">Q</th><th class="n">Q+</th><th class="n">CT</th><th class="n">ค่าจ้างทีม</th><th class="n">ผู้จัดการ</th><th class="n">รวม</th></tr></thead><tbody>
+    ${trend.map(t=>`<tr class="click ${t.k===S.mw?'on':''}" onclick="S.mw='${t.k}';render()"><td><b>${t.k.replace('-W',' · สัปดาห์ ')}</b></td><td class="mini">${esc(t.dates)}</td><td class="n">${t.q}</td><td class="n">${t.qplus}</td><td class="n">${t.ct}</td><td class="n">฿${Math.round(t.staff).toLocaleString()}</td><td class="n">฿${Math.round(t.mgr).toLocaleString()}</td><td class="n"><b>฿${Math.round(t.staff+t.mgr).toLocaleString()}</b></td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+  runCounters();
+}
+function openMktModal(id){
+  const w=id?MW.find(x=>x.id===id):null;
+  const cur=MW.find(x=>mktWeekKey(x)===S.mw);
+  const v=(k,d)=>w?(w[k]!=null?w[k]:''):d;
+  const names=[...new Set(MW.map(x=>(x.staff_code?x.staff_code+' ':'')+x.name))].sort();
+  openModal(`<h3>${w?'แก้ไข':'เพิ่ม'}ผลงานทีมการตลาด</h3>
+  <div class="form">
+    <div><label>ปี</label><input id="mk_year" type="number" value="${v('year',cur?cur.year:Number(TODAY.slice(0,4)))}"></div>
+    <div><label>สัปดาห์ที่</label><input id="mk_week" type="number" value="${v('week_no',cur?cur.week_no:'')}"></div>
+    <div class="full"><label>ช่วงวันที่ (เช่น 22-28/08/2026)</label><input id="mk_dates" type="text" value="${esc(v('dates',cur?cur.dates:''))}"></div>
+    <div><label>ประเภท</label><select id="mk_role" onchange="mkCalc()"><option value="staff" ${(w?w.role:'staff')!=='manager'?'selected':''}>พนักงานการตลาด</option><option value="manager" ${(w&&w.role==='manager')?'selected':''}>ผู้จัดการ</option></select></div>
+    <div><label>รหัส (เช่น B01)</label><input id="mk_code" type="text" value="${esc(v('staff_code',''))}"></div>
+    <div class="full"><label>ชื่อ</label><input id="mk_name" type="text" list="mk_names" value="${esc(v('name',''))}"><datalist id="mk_names">${names.map(n=>`<option value="${esc(n.replace(/^[A-Z]\d{2} /,''))}">`).join('')}</datalist></div>
+    ${['q','qplus','ct','pack_q','pack_ct','full_q','full_ct'].map(k=>`<div><label>${({q:'Q',qplus:'Q+',ct:'CT',pack_q:'Pack Q',pack_ct:'Pack CT',full_q:'Full Q',full_ct:'Full CT'})[k]}</label><input id="mk_${k}" type="number" step="1" value="${v(k,'')}" oninput="mkCalc()"></div>`).join('')}
+    <div><label>รวม (฿) — คำนวณอัตโนมัติ แก้ได้</label><input id="mk_total" type="number" step="any" value="${v('total','')}"></div>
+    <div class="full"><label>หมายเหตุ</label><input id="mk_note" type="text" value="${esc(v('note',''))}"></div>
+  </div>
+  <div class="right">${w?`<button class="btn ghost danger" onclick="deleteMkt('${esc(w.id)}')">🗑 ลบ</button>`:''}<button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveMkt('${w?esc(w.id):''}')">💾 บันทึก</button></div>`);
+  if(!w) mkCalc();
+}
+function mkCalc(){ const g=k=>document.getElementById(k); if(!g('mk_total')) return; const v={}; ['q','qplus','ct','pack_q','pack_ct','full_q','full_ct'].forEach(k=>v[k]=parseFloat(g('mk_'+k).value)||0); g('mk_total').value=mktCalc(g('mk_role').value,v); }
+function saveMkt(id){
+  const g=k=>document.getElementById(k); const n=k=>g(k).value===''?null:parseFloat(g(k).value);
+  const year=parseInt(g('mk_year').value), week=parseInt(g('mk_week').value), name=g('mk_name').value.trim();
+  if(!year||!week||!name){ toast('กรุณาใส่ปี สัปดาห์ และชื่อ'); return; }
+  const role=g('mk_role').value, code=g('mk_code').value.trim()||null;
+  const data={week_no:week, year:year, dates:g('mk_dates').value.trim()||null, role:role, staff_code:code, name:name,
+    q:n('mk_q'), qplus:n('mk_qplus'), ct:n('mk_ct'), pack_q:n('mk_pack_q'), pack_ct:n('mk_pack_ct'), full_q:n('mk_full_q'), full_ct:n('mk_full_ct'),
+    total:n('mk_total'), note:g('mk_note').value.trim()||null, updated_by:(typeof USER!=='undefined'&&USER)?USER.email:null};
+  const R=MKT_RATES[role]; data.bonus_total=(data.pack_q||0)*R.pack_q+(data.pack_ct||0)*R.pack_ct+(data.full_q||0)*R.full_q+(data.full_ct||0)*R.full_ct;
+  let rec=id?MW.find(x=>x.id===id):null;
+  if(rec) Object.assign(rec,data); else { rec=Object.assign({id:year+'-W'+String(week).padStart(2,'0')+'-'+(role==='manager'?'M':'S')+'-'+(code||name.replace(/\W+/g,''))+'-'+Date.now().toString(36).slice(-3)},data); MW.push(rec); }
+  S.mw=mktWeekKey(rec); pushMkt(rec); closeModal(); render(); toast('บันทึกแล้ว ✅');
+}
+function deleteMkt(id){ if(!confirm('ลบรายการนี้?')) return; MW=MW.filter(x=>x.id!==id); deleteMktPush(id); closeModal(); render(); toast('ลบแล้ว'); }
+function exportMktCSV(){
+  const rows=[['ปี','สัปดาห์','ช่วงวันที่','ประเภท','รหัส','ชื่อ','Q','Q+','CT','Pack Q','Pack CT','Full Q','Full CT','โบนัส','รวม (THB)','หมายเหตุ']];
+  MW.slice().sort((a,b)=>mktWeekKey(a)<mktWeekKey(b)?1:-1).forEach(w=>rows.push([w.year,w.week_no,w.dates||'',w.role,w.staff_code||'',w.name,w.q||'',w.qplus||'',w.ct||'',w.pack_q||'',w.pack_ct||'',w.full_q||'',w.full_ct||'',w.bonus_total||'',w.total||'',w.note||'']));
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='marketing-weekly-'+TODAY+'.csv'; a.click();
+}
+
 /* ================= ทะเบียนสัญญา (Bible) ================= */
 function rBible(){
   const pcnt={}; allContracts().forEach(c=>{pcnt[c.product]=(pcnt[c.product]||0)+1;});
@@ -2023,7 +2213,7 @@ function resetOV(){
 
 /* ===== LIVE: viewer role guards ===== */
 function canEdit(){ return USER && USER.role!=='viewer'; }
-['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase'].forEach(fn=>{
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt'].forEach(fn=>{
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('บัญชีของคุณมีสิทธิ์ดูอย่างเดียว'); return; } return orig.apply(this,arguments); };
 });
