@@ -1007,6 +1007,13 @@ function contractCard(c){
       const vu=p.vuRaw?((p.vu&&p.vu<TODAY)?`<b style="color:var(--s8)">${esc(p.vuRaw)} · หมดอายุแล้ว</b>`:esc(p.vuRaw)):'—';
       return `<tr><td><b>${nm}</b></td><td>${esc(p.t)}</td><td>${pay}</td><td>${act}</td><td>${esc(p.id||'—')}</td><td>${vu}</td></tr>`; }).join('')}
     </tbody></table></div></div>`:''}
+    ${(()=>{ const k=normCno(c.pa); const r=REC.find(x=>normCno(x.contract_no)===k); const cl=CL.filter(l=>normCno(l.contract_no)===k); const st=WU.filter(w=>normCno(w.contract_no)===k);
+      if(!r&&!cl.length&&!st.length) return '';
+      return `<div style="margin-top:12px"><b style="font-size:13px">เชื่อมโยงข้อมูลอื่นของสัญญานี้</b>
+      ${r?`<div class="kv">💳 ลูกหนี้: ราคาขาย <b>${usd(r.price)}</b> · รับแล้ว <b>${usd(r.deposit)}</b> · คงค้าง <b style="color:${(r.balance||0)>0?'var(--s8)':'var(--ink3)'}">${usd(r.balance)}</b>${r.sale_type?' · '+esc(r.sale_type):''}${r.generator?' · ที่มา '+esc(r.generator):''}${r.team&&r.team.sales_rep?' · Sales Rep <b>'+esc(r.team.sales_rep)+'</b>':''}${r.team&&r.team.to?' · T/O '+esc(r.team.to):''} <button class="btn sm ghost" onclick="openRecvHistory('${esc(r.contract_no)}')">📜 ประวัติรับเงิน</button></div>`:''}
+      ${cl.length?`<div class="kv">💰 คอมมิชชั่น: ${cl.map(l=>`<a href="#" onclick="openCommLine('${esc(l.id)}');return false">รอบ ${esc(l.period.replace('_',' → '))}${commToPay(l)?' · ค้างจ่าย '+usd(commToPay(l)):''}</a>`).join(' · ')}</div>`:''}
+      ${st.length?`<div class="kv">🛏 เข้าพัก ${st.length} ครั้ง รวม ${st.reduce((s,w)=>s+(w.nights||0),0)} คืน (ล่าสุด ${fmtD(st.slice().sort((a,b)=>a.check_in<b.check_in?1:-1)[0].check_in)})</div>`:''}
+      </div>`; })()}
     <div class="payout-sec">${payoutHtml}</div>
   </div>`;
 }
