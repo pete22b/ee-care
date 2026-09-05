@@ -1016,7 +1016,7 @@ function contractCard(c){
       ${r?`<div class="kv">💳 ลูกหนี้: ราคาขาย <b>${usd(r.price)}</b> · รับแล้ว <b>${usd(r.deposit)}</b> · คงค้าง <b style="color:${(r.balance||0)>0?'var(--s8)':'var(--ink3)'}">${usd(r.balance)}</b>${r.sale_type?' · '+esc(r.sale_type):''}${r.generator?' · ที่มา '+esc(r.generator):''}${r.team&&r.team.sales_rep?' · Sales Rep <b>'+esc(r.team.sales_rep)+'</b>':''}${r.team&&r.team.to?' · T/O '+esc(r.team.to):''} <button class="btn sm ghost" onclick="openRecvHistory('${esc(r.contract_no)}')">📜 ประวัติรับเงิน</button></div>`:''}
       ${cl.length?`<div class="kv">💰 คอมมิชชั่น: ${cl.map(l=>`<a href="#" onclick="openCommLine('${esc(l.id)}');return false">รอบ ${esc(l.period.replace('_',' → '))}${commToPay(l)?' · ค้างจ่าย '+usd(commToPay(l)):''}</a>`).join(' · ')}</div>`:''}
       ${st.length?`<div class="kv">🛏 เข้าพัก ${st.length} ครั้ง รวม ${st.reduce((s,w)=>s+(w.nights||0),0)} คืน (ล่าสุด ${fmtD(st.slice().sort((a,b)=>a.check_in<b.check_in?1:-1)[0].check_in)})</div>`:''}
-      ${(()=>{ const sc=scansOf(c.pa); return sc.length?`<div class="kv">📄 สแกนสัญญา (PA) ${sc.length} ไฟล์: <span class="mini">${sc.map(s=>esc(s.file_name)).join(' · ')}</span></div>`:''; })()}
+      ${(()=>{ const sc=scansOf(c.pa); return sc.length?`<div class="kv">📄 สแกนสัญญา (PA) ${sc.length} ไฟล์: <span class="mini">${sc.map(s=>esc(s.file_name)).join(' · ')}</span><br>${scanDriveLink(sc)}</div>`:''; })()}
       </div>`; })()}
     <div class="payout-sec">${payoutHtml}</div>
   </div>`;
@@ -1723,6 +1723,8 @@ const PAY_KIND_TH={payment:['รับเงิน','p-paid'],tradein:['Trade-in
 function payKindPill(k){ const d=PAY_KIND_TH[k||'payment']||[k,'p-none']; return `<span class="pill ${d[1]}">${esc(d[0])}</span>`; }
 function isCashKind(k){ return !k||k==='payment'||k==='tradein'; }
 function scansOf(cno){ const key=(normCno(cno).match(/^([A-Z]+)\/(\d+)/)||[]).slice(1).join('/'); return key?CS.filter(s=>s.contract_key===key):[]; }
+function scanDriveLink(sc){ const folders=[...new Set(sc.map(s=>s.drive_folder).filter(Boolean))]; if(!folders.length) return '';
+  return folders.map(f=>`<a class="btn sm sec" style="display:inline-block;margin:4px 6px 0 0" target="_blank" rel="noopener" href="https://drive.google.com/drive/search?q=${encodeURIComponent('"'+f+'"')}">📂 เปิดสแกนใน Drive (${esc(f)})</a>`).join('')+`<span class="mini"> Google Drive › DB Elite Escape › Contract Scans</span>`; }
 function openRecvHistory(cno){
   const r=REC.find(x=>x.contract_no===cno); if(!r) return;
   const ps=recvPayments(cno); const sumP=ps.filter(p=>isCashKind(p.kind)).reduce((s,p)=>s+(p.amount||0),0);
@@ -1739,7 +1741,7 @@ function openRecvHistory(cno){
   ${ps.slice().reverse().map(p=>`<tr><td>${p.paid_date?fmtD(p.paid_date):'—'}</td><td>${payKindPill(p.kind)}</td><td class="n"><b>${usd(p.amount)}</b></td><td class="n mini">${p.balance_after!=null?usd(p.balance_after):''}</td><td>${esc(p.pay_type||'—')}</td><td>${esc(p.source||'—')}</td><td class="mini">${esc(p.note||'')}</td><td class="mini">${esc((p.updated_by||'').replace('ar-ledger-import','บัญชี (Excel)').replace('commission-import','Commission Master'))}</td>${canEd?`<td><button class="btn sm danger" onclick="deletePayment('${esc(p.id)}')">🗑</button></td>`:''}</tr>`).join('')}
   ${(!ps.length&&initial<=0.5)?'<tr><td colspan="9" class="mini">ยังไม่มีรายการรับเงิน</td></tr>':''}
   </tbody></table></div>
-  ${(()=>{ const sc=scansOf(cno); return sc.length?`<div class="mini" style="margin-top:8px">📄 สแกนสัญญา ${sc.length} ไฟล์: ${sc.map(s=>esc(s.file_name)).join(' · ')}</div>`:''; })()}
+  ${(()=>{ const sc=scansOf(cno); return sc.length?`<div class="mini" style="margin-top:8px">📄 สแกนสัญญา ${sc.length} ไฟล์: ${sc.map(s=>esc(s.file_name)).join(' · ')}<br>${scanDriveLink(sc)}</div>`:''; })()}
   <div class="right" style="margin-top:12px"><button class="btn sec" onclick="openARStatement('${esc(cno)}')">🖨 พิมพ์ Statement</button>
   ${canEd&&recStatus(r)==='owing'?`<button class="btn paybtn" onclick="openRecvPay('${esc(cno)}')">รับเงินเพิ่ม</button>`:''}
   <button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
