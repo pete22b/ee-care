@@ -278,6 +278,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
 <button data-v="cases">แฟ้มสัญญา</button>
 <button data-v="comm">ค่าคอมมิชชั่น</button>
 <button data-v="mkt">ทีมการตลาด</button>
+<button data-v="deals">Daily Sale Report</button>
     <button data-v="interval">Interval</button>
     <div class="navlab">Registry</div>
     <button data-v="renew">ใกล้หมดอายุ</button>
@@ -478,14 +479,15 @@ async function boot(){
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
     const N=v=>v!=null?Number(v):null;
-    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css, mts] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css, mts, dls] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
       fetchAllRows('receivables','contract_no'), fetchAllRows('week_usage','id'), fetchAllRows('ar_payments','id'),
       fetchAllRows('case_files','contract_no'), fetchAllRows('case_customers','id'),
       fetchAllRows('commission_periods','period'), fetchAllRows('commission_lines','id'), fetchAllRows('mkt_weekly','id'),
-      fetchAllRows('contract_scans','sha1'), fetchAllRows('mkt_tours','id')
+      fetchAllRows('contract_scans','sha1'), fetchAllRows('mkt_tours','id'), fetchAllRows('sales_deals','id')
     ]);
+    DL = dls.map(d=>({id:d.id,deal_date:d.deal_date,contract_no:d.contract_no,client_name:d.client_name,email:d.email,nationality:d.nationality,product:d.product,term_years:d.term_years,plan:d.plan,season:d.season,suite:d.suite,sale_type:d.sale_type,generator:d.generator,upgrade_from:d.upgrade_from,list_price:N(d.list_price),purchase_price:N(d.purchase_price),overprice:N(d.overprice),admin_fee:N(d.admin_fee),deposit:N(d.deposit),trade_in:N(d.trade_in),refund:N(d.refund),items:d.items||[],gbp_rate:N(d.gbp_rate),deductions_usd:N(d.deductions_usd),deal_nett:N(d.deal_nett),instalments:d.instalments,instalment_amount:N(d.instalment_amount),first_due:d.first_due,pay_plan:d.pay_plan,team:d.team||{},opc_tour_id:d.opc_tour_id,client_code:d.client_code,bible_contract_id:d.bible_contract_id,status:d.status,note:d.note,updated_by:d.updated_by}));
     MT = mts.map(t=>({id:t.id,tour_date:t.tour_date,pay_friday:t.pay_friday,opc_code:t.opc_code,opc_name:t.opc_name,guest_name:t.guest_name,guests:t.guests,line:t.line,qualify:t.qualify,found:t.found,showed:t.showed!==false,presentation_90:t.presentation_90!==false,deal:!!t.deal,contract_no:t.contract_no,gift:t.gift,breakfast:t.breakfast!==false,taxi:N(t.taxi),hotel:t.hotel,checklist:t.checklist||{},note:t.note,pay_total:N(t.pay_total),updated_by:t.updated_by}));
     CS = css.map(s=>({sha1:s.sha1,contract_no:s.contract_no,contract_key:s.contract_key,file_name:s.file_name,size:s.size,copies:s.copies,drive_folder:s.drive_folder}));
     CP = cps.map(p=>({period:p.period,period_start:p.period_start,period_end:p.period_end,pay_day:p.pay_day,fx_rate:p.fx_rate!=null?Number(p.fx_rate):null,blocks:p.blocks||[],staff_pay:p.staff_pay||[],note:p.note}));
@@ -587,7 +589,8 @@ let CP=[];   /* รอบจ่ายคอมมิชชั่น (commission_
 let CL=[];   /* รายการคอมมิชชั่นต่อสัญญา (commission_lines) */
 let MW=[];   /* ผลงาน/ค่าจ้างทีมการตลาดรายสัปดาห์ (mkt_weekly) */
 let MT=[];   /* บันทึกรายทัวร์ OPC (mkt_tours) */
-Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all'});
+let DL=[];   /* Daily Sale Report — ดีลที่เซ็นสัญญา (sales_deals) */
+Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all', dq:'', dper:'month', dprod:'all'});
 Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all'});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
@@ -625,6 +628,7 @@ function render(){
   if(S.view==='cases') return rCases();
   if(S.view==='comm') return rComm();
   if(S.view==='mkt') return rMkt();
+  if(S.view==='deals') return rDeals();
   if(S.view==='interval') return rInterval();
   if(S.view==='renew') return rRenew();
   if(S.view==='bible') return rBible();
@@ -942,7 +946,7 @@ function rClient(){
   const hasPlan = cons.some(c=>OV.plans[c.id]);
 
   $main.innerHTML = `
-  <button class="bk" onclick="go('${['dash','todo','payouts','ar','recv','weeks','cases','comm','mkt','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
+  <button class="bk" onclick="go('${['dash','todo','payouts','ar','recv','weeks','cases','comm','mkt','deals','interval','renew','bible','backup'].includes(S.from)?S.from:'clients'}')">← กลับ</button>
   <div class="profile-head">
     <div>
       <h2>${esc(cl.name)}</h2>
@@ -1573,7 +1577,7 @@ async function pushRecv(cno){
   try{
     const r=REC.find(x=>x.contract_no===cno); if(!r) return;
     await sbApi('receivables?on_conflict=contract_no',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
-      body:JSON.stringify([{contract_no:r.contract_no,price:r.price,deposit:r.deposit,balance:r.balance,rep:r.rep,admin_fee:r.admin_fee,mfee_cost:r.mfee_cost,paid_note:r.paid_note||'',updated_by:USER&&USER.email}])});
+      body:JSON.stringify([{contract_no:r.contract_no,contract_date:r.contract_date||null,client_name:r.client_name||null,product:r.product||null,price:r.price,deposit:r.deposit,balance:r.balance,status:r.status||null,term:r.term||null,rep:r.rep,email:r.email||null,nationality:r.nationality||null,admin_fee:r.admin_fee,mfee_cost:r.mfee_cost,sale_type:r.sale_type||null,generator:r.generator||null,list_price:r.list_price,gift:r.gift,trade_in:r.trade_in,refund:r.refund,deal_nett:r.deal_nett,overprice:r.overprice,team:r.team||null,currency:r.currency||'USD',source_sheet:r.source_sheet||null,paid_note:r.paid_note||'',updated_by:USER&&USER.email}])});
     toast('☁️ บันทึกลงฐานกลางแล้ว');
   }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
 }
@@ -2266,6 +2270,210 @@ function exportToursCSV(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='opc-tours-'+TODAY+'.csv'; a.click();
 }
 
+/* ================= Daily Sale Report — บันทึกดีล ออกเลขสัญญา หักรายการก่อนคิดคอมฯ ================= */
+async function pushDeal(d){
+  try{
+    const row=Object.assign({},d); delete row.updated_at; row.updated_by=USER&&USER.email;
+    await sbApi('sales_deals?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify([row])});
+    toast('☁️ บันทึกดีลลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function deleteDealPush(id){
+  try{ await sbApi('sales_deals?id=eq.'+encodeURIComponent(id),{method:'DELETE'}); }
+  catch(e){ toast('⚠️ ลบจากฐานกลางไม่สำเร็จ: '+e.message); }
+}
+const DEAL_PRODUCTS=['TCU','CUG','VIP','KUD','EST','ESG','EVIP','ESP','EX','FR1'];
+const DEAL_ITEMS=[
+  ['iv5g','Interval 5Y Gold',388,'USD'],['iv5p','Interval 5Y Platinum',615,'USD'],['iv10g','Interval 10Y Gold',776,'USD'],
+  ['th5','Travel Hack 5y',330,'GBP'],['th10','Travel Hack 10y',630,'GBP'],['airport','Airport transfer',52,'USD'],['mf585','Management fee (เซลส์เสนอ)',585,'USD'],
+  ['rental','Rental night — พักฟรี 7 คืน/ปี (สิทธิ์ ไม่มีต้นทุนหัก)',0,'USD'],['mktweek','Marketing week (บริษัทจ่าย ฿15,400/คืน ไม่หักเซลส์)',0,'USD'],['other','Other (ระบุเอง)',0,'USD']];
+const DEAL_GEN=['Cold Line','Member IH','Upgrade','Self-Gen','Referral','Classic','Travel Partners Int','Other'];
+const GBP_USD_DEFAULT=1.30;
+function bibleProductOf(prefix){ return ({CUG:'Club',VIP:'Club',FR1:'Fractional',KUD:'Kudo'})[prefix]||prefix; }
+function dealSaleType(d){ return `${d.term_years||'?'} Year - ${d.suite||'T1'} - ${(d.season||'High')[0]==='L'?'LS':'HS'}`; }
+function makeContractNo(prod,seq,years,plan,season,suite){ return `${prod}/${seq}/${years}/${(plan||'Annual')[0].toUpperCase()}${(season||'High')[0].toUpperCase()}/${suite||'T1'}`; }
+function nextSeq(prod){
+  let mx=0; const scan=s=>{ const m=/^([A-Z0-9]+)\/(\d{3,5})/.exec(normCno(s||'')); if(m&&m[1]===prod){ const n=parseInt(m[2]); if(n>mx) mx=n; } };
+  allContracts().forEach(c=>scan(c.pa)); REC.forEach(r=>scan(r.contract_no)); CF.forEach(f=>scan(f.contract_no)); DL.forEach(d=>scan(d.contract_no)); CL.forEach(l=>scan(l.contract_no));
+  return mx?mx+1:1000;
+}
+function dealItemsUSD(items,rate){ return (items||[]).reduce((s,it)=>s+((it.cur==='GBP'?(it.cost||0)*(rate||GBP_USD_DEFAULT):(it.cost||0))),0); }
+function dealCalc(d){
+  const ded=dealItemsUSD(d.items,d.gbp_rate); const over=(d.purchase_price||0)-(d.list_price||0);
+  const nett=(d.purchase_price||0)-(d.admin_fee||0)-ded-(d.trade_in||0)-(d.refund||0);
+  return {deductions:ded, overprice:over, nett:nett, balance:(d.purchase_price||0)-(d.deposit||0)};
+}
+function dealPeriod(list){
+  const y=TODAY.slice(0,4), m=TODAY.slice(0,7);
+  if(S.dper==='today') return list.filter(d=>d.deal_date===TODAY);
+  if(S.dper==='week'){ const fri=fridayOf(TODAY), sat=addDaysISO(fri,-6); return list.filter(d=>d.deal_date>=sat&&d.deal_date<=fri); }
+  if(S.dper==='month') return list.filter(d=>(d.deal_date||'').slice(0,7)===m);
+  if(S.dper==='year') return list.filter(d=>(d.deal_date||'').slice(0,4)===y);
+  return list;
+}
+function rDeals(){
+  const canEd=(typeof canEdit==='function')?canEdit():true;
+  let list=dealPeriod(DL.slice());
+  const prods=[...new Set(DL.map(d=>d.product).filter(Boolean))].sort();
+  if(S.dprod!=='all') list=list.filter(d=>d.product===S.dprod);
+  if(S.dq.trim()){ const q=norm(S.dq); list=list.filter(d=>norm(d.contract_no||'').includes(q)||norm(d.client_name||'').includes(q)||norm((d.team||{}).sales_rep||'').includes(q)); }
+  list.sort((a,b)=>a.deal_date<b.deal_date?1:(a.deal_date>b.deal_date?-1:0));
+  const sum=k=>list.reduce((s,d)=>s+(d[k]||0),0);
+  const nett=list.reduce((s,d)=>s+dealCalc(d).nett,0);
+  const byRep={}; list.forEach(d=>{ const r=(d.team||{}).sales_rep||'ไม่ระบุ'; const o=byRep[r]=byRep[r]||{n:0,pp:0,nett:0}; o.n++; o.pp+=d.purchase_price||0; o.nett+=dealCalc(d).nett; });
+  const perLabel={today:'วันนี้',week:'สัปดาห์นี้ (เสาร์–ศุกร์)',month:'เดือนนี้',year:'ปีนี้',all:'ทั้งหมด'}[S.dper];
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div><div class="hero-kick">Sales · Daily Sale Report</div><h1>Daily Sale Report</h1>
+    <p class="sub">บันทึกดีลที่เซ็นสัญญา — ระบบออกเลขสัญญา คำนวณ Overprice, รายการหัก (Interval / Travel Hack / Airport / MF 585 / Other) และ <b>Deal Nett</b> ที่ใช้เป็นฐานคิดคอมมิชชั่น พร้อมสร้างลูกหนี้และทะเบียนสัญญาให้อัตโนมัติ</p></div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${list.length}">0</b><span>ดีล ${perLabel}</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(sum('purchase_price'))}">0</span></b><span>ยอดขาย (Purchase Price)</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(sum('deposit'))}">0</span></b><span>มัดจำรับแล้ว</span></div>
+      <div><b>$<span class="cnt" data-n="${Math.round(nett)}">0</span></b><span>Deal Nett (ฐานคอมฯ)</span></div>
+    </div>
+  </div></div>
+  <div class="tabbtns">${[['today','วันนี้'],['week','สัปดาห์นี้'],['month','เดือนนี้'],['year','ปีนี้'],['all','ทั้งหมด']].map(([k,l])=>`<button class="${S.dper===k?'on':''}" onclick="S.dper='${k}';render()">${l}</button>`).join('')}</div>
+  <div class="search">
+    <input type="text" id="dq" placeholder="🔍 เลขสัญญา / ชื่อลูกค้า / Sales Rep…" value="${esc(S.dq)}">
+    <select class="flt" onchange="S.dprod=this.value;render()"><option value="all">ทุกผลิตภัณฑ์</option>${prods.map(p=>`<option ${S.dprod===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+    ${canEd?`<button class="btn" onclick="openDealModal('')">＋ บันทึกดีล / ออกเลขสัญญา</button>`:''}
+    <button class="btn sec" onclick="printDailyReport()">🖨 พิมพ์รายงาน</button>
+    <button class="btn sec" onclick="exportDealsCSV()">⬇️ CSV</button>
+  </div>
+  ${DL.length===0?`<div class="note blue">ยังไม่มีดีลในระบบ — เมื่อปิดดีลแล้วกด "＋ บันทึกดีล" ระบบจะออกเลขสัญญาถัดไปของผลิตภัณฑ์นั้นให้เอง (เช่น ${esc(makeContractNo('TCU',nextSeq('TCU'),5,'Annual','High','T1'))})</div>`:''}
+  ${Object.keys(byRep).length>1?`<div class="panel"><h3><span class="idx">01</span>สรุปตาม Sales Rep — ${perLabel}</h3>
+    <div class="scroll"><table><thead><tr><th>Sales Rep</th><th class="n">ดีล</th><th class="n">ยอดขาย</th><th class="n">Deal Nett</th></tr></thead><tbody>
+    ${Object.entries(byRep).sort((a,b)=>b[1].nett-a[1].nett).map(([r,o])=>`<tr class="click" onclick="S.dq='${esc(r)}';render()"><td><b>${esc(r)}</b></td><td class="n">${o.n}</td><td class="n">${usd(o.pp)}</td><td class="n"><b>${usd(o.nett)}</b></td></tr>`).join('')}
+    </tbody></table></div></div>`:''}
+  <div class="panel">
+    <h3><span class="idx">${Object.keys(byRep).length>1?'02':'01'}</span>รายการดีล</h3>
+    <div class="cs">${list.length} ดีล · คลิกแถวเพื่อดู/แก้ไข · เลขสัญญาที่ออกแล้วจะไปโผล่ในลูกหนี้ ทะเบียนสัญญา และแฟ้มลูกค้าอัตโนมัติ</div>
+    ${list.length?`<div class="scroll"><table><thead><tr><th>วันที่</th><th>เลขสัญญา</th><th>ลูกค้า</th><th>ประเภท</th><th>ที่มา</th><th class="n">List</th><th class="n">Purchase</th><th class="n">Overprice</th><th class="n">มัดจำ</th><th class="n">หัก</th><th class="n">Deal Nett</th><th>Sales Rep</th><th>T/O</th><th>สถานะ</th></tr></thead><tbody>
+    ${list.map(d=>{ const c=dealCalc(d); return `<tr class="${canEd?'click':''}" ${canEd?`onclick="openDealModal('${esc(d.id)}')"`:''}><td>${fmtD(d.deal_date)}</td><td><b>${esc(d.contract_no||'—')}</b></td><td>${esc(d.client_name||'')}${d.nationality?'<br><span class="mini">'+esc(d.nationality)+'</span>':''}</td><td class="mini">${esc(dealSaleType(d))}</td><td class="mini">${esc(d.generator||'')}${d.upgrade_from?'<br>จาก '+esc(d.upgrade_from):''}</td>
+      <td class="n">${usd(d.list_price)}</td><td class="n"><b>${usd(d.purchase_price)}</b></td><td class="n">${c.overprice?usd(c.overprice):'—'}</td><td class="n">${usd(d.deposit)}</td><td class="n">${c.deductions?usd(c.deductions+(d.admin_fee||0)):usd(d.admin_fee||0)}</td><td class="n"><b>${usd(c.nett)}</b></td>
+      <td>${esc((d.team||{}).sales_rep||'—')}</td><td>${esc((d.team||{}).to||'—')}</td><td><span class="pill ${/cancel/i.test(d.status||'')?'p-cancel':(/paid|complete/i.test(d.status||'')?'p-paid':'p-soon')}">${esc(d.status||'Instalments')}</span></td></tr>`; }).join('')}
+    </tbody></table></div>`:'<div class="mini">ไม่มีดีลในช่วงที่เลือก</div>'}
+  </div>`;
+  runCounters();
+  const inp=document.getElementById('dq');
+  if(inp) inp.oninput=()=>{ S.dq=inp.value; render(); const el=document.getElementById('dq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function dealTeamNames(role){ const s=new Set(); REC.forEach(r=>{ if(r.team&&r.team[role]) s.add(r.team[role]); }); CL.forEach(l=>{ if(l.roles&&l.roles[role]) s.add(l.roles[role]); }); DL.forEach(d=>{ if(d.team&&d.team[role]) s.add(d.team[role]); }); return [...s].sort(); }
+function openDealModal(id){
+  const d=id?DL.find(x=>x.id===id):null;
+  const v=(k,dft)=>d?(d[k]!=null?d[k]:''):dft;
+  const items=(d&&d.items)||[]; const has=code=>items.find(i=>i.code===code);
+  const tours=MT.filter(t=>!t.contract_no||(d&&t.id===d.opc_tour_id)).sort((a,b)=>a.tour_date<b.tour_date?1:-1).slice(0,60);
+  const roles=[['sales_rep','Sales Rep'],['to','T/O'],['manager','Manager'],['button_up','Button-Up'],['follow_up','Follow-Up'],['support','Support']];
+  openModal(`<h3>${d?'ดีล '+esc(d.contract_no||''):'บันทึกดีล / ออกเลขสัญญา'}</h3>
+  <div class="form">
+    <div><label>วันที่เซ็นสัญญา</label><input id="dl_date" type="date" value="${v('deal_date',TODAY)}"></div>
+    <div><label>ที่มาของดีล (Generator)</label><select id="dl_gen">${DEAL_GEN.map(g=>`<option ${(d?d.generator:'Cold Line')===g?'selected':''}>${g}</option>`).join('')}</select></div>
+    <div class="full"><label>ชื่อลูกค้า *</label><input id="dl_name" type="text" value="${esc(v('client_name',''))}" placeholder="เช่น John & Mary Smith"></div>
+    <div><label>อีเมล</label><input id="dl_email" type="text" value="${esc(v('email',''))}"></div>
+    <div><label>สัญชาติ</label><input id="dl_nat" type="text" value="${esc(v('nationality',''))}"></div>
+    <div><label>ผลิตภัณฑ์</label><select id="dl_prod" onchange="dlAuto()">${DEAL_PRODUCTS.map(p=>`<option ${(d?d.product:'TCU')===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div><label>ระยะสัญญา (ปี)</label><select id="dl_years" onchange="dlAuto()">${[5,10,15,20].map(y=>`<option ${(d?d.term_years:5)===y?'selected':''}>${y}</option>`).join('')}</select></div>
+    <div><label>แผน</label><select id="dl_plan" onchange="dlAuto()"><option ${(d?d.plan:'Annual')!=='Biennial'?'selected':''}>Annual</option><option ${(d&&d.plan==='Biennial')?'selected':''}>Biennial</option></select></div>
+    <div><label>Season</label><select id="dl_season" onchange="dlAuto()"><option ${(d?d.season:'High')!=='Low'?'selected':''}>High</option><option ${(d&&d.season==='Low')?'selected':''}>Low</option></select></div>
+    <div><label>Suite</label><select id="dl_suite" onchange="dlAuto()"><option ${(d?d.suite:'T1')!=='T0'?'selected':''}>T1</option><option ${(d&&d.suite==='T0')?'selected':''}>T0</option></select></div>
+    <div><label>เลขสัญญา ${d?'':'(ออกให้อัตโนมัติ แก้ได้)'}</label><div style="display:flex;gap:6px"><input id="dl_cno" type="text" value="${esc(v('contract_no',''))}" style="flex:1;font-weight:700">${d?'':'<button class="btn sm ghost" type="button" onclick="dlNewNo()" title="ออกเลขถัดไป">🔄</button>'}</div></div>
+    <div><label>อัปเกรด/ดาวน์เกรดจากสัญญา</label><input id="dl_from" type="text" value="${esc(v('upgrade_from',''))}" placeholder="เช่น TCU/1086/5/AH/T1"></div>
+    <div><label>List Price (US$)</label><input id="dl_list" type="number" step="any" value="${v('list_price','')}" oninput="dlCalc()"></div>
+    <div><label>Purchase Price (US$) *</label><input id="dl_pp" type="number" step="any" value="${v('purchase_price','')}" oninput="dlCalc()"></div>
+    <div><label>Admin fee (US$)</label><input id="dl_admin" type="number" step="any" value="${v('admin_fee','')}" oninput="dlCalc()" placeholder="1000 (5/10 ปี) · 1500 (20 ปี)"></div>
+    <div><label>มัดจำรับวันนี้ (US$)</label><input id="dl_dep" type="number" step="any" value="${v('deposit','')}" oninput="dlCalc()"></div>
+    <div><label>Trade-in (US$)</label><input id="dl_ti" type="number" step="any" value="${v('trade_in','')}" oninput="dlCalc()"></div>
+    <div><label>Refund (US$)</label><input id="dl_rf" type="number" step="any" value="${v('refund','')}" oninput="dlCalc()"></div>
+    <div class="full" style="background:var(--surface2);border-radius:10px;padding:10px 12px"><b style="font-size:13px">รายการที่มากับดีล (หักจากยอดขายก่อนคิดคอมฯ)</b> <span class="mini">อัตรา £→$ <input id="dl_gbp" type="number" step="0.01" value="${v('gbp_rate',GBP_USD_DEFAULT)}" style="width:70px" oninput="dlCalc()"></span>
+      ${DEAL_ITEMS.map(([code,label,cost,cur])=>{ const it=has(code); return `<div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><label style="font-weight:400;flex:1;min-width:220px"><input type="checkbox" id="dl_it_${code}" ${it?'checked':''} onchange="dlCalc()"> ${label}</label>
+        ${code==='other'?`<input id="dl_it_other_label" type="text" placeholder="ระบุรายการ" value="${esc(it?it.label:'')}" style="width:160px">`:''}
+        <input id="dl_itc_${code}" type="number" step="any" value="${it?it.cost:cost}" style="width:90px" oninput="dlCalc()"> <span class="mini" style="width:34px">${cur}</span></div>`; }).join('')}</div>
+    <div><label>จำนวนงวดผ่อน</label><input id="dl_inst" type="number" value="${v('instalments','')}" oninput="dlCalc()"></div>
+    <div><label>งวดแรกวันที่</label><input id="dl_due" type="date" value="${v('first_due','')}"></div>
+    <div class="full"><label>แผนชำระ (ข้อความ)</label><input id="dl_plan_txt" type="text" value="${esc(v('pay_plan',''))}" placeholder="เช่น 11x458; 1x462 from 20.10.2026 via CC auth"></div>
+    ${roles.map(([k,l])=>`<div><label>${l}</label><input id="dl_t_${k}" type="text" list="dl_names_${k}" value="${esc((d&&d.team&&d.team[k])||'')}"><datalist id="dl_names_${k}">${dealTeamNames(k).map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>`).join('')}
+    <div class="full"><label>ผูกกับทัวร์ OPC (Cold Line)</label><select id="dl_tour"><option value="">— ไม่ผูก —</option>${tours.map(t=>`<option value="${esc(t.id)}" ${(d&&d.opc_tour_id===t.id)?'selected':''}>${fmtD(t.tour_date)} · ${esc(t.guest_name||'')} · ${esc((t.opc_code?t.opc_code+' ':'')+(t.opc_name||''))} (${esc(t.qualify||'')})</option>`).join('')}</select></div>
+    <div><label>สถานะ</label><select id="dl_status">${['Instalments','Paid Upfront','Completed','Cancelled'].map(s=>`<option ${(d?d.status:'Instalments')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div><label>สร้างในทะเบียน Bible + ลูกหนี้</label><select id="dl_sync"><option value="1" ${d?'':'selected'}>${d?'อัปเดตลูกหนี้':'สร้างลูกค้า+สัญญา+ลูกหนี้'}</option><option value="0" ${d?'selected':''}>บันทึกดีลอย่างเดียว</option></select></div>
+    <div class="full"><label>หมายเหตุ</label><input id="dl_note" type="text" value="${esc(v('note',''))}"></div>
+    <div class="full" id="dl_summary" style="background:var(--surface2);border-radius:10px;padding:10px 12px;font-size:13.5px"></div>
+  </div>
+  <div class="right">${d?`<button class="btn ghost danger" onclick="deleteDeal('${esc(d.id)}')">🗑 ลบดีล</button>`:''}<button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveDeal('${d?esc(d.id):''}')">💾 บันทึกดีล</button></div>`);
+  if(!d){ dlAuto(true); } dlCalc();
+}
+function dlAuto(force){ const g=k=>document.getElementById(k); if(!g('dl_cno')) return;
+  const prod=g('dl_prod').value, years=parseInt(g('dl_years').value);
+  if(force||!g('dl_cno').dataset.manual) dlNewNo();
+  if(g('dl_admin').value==='') g('dl_admin').value=years>=20?1500:1000; dlCalc(); }
+function dlNewNo(){ const g=k=>document.getElementById(k); const prod=g('dl_prod').value; g('dl_cno').value=makeContractNo(prod,nextSeq(prod),parseInt(g('dl_years').value),g('dl_plan').value,g('dl_season').value,g('dl_suite').value); g('dl_cno').oninput=()=>{ g('dl_cno').dataset.manual='1'; }; }
+function dlRead(){ const g=k=>document.getElementById(k); const n=k=>g(k).value===''?null:parseFloat(g(k).value);
+  const items=[]; DEAL_ITEMS.forEach(([code,label,cost,cur])=>{ if(g('dl_it_'+code).checked) items.push({code,label:code==='other'?(g('dl_it_other_label').value.trim()||'Other'):label,cost:n('dl_itc_'+code)||0,cur}); });
+  const team={}; ['sales_rep','to','manager','button_up','follow_up','support'].forEach(k=>{ const val=g('dl_t_'+k).value.trim(); if(val) team[k]=val; });
+  const d={deal_date:g('dl_date').value, contract_no:normCno(g('dl_cno').value), client_name:g('dl_name').value.trim(), email:g('dl_email').value.trim()||null, nationality:g('dl_nat').value.trim()||null,
+    product:g('dl_prod').value, term_years:parseInt(g('dl_years').value), plan:g('dl_plan').value, season:g('dl_season').value, suite:g('dl_suite').value, generator:g('dl_gen').value, upgrade_from:normCno(g('dl_from').value)||null,
+    list_price:n('dl_list'), purchase_price:n('dl_pp'), admin_fee:n('dl_admin'), deposit:n('dl_dep'), trade_in:n('dl_ti'), refund:n('dl_rf'), items, gbp_rate:n('dl_gbp')||GBP_USD_DEFAULT,
+    instalments:g('dl_inst').value===''?null:parseInt(g('dl_inst').value), first_due:g('dl_due').value||null, pay_plan:g('dl_plan_txt').value.trim()||null, team, opc_tour_id:g('dl_tour').value||null, status:g('dl_status').value, note:g('dl_note').value.trim()||null};
+  d.sale_type=dealSaleType(d); const c=dealCalc(d); d.overprice=c.overprice; d.deductions_usd=c.deductions; d.deal_nett=c.nett; return d; }
+function dlCalc(){ const el=document.getElementById('dl_summary'); if(!el) return; const d=dlRead(); const c=dealCalc(d);
+  const per=d.instalments&&c.balance>0?Math.round(c.balance/d.instalments):null;
+  el.innerHTML=`<b>สรุป:</b> Purchase ${usd(d.purchase_price)} − Admin ${usd(d.admin_fee)} − รายการหัก ${usd(c.deductions)}${d.trade_in?' − Trade-in '+usd(d.trade_in):''}${d.refund?' − Refund '+usd(d.refund):''} = <b>Deal Nett ${usd(c.nett)}</b> (ฐานคิดคอมฯ)<br>
+  Overprice ${c.overprice?usd(c.overprice):'—'} · มัดจำ ${usd(d.deposit)} · <b>คงค้าง ${usd(c.balance)}</b>${per?' ≈ '+d.instalments+' งวด × '+usd(per):''}${d.items.some(i=>i.code==='rental')?' · สิทธิ์พักฟรี 7 คืน/ปี':''}${d.items.some(i=>i.code==='mktweek')?' · มี Marketing week':''}`; }
+function saveDeal(id){
+  const d=dlRead();
+  if(!d.client_name||!d.contract_no||!(d.purchase_price>0)){ toast('กรุณาใส่ชื่อลูกค้า เลขสัญญา และ Purchase Price'); return; }
+  if(!id && (DL.some(x=>x.contract_no===d.contract_no)||REC.some(r=>normCno(r.contract_no)===d.contract_no)||contractByPa(d.contract_no))){ if(!confirm('เลขสัญญา '+d.contract_no+' มีอยู่แล้วในระบบ — บันทึกซ้ำหรือไม่?')) return; }
+  d.updated_by=(typeof USER!=='undefined'&&USER)?USER.email:null;
+  const sync=document.getElementById('dl_sync').value==='1';
+  let rec=id?DL.find(x=>x.id===id):null;
+  if(rec) Object.assign(rec,d); else { rec=Object.assign({id:'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d); DL.push(rec); }
+  if(sync){
+    /* 1) ลูกหนี้ */
+    let r=REC.find(x=>normCno(x.contract_no)===rec.contract_no);
+    const c=dealCalc(rec);
+    const fields={contract_no:rec.contract_no,contract_date:rec.deal_date,client_name:rec.client_name,product:rec.product,price:rec.purchase_price,status:rec.status,term:rec.term_years+' Yrs',rep:rec.team.sales_rep||null,email:rec.email,nationality:rec.nationality,sale_type:rec.sale_type,generator:rec.generator,list_price:rec.list_price,admin_fee:rec.admin_fee,gift:c.deductions,trade_in:rec.trade_in,refund:rec.refund,deal_nett:c.nett,overprice:c.overprice,team:rec.team,currency:'USD',source_sheet:'Daily Sale Report'};
+    if(!r){ r=Object.assign({deposit:0,balance:rec.purchase_price,paid_note:''},fields); REC.push(r); if(rec.deposit>0){ const p={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),contract_no:rec.contract_no,amount:rec.deposit,paid_date:rec.deal_date,pay_type:null,source:null,note:'Deposit (Daily Sale Report)',kind:'payment',updated_by:d.updated_by}; RP.unshift(p); pushPayment(p); r.deposit=rec.deposit; r.balance=Math.max(0,rec.purchase_price-rec.deposit); } }
+    else { Object.assign(r,fields); r.balance=Math.max(0,(r.price||0)-(r.deposit||0)); }
+    pushRecv(rec.contract_no);
+    /* 2) ทะเบียน Bible (ลูกค้า + สัญญา) */
+    if(!contractByPa(rec.contract_no)){
+      const maxN=Math.max(0,...allClients().map(cl=>{const m=/^EE-(\d+)$/.exec(cl.code); return m?Number(m[1]):0;}));
+      const code='EE-'+String(maxN+1).padStart(4,'0'); const cid=OV.nextCid++; const fyo=Number(rec.deal_date.slice(0,4))+1;
+      OV.customClients.push({code,name:rec.client_name,alt_names:[],emails:rec.email?[rec.email]:[],nat:rec.nationality||null,contract_ids:[cid],custom:true});
+      OV.customContracts.push({id:cid,sheet:'Daily Sale Report',product:bibleProductOf(rec.product),pa:rec.contract_no,name:rec.client_name,nat:rec.nationality||null,plan:rec.plan,term:rec.term_years+' Yrs',suite:rec.suite,season:rec.season,status:'Welcome',status_note:'จาก Daily Sale Report · '+(rec.generator||''),comp_date:rec.deal_date,fyo:fyo,lyo:fyo+rec.term_years-1,fees:[],row:null,client:code,custom:true});
+      rec.client_code=code; rec.bible_contract_id=cid; invalidate(); save(); pushNewClient(code);
+    }
+    /* 3) ทัวร์ OPC */
+    if(rec.opc_tour_id){ const t=MT.find(x=>x.id===rec.opc_tour_id); if(t){ t.deal=true; t.contract_no=rec.contract_no; const p=tourPay(t); Object.assign(t,{pay_base:p.base,pay_split:p.split,pay_bonus:p.bonus,pay_total:p.total}); pushTour(t); } }
+  }
+  pushDeal(rec); closeModal(); render(); toast('บันทึกดีล '+rec.contract_no+' แล้ว ✅'+(sync?' สร้างลูกหนี้/ทะเบียนแล้ว':''));
+}
+function deleteDeal(id){ if(!confirm('ลบดีลนี้? (ลูกหนี้/ทะเบียนที่สร้างไว้จะไม่ถูกลบอัตโนมัติ)')) return; DL=DL.filter(x=>x.id!==id); deleteDealPush(id); closeModal(); render(); toast('ลบดีลแล้ว'); }
+function printDailyReport(){
+  const list=dealPeriod(DL.slice()).sort((a,b)=>a.deal_date<b.deal_date?-1:1); const perLabel={today:'วันนี้ '+fmtD(TODAY),week:'สัปดาห์ '+fmtD(addDaysISO(fridayOf(TODAY),-6))+' – '+fmtD(fridayOf(TODAY)),month:'เดือน '+TH_M[Number(TODAY.slice(5,7))-1]+' '+TODAY.slice(0,4),year:'ปี '+TODAY.slice(0,4),all:'ทั้งหมด'}[S.dper];
+  const tot=k=>list.reduce((s,d)=>s+(d[k]||0),0); const nett=list.reduce((s,d)=>s+dealCalc(d).nett,0);
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>Daily Sale Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=EB+Garamond:wght@600&display=swap" rel="stylesheet">
+  <style>body{font:12.5px/1.6 'Sarabun',sans-serif;color:#1c2436;max-width:1000px;margin:26px auto;padding:0 20px}.wm{font-family:'EB Garamond',Georgia,serif;font-size:22px;letter-spacing:.15em;color:#102e4c;font-weight:600}.kick{letter-spacing:.3em;font-size:10px;color:#b08d3e;text-transform:uppercase;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:5px 8px;border-bottom:1px solid #e8e8e8;text-align:left;font-size:11.5px}th{background:#f2f5f7;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#5b6b7a}td.n,th.n{text-align:right}
+  .btn{margin-top:22px;padding:9px 22px;font:600 13px 'Sarabun';border:none;border-radius:99px;background:#102e4c;color:#fff;cursor:pointer}@media print{.btn{display:none}@page{size:landscape}}</style></head><body>
+  <div class="wm">CLUB UNIQUE · ELITE ESCAPES</div><div class="kick">Daily Sale Report · ${esc(perLabel)}</div><hr style="border:none;border-top:2px solid #b08d3e;margin:10px 0 14px">
+  <table><thead><tr><th>วันที่</th><th>เลขสัญญา</th><th>ลูกค้า</th><th>ประเภท</th><th>ที่มา</th><th class="n">List</th><th class="n">Purchase</th><th class="n">Overprice</th><th class="n">Admin</th><th class="n">รายการหัก</th><th class="n">Deal Nett</th><th class="n">มัดจำ</th><th class="n">คงค้าง</th><th>Rep</th><th>T/O</th><th>แผนชำระ</th></tr></thead><tbody>
+  ${list.map(d=>{const c=dealCalc(d); return `<tr><td>${fmtD(d.deal_date)}</td><td>${esc(d.contract_no||'')}</td><td>${esc(d.client_name||'')}</td><td>${esc(dealSaleType(d))}</td><td>${esc(d.generator||'')}</td><td class="n">${Math.round(d.list_price||0).toLocaleString()}</td><td class="n">${Math.round(d.purchase_price||0).toLocaleString()}</td><td class="n">${Math.round(c.overprice).toLocaleString()}</td><td class="n">${Math.round(d.admin_fee||0).toLocaleString()}</td><td class="n">${Math.round(c.deductions).toLocaleString()}${(d.items||[]).length?'<br><span style="color:#5b6b7a">'+d.items.map(i=>esc(i.label)).join(', ')+'</span>':''}</td><td class="n"><b>${Math.round(c.nett).toLocaleString()}</b></td><td class="n">${Math.round(d.deposit||0).toLocaleString()}</td><td class="n">${Math.round(c.balance).toLocaleString()}</td><td>${esc((d.team||{}).sales_rep||'')}</td><td>${esc((d.team||{}).to||'')}</td><td>${esc(d.pay_plan||'')}</td></tr>`;}).join('')}
+  <tr><td colspan="6" style="text-align:right;font-weight:700">รวม ${list.length} ดีล</td><td class="n"><b>${Math.round(tot('purchase_price')).toLocaleString()}</b></td><td></td><td class="n">${Math.round(tot('admin_fee')).toLocaleString()}</td><td class="n">${Math.round(list.reduce((s,d)=>s+dealCalc(d).deductions,0)).toLocaleString()}</td><td class="n"><b>${Math.round(nett).toLocaleString()}</b></td><td class="n"><b>${Math.round(tot('deposit')).toLocaleString()}</b></td><td colspan="4"></td></tr></tbody></table>
+  <p style="font-size:11px;color:#8a97a5;margin-top:18px">ตัวเลขเป็น US$ · Deal Nett = Purchase − Admin − รายการหัก − Trade-in − Refund (ฐานคิดคอมมิชชั่น) · ออกจากระบบ Elite Escapes Customer Care ${fmtD(TODAY)}</p>
+  <button class="btn" onclick="print()">🖨 พิมพ์</button></body></html>`); w.document.close();
+}
+function exportDealsCSV(){
+  const rows=[['วันที่','เลขสัญญา','ลูกค้า','อีเมล','สัญชาติ','ผลิตภัณฑ์','ปี','แผน','Season','Suite','ที่มา','อัปเกรดจาก','List','Purchase','Overprice','Admin','มัดจำ','Trade-in','Refund','รายการหัก (US$)','รายการ','Deal Nett','งวด','งวดแรก','แผนชำระ','Sales Rep','T/O','Manager','Button-Up','Follow-Up','สถานะ','หมายเหตุ','บันทึกโดย']];
+  DL.slice().sort((a,b)=>a.deal_date<b.deal_date?1:-1).forEach(d=>{ const c=dealCalc(d); const t=d.team||{}; rows.push([d.deal_date,d.contract_no,d.client_name,d.email||'',d.nationality||'',d.product,d.term_years,d.plan,d.season,d.suite,d.generator||'',d.upgrade_from||'',d.list_price||'',d.purchase_price||'',c.overprice,d.admin_fee||'',d.deposit||'',d.trade_in||'',d.refund||'',c.deductions,(d.items||[]).map(i=>i.label+' '+i.cost+' '+i.cur).join('; '),c.nett,d.instalments||'',d.first_due||'',d.pay_plan||'',t.sales_rep||'',t.to||'',t.manager||'',t.button_up||'',t.follow_up||'',d.status||'',d.note||'',d.updated_by||'']); });
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='daily-sale-report-'+TODAY+'.csv'; a.click();
+}
+
 /* ================= ทะเบียนสัญญา (Bible) ================= */
 function rBible(){
   const pcnt={}; allContracts().forEach(c=>{pcnt[c.product]=(pcnt[c.product]||0)+1;});
@@ -2402,7 +2610,7 @@ function resetOV(){
 
 /* ===== LIVE: viewer role guards ===== */
 function canEdit(){ return USER && USER.role!=='viewer'; }
-['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt','openTourModal','saveTour','deleteTour'].forEach(fn=>{
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt','openTourModal','saveTour','deleteTour','openDealModal','saveDeal','deleteDeal'].forEach(fn=>{
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('บัญชีของคุณมีสิทธิ์ดูอย่างเดียว'); return; } return orig.apply(this,arguments); };
 });
