@@ -604,6 +604,45 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="bracket"] .pmix{border-radius:2px}
 [data-skin="bracket"] .donut{box-shadow:none} [data-skin="bracket"] .donut i{box-shadow:none}
 [data-skin="bracket"] .cards{gap:14px}
+/* --- Bracket: layout with top bar + sidebar summary --- */
+.topbar,#sidestats{display:none}
+[data-skin="bracket"] .app{grid-template-rows:auto 1fr}
+[data-skin="bracket"] .side{grid-row:1/3}
+[data-skin="bracket"] .app.collapsed{grid-template-columns:0 1fr} [data-skin="bracket"] .app.collapsed .side{display:none}
+[data-skin="bracket"] .topbar{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid var(--line);padding:0 18px;height:54px;position:sticky;top:0;z-index:20}
+[data-skin="bracket"] .tb-menu{font:18px/1 sans-serif;background:none;border:none;color:var(--ink2);cursor:pointer;padding:6px 8px;border-radius:2px}
+[data-skin="bracket"] .tb-menu:hover{background:var(--surface2)}
+[data-skin="bracket"] .tb-search{position:relative;flex:0 1 380px}
+[data-skin="bracket"] .tb-search input{width:100%;padding:7px 34px 7px 12px;border:1px solid #cfd6de;border-radius:2px;font:inherit;font-size:13px;background:#fff;outline:none}
+[data-skin="bracket"] .tb-search input:focus{border-color:var(--s1)}
+[data-skin="bracket"] .tb-search .tb-ico{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:15px}
+[data-skin="bracket"] .tb-crumb{margin-left:auto;font-size:12px;color:var(--ink3);white-space:nowrap}
+[data-skin="bracket"] .tb-crumb a{color:var(--s1);text-decoration:none} [data-skin="bracket"] .tb-crumb b{color:var(--ink);font-weight:600}
+[data-skin="bracket"] .tb-bell{position:relative;background:none;border:none;font-size:16px;cursor:pointer;padding:6px 8px;border-radius:2px;color:var(--ink2)}
+[data-skin="bracket"] .tb-bell:hover{background:var(--surface2)}
+[data-skin="bracket"] .tb-bell span{position:absolute;top:0;right:0;background:#f0534b;color:#fff;font:700 10px var(--sans);padding:1px 5px;border-radius:2px}
+[data-skin="bracket"] .tb-bell span.hide{display:none}
+[data-skin="bracket"] .tb-user{display:flex;align-items:center;gap:9px;background:none;border:none;border-left:1px solid var(--line);padding:4px 4px 4px 14px;cursor:pointer;font:inherit;color:var(--ink);text-align:left}
+[data-skin="bracket"] .tb-user:hover .tb-av{filter:brightness(1.1)}
+[data-skin="bracket"] .tb-av{width:32px;height:32px;border-radius:50%;background:#1caf9a;color:#fff;display:inline-flex;align-items:center;justify-content:center;font:700 12px var(--sans);letter-spacing:.02em}
+[data-skin="bracket"] .tb-user b{display:block;font-size:13px;font-weight:600;line-height:1.2} [data-skin="bracket"] .tb-user small{display:block;font-size:11px;color:var(--ink3);line-height:1.2}
+[data-skin="bracket"] #sidestats{display:block;margin-top:auto;padding:6px 0 0;border-top:1px solid #384049}
+[data-skin="bracket"] #sidestats .ssl{color:#7d8794;font:700 10px var(--sans);letter-spacing:.14em;padding:10px 18px 4px}
+[data-skin="bracket"] .ss{display:grid;grid-template-columns:1fr 56px;gap:8px;align-items:center;padding:7px 18px;border-bottom:1px solid #384049}
+[data-skin="bracket"] .ss small{display:block;color:#7d8794;font:700 9.5px var(--sans);letter-spacing:.1em;text-transform:uppercase}
+[data-skin="bracket"] .ss b{display:block;color:#fff;font:500 14px var(--sans);font-variant-numeric:tabular-nums}
+[data-skin="bracket"] .ss .sp{display:flex;align-items:flex-end;gap:2px;height:22px} [data-skin="bracket"] .ss .sp i{flex:1;display:block;background:#3a97d3;min-height:2px;border-radius:1px}
+[data-skin="bracket"] .ss.g .sp i{background:#1caf9a} [data-skin="bracket"] .ss.r .sp i{background:#f0534b} [data-skin="bracket"] .ss.o .sp i{background:#f39c12}
+[data-skin="bracket"] .side .tag{margin-top:0}
+/* Bracket KPI tiles: faint icon + sub metric row like the reference */
+[data-skin="bracket"] .hero-stats>div{position:relative;overflow:hidden;padding-left:70px;min-height:96px;justify-content:center}
+[data-skin="bracket"] .hero-stats>div::before{content:'';position:absolute;left:16px;top:50%;width:42px;height:42px;transform:translateY(-50%);background:rgba(255,255,255,.85);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+[data-skin="bracket"] .hero-stats>div:nth-child(4n+1){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'/></svg>")}
+[data-skin="bracket"] .hero-stats>div:nth-child(4n+2){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h8'/></svg>")}
+[data-skin="bracket"] .hero-stats>div:nth-child(4n+3){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M3 3v18h18M7 15l4-5 4 3 5-7'/></svg>")}
+[data-skin="bracket"] .hero-stats>div:nth-child(4n+4){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/></svg>")}
+[data-skin="bracket"] .hero{border-bottom:1px solid var(--line);padding-bottom:16px}
+@media(max-width:840px){[data-skin="bracket"] .side{grid-row:auto} [data-skin="bracket"] .topbar{position:static} [data-skin="bracket"] .tb-crumb{display:none}}
 
 /* ===== LIVE: login gate ===== */
 #gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#071a2e;overflow:hidden;transition:opacity .5s}
@@ -687,10 +726,18 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button data-b="CU" onclick="setBrand('CU')">Club Unique</button>
     <button data-b="EE" onclick="setBrand('EE')">Elite Escapes</button>
   </div>
+  <div id="sidestats"></div>
   <button class="palhint" onclick="openPalette()">🔍 ค้นหาด่วน <span>Ctrl+K</span></button>
   <div class="tag" id="userbox" style="margin-top:auto;line-height:1.7"></div>
   <div class="tag" style="margin-top:14px" id="synctag">🟢 เชื่อมต่อฐานข้อมูลกลาง<br>Supabase · Elite-Escapes</div>
 </aside>
+<header class="topbar" id="topbar">
+  <button class="tb-menu" onclick="document.querySelector('.app').classList.toggle('collapsed')" title="ย่อ/ขยายเมนู">☰</button>
+  <div class="tb-search"><input id="tb-q" type="text" placeholder="ค้นหาลูกค้า / เลขสัญญา / อีเมล…  (Enter)"><span class="tb-ico">⌕</span></div>
+  <div class="tb-crumb">คุณอยู่ที่: <a href="#" onclick="go('dash');return false">Elite Escapes</a> / <b id="tb-crumb">ภาพรวม</b></div>
+  <button class="tb-bell" onclick="go('todo')" title="งานที่ต้องทำ">🔔<span id="tb-badge" class="hide"></span></button>
+  <button class="tb-user" onclick="go('backup')" title="ข้อมูลกลาง / ผู้ใช้"><span class="tb-av" id="tb-av">EE</span><span><b id="tb-name">ทีมงาน</b><small id="tb-role">Elite Escapes</small></span></button>
+</header>
 <main id="main"></main>
 </div>
 <div id="pal" class="hide" onclick="if(event.target===this)closePalette()"><div class="pal-box"><input id="palq" placeholder="พิมพ์ชื่อลูกค้า / อีเมล / เลขสัญญา… แล้ว Enter" oninput="PAL.q=this.value;PAL.idx=0;palRender()"><div class="pal-res" id="palres"></div><div class="pal-tip">↑↓ เลือก · Enter เปิด · Esc ปิด · เปิดจากหน้าไหนก็ได้ด้วย Ctrl+K</div></div></div>
@@ -1266,6 +1313,35 @@ function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElemen
 const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.querySelector('.nv')) return; const p=NAV_ICONS[b.dataset.v]; if(!p) return; b.insertAdjacentHTML('afterbegin',`<i class="nv"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`); }); }
 document.addEventListener('DOMContentLoaded',decorateNav);
+/* ===== top bar + sidebar summary (สกิน Bracket) ===== */
+function syncTopbar(){
+  const g=id=>document.getElementById(id); if(!g('topbar')) return;
+  const onBtn=document.querySelector('nav button.on'); const crumb=g('tb-crumb');
+  if(crumb) crumb.textContent = S.view==='client' ? 'ลูกค้า / โปรไฟล์' : (onBtn ? onBtn.textContent.replace(/\d+\s*$/,'').trim() : 'ภาพรวม');
+  const nb=document.querySelector('nav button[data-v="todo"] .badge'); const tb=g('tb-badge');
+  if(tb){ if(nb&&nb.textContent.trim()){ tb.textContent=nb.textContent.trim(); tb.classList.remove('hide'); } else tb.classList.add('hide'); }
+  const u=(typeof USER!=='undefined'&&USER&&USER.email&&USER.email!=='team')?USER:null;
+  if(g('tb-name')){ g('tb-name').textContent=u?(u.name||u.email):'ทีมงาน'; g('tb-role').textContent=u?({admin:'แอดมิน',editor:'กรอกได้',viewer:'ดูอย่างเดียว'}[u.role]||u.role||'')+' · '+u.email:'Elite Escapes'; g('tb-av').textContent=(u?(u.name||u.email):'EE').replace(/[^A-Za-zก-๙ ]/g,'').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'EE'; }
+  const ss=g('sidestats');
+  if(ss){
+    try{
+      const cons=allContracts(); const act=cons.filter(c=>!/cancel/i.test(c.status||'')).length;
+      const owing=REC.filter(r=>recStatus(r)==='owing'&&r.currency!=='THB'); const owe=owing.reduce((s,r)=>s+(r.balance||0),0);
+      const todo=nb?parseInt(nb.textContent)||0:0;
+      const byYear={}; cons.forEach(c=>{ const y=(c.comp_date||'').slice(0,4); if(/^\d{4}$/.test(y)) byYear[y]=(byYear[y]||0)+1; });
+      const ys=Object.keys(byYear).sort().slice(-8); const mx=Math.max(1,...ys.map(y=>byYear[y]));
+      const spark=(vals,mx)=>`<span class="sp">${vals.map(v=>`<i style="height:${Math.max(8,Math.round(100*v/mx))}%"></i>`).join('')}</span>`;
+      const payY={}; RP.forEach(p=>{ const y=(p.paid_date||'').slice(0,4); if(/^\d{4}$/.test(y)&&isCashKind(p.kind)) payY[y]=(payY[y]||0)+(p.amount||0); }); const pys=Object.keys(payY).sort().slice(-8); const pmx=Math.max(1,...pys.map(y=>payY[y]));
+      ss.innerHTML=`<div class="ssl">INFORMATION SUMMARY</div>
+        <div class="ss"><div><small>ลูกค้าทั้งหมด</small><b>${allClients().length.toLocaleString()}</b></div>${spark(ys.map(y=>byYear[y]),mx)}</div>
+        <div class="ss g"><div><small>สัญญา Active</small><b>${act.toLocaleString()}</b></div>${spark(ys.map(y=>byYear[y]),mx)}</div>
+        <div class="ss r"><div><small>ยอดค้างรับ (US$)</small><b>${Math.round(owe).toLocaleString()}</b></div>${spark(pys.map(y=>payY[y]),pmx)}</div>
+        <div class="ss o"><div><small>งานที่ต้องทำ</small><b>${todo.toLocaleString()}</b></div>${spark([2,4,3,5,4,6,3,todo?Math.min(8,todo):1],8)}</div>`;
+    }catch(e){ ss.innerHTML=''; }
+  }
+}
+document.addEventListener('DOMContentLoaded',()=>{ const q=document.getElementById('tb-q'); if(q) q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ S.q=q.value.trim(); go('clients'); } }); });
+const __render=render; render=function(){ const r=__render.apply(this,arguments); try{ syncTopbar(); }catch(e){} return r; };
 function areaChart(vals,labs){
   const W=640,H=200,P=26,BW=W-P*2,BH=H-P*2;
   const mx=Math.max(1,...vals);
