@@ -478,14 +478,15 @@ async function boot(){
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
     const N=v=>v!=null?Number(v):null;
-    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css, mts] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
       fetchAllRows('receivables','contract_no'), fetchAllRows('week_usage','id'), fetchAllRows('ar_payments','id'),
       fetchAllRows('case_files','contract_no'), fetchAllRows('case_customers','id'),
       fetchAllRows('commission_periods','period'), fetchAllRows('commission_lines','id'), fetchAllRows('mkt_weekly','id'),
-      fetchAllRows('contract_scans','sha1')
+      fetchAllRows('contract_scans','sha1'), fetchAllRows('mkt_tours','id')
     ]);
+    MT = mts.map(t=>({id:t.id,tour_date:t.tour_date,pay_friday:t.pay_friday,opc_code:t.opc_code,opc_name:t.opc_name,guest_name:t.guest_name,guests:t.guests,line:t.line,qualify:t.qualify,found:t.found,showed:t.showed!==false,presentation_90:t.presentation_90!==false,deal:!!t.deal,contract_no:t.contract_no,gift:t.gift,breakfast:t.breakfast!==false,taxi:N(t.taxi),hotel:t.hotel,checklist:t.checklist||{},note:t.note,pay_total:N(t.pay_total),updated_by:t.updated_by}));
     CS = css.map(s=>({sha1:s.sha1,contract_no:s.contract_no,contract_key:s.contract_key,file_name:s.file_name,size:s.size,copies:s.copies,drive_folder:s.drive_folder}));
     CP = cps.map(p=>({period:p.period,period_start:p.period_start,period_end:p.period_end,pay_day:p.pay_day,fx_rate:p.fx_rate!=null?Number(p.fx_rate):null,blocks:p.blocks||[],staff_pay:p.staff_pay||[],note:p.note}));
     CL = cls2.map(l=>({id:l.id,period:l.period,contract_no:l.contract_no,customer:l.customer,sale_type:l.sale_type,status:l.status,purchase_price:N(l.purchase_price),paid_to_date:N(l.paid_to_date),new_payment:N(l.new_payment),total_instalments:N(l.total_instalments),balance:N(l.balance),cash_in_pct:N(l.cash_in_pct),roles:l.roles||{},blocks:l.blocks||{},remark:l.remark}));
@@ -585,6 +586,8 @@ let CS=[];   /* ดัชนีไฟล์สแกนสัญญา (contract
 let CP=[];   /* รอบจ่ายคอมมิชชั่น (commission_periods) */
 let CL=[];   /* รายการคอมมิชชั่นต่อสัญญา (commission_lines) */
 let MW=[];   /* ผลงาน/ค่าจ้างทีมการตลาดรายสัปดาห์ (mkt_weekly) */
+let MT=[];   /* บันทึกรายทัวร์ OPC (mkt_tours) */
+Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all'});
 Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all'});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
@@ -2010,10 +2013,12 @@ async function deleteMktPush(id){
 const MKT_RATES={staff:{q:3000,qplus:3500,ct:1500,pack_q:1000,pack_ct:2000,full_q:3000,full_ct:6000}, manager:{q:500,qplus:500,ct:250,pack_q:1000,pack_ct:1000,full_q:2000,full_ct:2000}};
 function mktCalc(role,v){ const R=MKT_RATES[role]||MKT_RATES.staff; return Object.keys(R).reduce((s,k)=>s+((v[k]||0)*R[k]),0); }
 function mktWeekKey(w){ return w.year+'-W'+String(w.week_no).padStart(2,'0'); }
+function mktTabs(){ return `<div class="tabbtns">${[['tours','🧭 รายทัวร์ / ค่าจ้างวันศุกร์'],['weekly','📊 สรุปรายสัปดาห์ (จากไฟล์ Excel)']].map(([k,l])=>`<button class="${S.mkTab===k?'on':''}" onclick="S.mkTab='${k}';render()">${l}</button>`).join('')}</div>`; }
 function rMkt(){
+  if(S.mkTab==='tours') return rTours();
   const weeks=[...new Set(MW.map(mktWeekKey))].sort().reverse();
   const canEd=(typeof canEdit==='function')?canEdit():true;
-  if(!weeks.length){ $main.innerHTML=`<div class="pk">Marketing · OPC</div><h1>ทีมการตลาด (OPC)</h1><div class="note blue">ยังไม่มีข้อมูลรายสัปดาห์ — ${canEd?'<a href="#" onclick="openMktModal(&quot;&quot;);return false">เพิ่มสัปดาห์แรก</a> หรือ':''}ข้อมูลจะแสดงเมื่อเปิดผ่านฐานข้อมูลกลาง</div>`; return; }
+  if(!weeks.length){ $main.innerHTML=`<div class="pk">Marketing · OPC</div><h1>ทีมการตลาด (OPC)</h1>${mktTabs()}<div class="note blue">ยังไม่มีข้อมูลรายสัปดาห์ — ${canEd?'<a href="#" onclick="openMktModal(&quot;&quot;);return false">เพิ่มสัปดาห์แรก</a> หรือ':''}ข้อมูลจะแสดงเมื่อเปิดผ่านฐานข้อมูลกลาง</div>`; return; }
   if(!weeks.includes(S.mw)) S.mw=weeks[0];
   const rows=MW.filter(w=>mktWeekKey(w)===S.mw);
   const staff=rows.filter(w=>w.role!=='manager').sort((a,b)=>String(a.staff_code||a.name).localeCompare(String(b.staff_code||b.name)));
@@ -2032,6 +2037,7 @@ function rMkt(){
       <div><b>฿<span class="cnt" data-n="${Math.round(sum(mgrs,'total'))}">0</span></b><span>ค่าจ้างผู้จัดการ</span></div>
     </div>
   </div></div>
+  ${mktTabs()}
   <div class="search">
     <select class="flt" onchange="S.mw=this.value;render()">${weeks.map(k=>{ const r0=MW.find(w=>mktWeekKey(w)===k); return `<option value="${k}" ${k===S.mw?'selected':''}>สัปดาห์ ${r0.week_no}/${r0.year}${r0.dates?' · '+esc(r0.dates):''}</option>`; }).join('')}</select>
     ${canEd?`<button class="btn" onclick="openMktModal('')">＋ เพิ่มรายการ/สัปดาห์ใหม่</button>`:''}
@@ -2098,6 +2104,166 @@ function exportMktCSV(){
   MW.slice().sort((a,b)=>mktWeekKey(a)<mktWeekKey(b)?1:-1).forEach(w=>rows.push([w.year,w.week_no,w.dates||'',w.role,w.staff_code||'',w.name,w.q||'',w.qplus||'',w.ct||'',w.pack_q||'',w.pack_ct||'',w.full_q||'',w.full_ct||'',w.bonus_total||'',w.total||'',w.note||'']));
   const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='marketing-weekly-'+TODAY+'.csv'; a.click();
+}
+
+/* ================= บันทึกรายทัวร์ OPC (Cold Line) + ค่าจ้างวันศุกร์ ================= */
+async function pushTour(t){
+  try{
+    await sbApi('mkt_tours?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{id:t.id,tour_date:t.tour_date,pay_friday:t.pay_friday,opc_code:t.opc_code,opc_name:t.opc_name,guest_name:t.guest_name,guests:t.guests,line:t.line,qualify:t.qualify,found:t.found,showed:t.showed,presentation_90:t.presentation_90,deal:t.deal,contract_no:t.contract_no,gift:t.gift,breakfast:t.breakfast,taxi:t.taxi,hotel:t.hotel,checklist:t.checklist,note:t.note,pay_base:t.pay_base,pay_split:t.pay_split,pay_bonus:t.pay_bonus,pay_total:t.pay_total,updated_by:USER&&USER.email}])});
+    toast('☁️ บันทึกลงฐานกลางแล้ว');
+  }catch(e){ toast('⚠️ บันทึกฐานกลางไม่สำเร็จ: '+e.message); }
+}
+async function deleteTourPush(id){
+  try{ await sbApi('mkt_tours?id=eq.'+encodeURIComponent(id),{method:'DELETE'}); }
+  catch(e){ toast('⚠️ ลบจากฐานกลางไม่สำเร็จ: '+e.message); }
+}
+const TOUR_LINES={AUS:'ออสเตรเลีย',NZ:'นิวซีแลนด์',USA:'อเมริกา (USA)',UK:'อังกฤษ (UK)',FR:'ฝรั่งเศส / สวิส-เบลเยียมฝรั่งเศส',SCANDI:'สแกนดิเนเวีย (สวีเดน/นอร์เวย์)',FIN:'ฟินแลนด์',OTHER:'อื่น ๆ'};
+const TOUR_QUAL={'Q':['Q — Qualified',3000],'Q+':['Q+ — ทัวร์ Kudo',3500],'CT':['CT — Courtesy Tour (<35 / ไม่น่าดีล)',1500],'NQ':['ไม่ผ่านเกณฑ์ / ไม่จ่าย',0]};
+const TOUR_GIFTS={none:'ไม่มี',spa:'สปา ฿1,800',pp:'ทัวร์เกาะพีพี ฿1,800',kudo:'Kudo voucher',cash1500:'ของแถม daytime ฿1,500'};
+const TOUR_CHECKS=[['age','ชายอายุ 35–71 (French 40–65) · ฮันนีมูนชาย 40+'],['couple','คู่อยู่ด้วยกัน ≥2 ปี หรือโสด (French ต้องเป็นคู่)'],['job','ชายทำงานประจำ / เกษียณด้วยบำนาญเอกชน'],['card','มีบัตรเครดิต/เดบิต (โสดโชว์ที่ reception)'],['hotel','พักโรงแรม ≥ ฿1,000/คืน (UK ต้อง 4–5 ดาว)'],['island','อยู่บนเกาะ ≥24 ชม. · ไม่บินกลับวันเดียวกับทัวร์ · วันหยุด ≤6 สัปดาห์'],['nodq','ไม่เข้าข่ายไม่ผ่าน (กำลังหย่า, กลุ่ม ≥4 ผู้ใหญ่, เด็ก <5, NGO, คนอื่นออกค่าทริป, ทำงานท่องเที่ยว/timeshare, อาศัยในไทย, one-legger)']];
+function addDaysISO(iso,n){ const [y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d+n); const p=x=>String(x).padStart(2,'0'); return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate()); }
+function fridayOf(iso){ if(!iso||!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null; const [y,m,d]=iso.split('-').map(Number); const dow=new Date(y,m-1,d).getDay(); return addDaysISO(iso,(5-dow+7)%7); }
+function tourPay(t){
+  const q=t.qualify||'NQ'; let base=0, split=0, bonus=0, why=[];
+  const attended = t.showed!==false && t.presentation_90!==false;
+  if(!attended){ why.push(t.showed===false?'ไม่มาทัวร์':'ฟัง presentation ไม่ครบ 90 นาที'); return {base:0,split:0,bonus:0,total:0,why}; }
+  base=(TOUR_QUAL[q]||[0,0])[1]; if(base) why.push(q+' ฿'+base.toLocaleString());
+  if(q==='Q'||q==='Q+'){
+    const L=t.line||'OTHER', night=t.found==='night';
+    if(['AUS','NZ','FR','FIN','SCANDI'].includes(L)){ split=night?2000:1000; why.push('Split '+(night?'night':'day')+' ฿'+split.toLocaleString()); }
+    else if(L==='USA'){ split=night?2000:500; why.push('Split USA '+(night?'night':'day')+' ฿'+split.toLocaleString()); if(t.deal){ bonus=1000; why.push('เซ็นสัญญา +฿1,000'); } }
+    else if(L==='UK'){ if(t.deal){ split=1000; why.push('UK ได้ดีล ฿1,000'); } else why.push('UK ไม่ดีล — ไม่มี split'); }
+  } else if(q==='CT') why.push('CT ไม่มี split');
+  return {base,split,bonus,total:base+split+bonus,why};
+}
+function tourWeekLabel(fri){ return fri?('ศุกร์ '+fmtD(fri)):'—'; }
+function rTours(){
+  const canEd=(typeof canEdit==='function')?canEdit():true;
+  const fridays=[...new Set(MT.map(t=>t.pay_friday).filter(Boolean))].sort().reverse();
+  const thisFri=fridayOf(TODAY);
+  if(!S.tweek) S.tweek=fridays[0]||thisFri;
+  const opcs=[...new Set(MT.map(t=>(t.opc_code?t.opc_code+' ':'')+(t.opc_name||'')).filter(x=>x.trim()))].sort();
+  let list=MT.filter(t=>t.pay_friday===S.tweek);
+  if(S.topc!=='all') list=list.filter(t=>((t.opc_code?t.opc_code+' ':'')+(t.opc_name||''))===S.topc);
+  if(S.tq.trim()){ const q=norm(S.tq); list=list.filter(t=>norm(t.guest_name||'').includes(q)||norm(t.opc_name||'').includes(q)||norm(t.contract_no||'').includes(q)||norm(t.hotel||'').includes(q)); }
+  list.sort((a,b)=>(a.tour_date<b.tour_date)?1:(a.tour_date>b.tour_date?-1:0));
+  const wk=MT.filter(t=>t.pay_friday===S.tweek);
+  const cnt=k=>wk.filter(t=>t.qualify===k&&t.showed!==false).length;
+  const payTot=wk.reduce((s,t)=>s+(tourPay(t).total),0), taxi=wk.reduce((s,t)=>s+(t.taxi||0),0);
+  const byOpc={}; wk.forEach(t=>{ const k=(t.opc_code?t.opc_code+' ':'')+(t.opc_name||'ไม่ระบุ'); const o=byOpc[k]=byOpc[k]||{n:0,q:0,qp:0,ct:0,deal:0,pay:0,taxi:0}; const p=tourPay(t); o.n++; if(t.showed!==false){ if(t.qualify==='Q') o.q++; if(t.qualify==='Q+') o.qp++; if(t.qualify==='CT') o.ct++; } if(t.deal) o.deal++; o.pay+=p.total; o.taxi+=(t.taxi||0); });
+  $main.innerHTML=`
+  <div class="hero"><div class="hero-in">
+    <div><div class="hero-kick">Marketing · Cold Line · Market Survey</div><h1>ทีมการตลาด (OPC)</h1>
+    <p class="sub">บันทึกแขกที่ OPC พามาทัวร์ทีละราย — ระบบคิดค่าจ้างวันศุกร์ให้อัตโนมัติ (เรท Q ฿3,000 · Q+ ฿3,500 · CT ฿1,500 + Split ตามสัญชาติ/Day-Night) จ่ายเมื่อมาทัวร์และฟัง presentation ครบ 90 นาที</p></div>
+    <div class="hero-stats">
+      <div><b class="cnt" data-n="${wk.length}">0</b><span>ทัวร์ในสัปดาห์นี้</span></div>
+      <div><b>${cnt('Q')} / ${cnt('Q+')} / ${cnt('CT')}</b><span>Q / Q+ / CT</span></div>
+      <div><b class="cnt" data-n="${wk.filter(t=>t.deal).length}">0</b><span>ปิดดีล</span></div>
+      <div><b>฿<span class="cnt" data-n="${Math.round(payTot)}">0</span></b><span>ค่าจ้างจ่าย${tourWeekLabel(S.tweek)}</span></div>
+    </div>
+  </div></div>
+  ${mktTabs()}
+  <div class="search">
+    <select class="flt" onchange="S.tweek=this.value;render()">${[...new Set([thisFri].concat(fridays))].sort().reverse().map(f=>`<option value="${f}" ${f===S.tweek?'selected':''}>จ่าย${tourWeekLabel(f)} (${fmtD(addDaysISO(f,-6))} – ${fmtD(f)})${MT.some(t=>t.pay_friday===f)?'':' · ยังไม่มีรายการ'}</option>`).join('')}</select>
+    <select class="flt" onchange="S.topc=this.value;render()"><option value="all">ทุก OPC</option>${opcs.map(o=>`<option ${S.topc===o?'selected':''}>${esc(o)}</option>`).join('')}</select>
+    <input type="text" id="tq" placeholder="🔍 ชื่อแขก / OPC / โรงแรม / เลขสัญญา…" value="${esc(S.tq)}">
+    ${canEd?`<button class="btn" onclick="openTourModal('')">＋ บันทึกทัวร์</button>`:''}
+    <button class="btn sec" onclick="exportToursCSV()">⬇️ CSV</button>
+  </div>
+  <div class="panel">
+    <h3><span class="idx">01</span>ค่าจ้าง OPC ที่ต้องจ่าย${tourWeekLabel(S.tweek)}</h3>
+    <div class="cs">รวม <b>฿${Math.round(payTot).toLocaleString()}</b> · ค่าแท็กซี่ที่บริษัทจ่าย ฿${Math.round(taxi).toLocaleString()} · คลิกชื่อเพื่อดูเฉพาะคนนั้น · 🖨 พิมพ์สลิป</div>
+    ${Object.keys(byOpc).length?`<div class="scroll"><table><thead><tr><th>OPC</th><th class="n">ทัวร์</th><th class="n">Q</th><th class="n">Q+</th><th class="n">CT</th><th class="n">ดีล</th><th class="n">แท็กซี่</th><th class="n">ค่าจ้าง (฿)</th><th></th></tr></thead><tbody>
+    ${Object.entries(byOpc).sort((a,b)=>b[1].pay-a[1].pay).map(([k,o])=>`<tr><td class="click" onclick="S.topc='${esc(k)}';render()"><b>${esc(k)}</b></td><td class="n">${o.n}</td><td class="n">${o.q}</td><td class="n">${o.qp}</td><td class="n">${o.ct}</td><td class="n">${o.deal||''}</td><td class="n">${o.taxi?'฿'+Math.round(o.taxi).toLocaleString():''}</td><td class="n"><b>฿${Math.round(o.pay).toLocaleString()}</b></td><td><button class="btn sm ghost" onclick="printTourSlip('${esc(k)}','${S.tweek}')">🖨</button></td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="mini">ยังไม่มีทัวร์ในสัปดาห์นี้ — กด "＋ บันทึกทัวร์"</div>'}
+  </div>
+  <div class="panel">
+    <h3><span class="idx">02</span>รายการทัวร์${S.topc!=='all'?' — '+esc(S.topc):''}</h3>
+    <div class="cs">${list.length} รายการ · คลิกแถวเพื่อแก้ไข</div>
+    ${list.length?`<div class="scroll"><table><thead><tr><th>วันที่</th><th>OPC</th><th>แขก</th><th>สัญชาติ</th><th>ประเภท</th><th>หาตอน</th><th>มาทัวร์</th><th>ดีล</th><th>ของแถม</th><th class="n">ค่าจ้าง</th><th>คำนวณ</th></tr></thead><tbody>
+    ${list.map(t=>{ const p=tourPay(t); return `<tr class="${canEd?'click':''}" ${canEd?`onclick="openTourModal('${esc(t.id)}')"`:''}><td>${fmtD(t.tour_date)}</td><td>${esc((t.opc_code?t.opc_code+' ':'')+(t.opc_name||''))}</td><td><b>${esc(t.guest_name||'—')}</b>${t.hotel?'<br><span class="mini">'+esc(t.hotel)+'</span>':''}</td><td>${esc(TOUR_LINES[t.line]||t.line||'—')}</td>
+      <td><span class="pill ${t.qualify==='Q'||t.qualify==='Q+'?'p-paid':t.qualify==='CT'?'p-soon':'p-none'}">${esc(t.qualify||'—')}</span></td><td>${t.found==='night'?'🌙 กลางคืน':'☀️ กลางวัน'}</td>
+      <td>${t.showed===false?'<span class="pill p-cancel">ไม่มา</span>':(t.presentation_90===false?'<span class="pill p-over">ไม่ครบ 90 น.</span>':'✓')}</td><td>${t.deal?'<span class="pill p-paid">ดีล'+(t.contract_no?' '+esc(t.contract_no):'')+'</span>':''}</td>
+      <td class="mini">${esc(TOUR_GIFTS[t.gift]||'')}${t.breakfast!==false?' + breakfast':''}</td><td class="n"><b>${p.total?'฿'+p.total.toLocaleString():'—'}</b></td><td class="mini">${esc(p.why.join(' · '))}</td></tr>`; }).join('')}
+    </tbody></table></div>`:''}
+  </div>`;
+  runCounters();
+  const inp=document.getElementById('tq');
+  if(inp) inp.oninput=()=>{ S.tq=inp.value; render(); const el=document.getElementById('tq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+}
+function openTourModal(id){
+  const t=id?MT.find(x=>x.id===id):null;
+  const v=(k,d)=>t?(t[k]!=null?t[k]:''):d;
+  const opcNames=[...new Set(MT.map(x=>(x.opc_code?x.opc_code+' ':'')+(x.opc_name||'')).concat(MW.filter(w=>w.role!=='manager').map(w=>(w.staff_code?w.staff_code+' ':'')+w.name)))].filter(x=>x.trim()).sort();
+  const ck=(t&&t.checklist)||{};
+  openModal(`<h3>${t?'แก้ไข':'บันทึก'}ทัวร์ (Cold Line)</h3>
+  <div class="form">
+    <div><label>วันที่ทัวร์</label><input id="tr_date" type="date" value="${v('tour_date',TODAY)}" onchange="trCalc()"></div>
+    <div><label>OPC ที่พามา (รหัส ชื่อ)</label><input id="tr_opc" type="text" list="tr_opcs" value="${esc(((t&&t.opc_code)?t.opc_code+' ':'')+((t&&t.opc_name)||''))}" placeholder="เช่น B01 Blasco"><datalist id="tr_opcs">${opcNames.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
+    <div><label>ชื่อแขก</label><input id="tr_guest" type="text" value="${esc(v('guest_name',''))}" placeholder="เช่น John & Mary Smith"></div>
+    <div><label>จำนวนคน</label><input id="tr_guests" type="number" value="${v('guests',2)}"></div>
+    <div><label>สัญชาติ / Line</label><select id="tr_line" onchange="trCalc()">${Object.entries(TOUR_LINES).map(([k,l])=>`<option value="${k}" ${(t?t.line:'AUS')===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label>โรงแรมที่พัก</label><input id="tr_hotel" type="text" value="${esc(v('hotel',''))}"></div>
+    <div class="full" style="background:var(--surface2);border-radius:10px;padding:10px 12px"><b style="font-size:13px">เกณฑ์คัดกรอง (reception ติ๊ก — ช่วยตัดสิน ไม่บังคับ)</b>
+      ${TOUR_CHECKS.map(([k,l])=>`<label style="display:block;font-weight:400;margin-top:4px"><input type="checkbox" id="tr_ck_${k}" ${ck[k]?'checked':''} onchange="trSuggest()"> ${l}</label>`).join('')}
+      <div class="mini" id="tr_suggest" style="margin-top:6px"></div></div>
+    <div><label>ประเภทที่ตัดสิน</label><select id="tr_qual" onchange="trCalc()">${Object.entries(TOUR_QUAL).map(([k,[l]])=>`<option value="${k}" ${(t?t.qualify:'Q')===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label>หาแขกตอน</label><select id="tr_found" onchange="trCalc()"><option value="day" ${(t?t.found:'day')!=='night'?'selected':''}>☀️ กลางวัน (daytime)</option><option value="night" ${(t&&t.found==='night')?'selected':''}>🌙 กลางคืน บุ๊กทัวร์เช้า (night booking)</option></select></div>
+    <div><label>มาทัวร์จริง</label><select id="tr_showed" onchange="trCalc()"><option value="1" ${(t?t.showed!==false:true)?'selected':''}>มา</option><option value="0" ${(t&&t.showed===false)?'selected':''}>ไม่มา (no-show)</option></select></div>
+    <div><label>ฟัง presentation ครบ 90 นาที</label><select id="tr_p90" onchange="trCalc()"><option value="1" ${(t?t.presentation_90!==false:true)?'selected':''}>ครบ</option><option value="0" ${(t&&t.presentation_90===false)?'selected':''}>ไม่ครบ (ไม่จ่าย)</option></select></div>
+    <div><label>ปิดดีล / เซ็นสัญญา</label><select id="tr_deal" onchange="trCalc()"><option value="0" ${!(t&&t.deal)?'selected':''}>ไม่</option><option value="1" ${(t&&t.deal)?'selected':''}>ได้ดีล</option></select></div>
+    <div><label>เลขสัญญา (ถ้าได้ดีล)</label><input id="tr_cno" type="text" value="${esc(v('contract_no',''))}" placeholder="เช่น TCU/1870/5/AH/T1"></div>
+    <div><label>ของแถมแขก</label><select id="tr_gift">${Object.entries(TOUR_GIFTS).map(([k,l])=>`<option value="${k}" ${(t?t.gift:'none')===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label>อาหารเช้า</label><select id="tr_bf"><option value="1" ${(t?t.breakfast!==false:true)?'selected':''}>ได้</option><option value="0" ${(t&&t.breakfast===false)?'selected':''}>ไม่</option></select></div>
+    <div><label>ค่าแท็กซี่ (฿ บริษัทจ่าย)</label><input id="tr_taxi" type="number" step="any" value="${v('taxi','')}"></div>
+    <div><label>ค่าจ้าง OPC ที่คำนวณได้</label><input id="tr_pay" type="text" readonly style="background:var(--surface2);font-weight:700" value=""></div>
+    <div class="full"><label>หมายเหตุ</label><input id="tr_note" type="text" value="${esc(v('note',''))}"></div>
+    <div class="full mini" id="tr_why"></div>
+  </div>
+  <div class="right">${t?`<button class="btn ghost danger" onclick="deleteTour('${esc(t.id)}')">🗑 ลบ</button>`:''}<button class="btn ghost" onclick="closeModal()">ยกเลิก</button>
+  <button class="btn" onclick="saveTour('${t?esc(t.id):''}')">💾 บันทึก</button></div>`);
+  trCalc(); trSuggest();
+}
+function trRead(){ const g=k=>document.getElementById(k); const opc=g('tr_opc').value.trim(); const m=opc.match(/^([A-Z]\d{2})\s+(.*)$/i);
+  const checklist={}; TOUR_CHECKS.forEach(([k])=>checklist[k]=!!g('tr_ck_'+k).checked);
+  return {tour_date:g('tr_date').value, pay_friday:fridayOf(g('tr_date').value), opc_code:m?m[1].toUpperCase():null, opc_name:(m?m[2]:opc).trim()||null,
+    guest_name:g('tr_guest').value.trim()||null, guests:parseInt(g('tr_guests').value)||null, line:g('tr_line').value, qualify:g('tr_qual').value, found:g('tr_found').value,
+    showed:g('tr_showed').value==='1', presentation_90:g('tr_p90').value==='1', deal:g('tr_deal').value==='1', contract_no:g('tr_cno').value.trim().toUpperCase()||null,
+    gift:g('tr_gift').value, breakfast:g('tr_bf').value==='1', taxi:g('tr_taxi').value===''?null:parseFloat(g('tr_taxi').value), hotel:g('tr_hotel').value.trim()||null,
+    checklist, note:g('tr_note').value.trim()||null}; }
+function trCalc(){ if(!document.getElementById('tr_pay')) return; const d=trRead(); const p=tourPay(d); document.getElementById('tr_pay').value=p.total?('฿'+p.total.toLocaleString()+'  (จ่าย'+tourWeekLabel(d.pay_friday)+')'):'฿0'; document.getElementById('tr_why').textContent='การคิด: '+p.why.join(' · '); }
+function trSuggest(){ const el=document.getElementById('tr_suggest'); if(!el) return; const n=TOUR_CHECKS.filter(([k])=>document.getElementById('tr_ck_'+k).checked).length; el.textContent = n===TOUR_CHECKS.length?'✅ ผ่านทุกข้อ → น่าจะเป็น Q (ถ้าทัวร์ Kudo เลือก Q+)':(n>=TOUR_CHECKS.length-2?'⚠️ ผ่าน '+n+'/'+TOUR_CHECKS.length+' ข้อ → พิจารณา CT':'❌ ผ่าน '+n+'/'+TOUR_CHECKS.length+' ข้อ → น่าจะไม่ผ่านเกณฑ์ / CT'); }
+function saveTour(id){
+  const d=trRead(); if(!d.tour_date){ toast('กรุณาใส่วันที่ทัวร์'); return; } if(!d.opc_name){ toast('กรุณาใส่ชื่อ OPC'); return; }
+  const p=tourPay(d); Object.assign(d,{pay_base:p.base,pay_split:p.split,pay_bonus:p.bonus,pay_total:p.total,updated_by:(typeof USER!=='undefined'&&USER)?USER.email:null});
+  let rec=id?MT.find(x=>x.id===id):null;
+  if(rec) Object.assign(rec,d); else { rec=Object.assign({id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d); MT.push(rec); }
+  S.tweek=rec.pay_friday; S.mkTab='tours'; pushTour(rec); closeModal(); render(); toast('บันทึกทัวร์แล้ว ✅ ค่าจ้าง ฿'+p.total.toLocaleString());
+}
+function deleteTour(id){ if(!confirm('ลบรายการทัวร์นี้?')) return; MT=MT.filter(x=>x.id!==id); deleteTourPush(id); closeModal(); render(); toast('ลบแล้ว'); }
+function printTourSlip(opc,fri){
+  const rows=MT.filter(t=>t.pay_friday===fri&&((t.opc_code?t.opc_code+' ':'')+(t.opc_name||'ไม่ระบุ'))===opc).sort((a,b)=>a.tour_date<b.tour_date?-1:1);
+  const tot=rows.reduce((s,t)=>s+tourPay(t).total,0);
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>OPC Pay Slip — ${esc(opc)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=EB+Garamond:wght@600&display=swap" rel="stylesheet">
+  <style>body{font:13px/1.6 'Sarabun',sans-serif;color:#1c2436;max-width:800px;margin:30px auto;padding:0 24px}.wm{font-family:'EB Garamond',Georgia,serif;font-size:22px;letter-spacing:.15em;color:#102e4c;font-weight:600}
+  .kick{letter-spacing:.3em;font-size:10px;color:#b08d3e;text-transform:uppercase;font-weight:600}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{padding:6px 10px;border-bottom:1px solid #e8e8e8;text-align:left;font-size:12px}th{background:#f2f5f7;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#5b6b7a}
+  .btn{margin-top:24px;padding:10px 24px;font:600 13px 'Sarabun';border:none;border-radius:99px;background:#102e4c;color:#fff;cursor:pointer}@media print{.btn{display:none}}</style></head><body>
+  <div class="wm">CLUB UNIQUE · ELITE ESCAPES</div><div class="kick">OPC Marketing Pay Slip · Cold Line</div><hr style="border:none;border-top:2px solid #b08d3e;margin:12px 0 16px">
+  <table style="margin:0"><tr><td style="border:none;padding:0"><b>${esc(opc)}</b></td><td style="border:none;padding:0;text-align:right">งวดจ่าย <b>${tourWeekLabel(fri)}</b><br>ออกเอกสาร ${fmtD(TODAY)}</td></tr></table>
+  <table><thead><tr><th>วันที่</th><th>แขก</th><th>สัญชาติ</th><th>ประเภท</th><th>Day/Night</th><th>ดีล</th><th style="text-align:right">ค่าจ้าง</th><th>การคิด</th></tr></thead><tbody>
+  ${rows.map(t=>{const p=tourPay(t); return `<tr><td>${fmtD(t.tour_date)}</td><td>${esc(t.guest_name||'')}</td><td>${esc(TOUR_LINES[t.line]||'')}</td><td>${esc(t.qualify||'')}</td><td>${t.found==='night'?'Night':'Day'}</td><td>${t.deal?'✓ '+esc(t.contract_no||''):''}</td><td style="text-align:right">฿${p.total.toLocaleString()}</td><td style="color:#5b6b7a">${esc(p.why.join(' · '))}</td></tr>`;}).join('')}
+  <tr><td colspan="6" style="text-align:right;font-weight:700">รวมจ่าย</td><td style="text-align:right;font-weight:700">฿${tot.toLocaleString()}</td><td></td></tr></tbody></table>
+  <p style="margin-top:28px;font-size:12px">ผู้จ่าย ____________________ &nbsp;&nbsp;&nbsp; ผู้รับเงิน ____________________</p>
+  <button class="btn" onclick="print()">🖨 พิมพ์</button></body></html>`); w.document.close();
+}
+function exportToursCSV(){
+  const rows=[['วันที่ทัวร์','จ่ายวันศุกร์','OPC รหัส','OPC ชื่อ','แขก','จำนวน','สัญชาติ','ประเภท','หาตอน','มาทัวร์','ครบ 90 นาที','ดีล','เลขสัญญา','ของแถม','อาหารเช้า','แท็กซี่','โรงแรม','ค่าจ้างฐาน','Split','โบนัสดีล','รวม','หมายเหตุ','บันทึกโดย']];
+  MT.slice().sort((a,b)=>a.tour_date<b.tour_date?1:-1).forEach(t=>{ const p=tourPay(t); rows.push([t.tour_date,t.pay_friday||'',t.opc_code||'',t.opc_name||'',t.guest_name||'',t.guests||'',TOUR_LINES[t.line]||t.line||'',t.qualify||'',t.found==='night'?'night':'day',t.showed===false?'no':'yes',t.presentation_90===false?'no':'yes',t.deal?'yes':'no',t.contract_no||'',TOUR_GIFTS[t.gift]||'',t.breakfast===false?'no':'yes',t.taxi||'',t.hotel||'',p.base,p.split,p.bonus,p.total,t.note||'',t.updated_by||'']); });
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='opc-tours-'+TODAY+'.csv'; a.click();
 }
 
 /* ================= ทะเบียนสัญญา (Bible) ================= */
@@ -2236,7 +2402,7 @@ function resetOV(){
 
 /* ===== LIVE: viewer role guards ===== */
 function canEdit(){ return USER && USER.role!=='viewer'; }
-['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt'].forEach(fn=>{
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt','openTourModal','saveTour','deleteTour'].forEach(fn=>{
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('บัญชีของคุณมีสิทธิ์ดูอย่างเดียว'); return; } return orig.apply(this,arguments); };
 });
