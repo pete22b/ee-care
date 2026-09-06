@@ -660,6 +660,47 @@ nav .ng>button.navlab:hover{opacity:.95}
 [data-skin="verde"] nav .ng>button.navlab{color:rgba(255,255,255,.55)}
 [data-skin="apex"] nav .ng>button.navlab{color:var(--ink3)}
 @media(max-width:840px){nav .ng{flex:1 1 100%} nav .ng .ngi{flex-direction:row;flex-wrap:wrap}}
+</style>
+<style id="sysmap-css">
+/* ===== ผังระบบ (node canvas) — เห็นเฉพาะ admin ===== */
+body:not(.isadmin) .adminonly{display:none!important}
+.sm-wrap{position:relative;height:calc(100vh - 190px);min-height:520px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface2);
+ background-image:radial-gradient(color-mix(in srgb,var(--ink3) 40%,transparent) 1px,transparent 1px);background-size:22px 22px}
+.sm-stage{position:absolute;inset:0;cursor:grab;touch-action:none}
+.sm-stage.panning{cursor:grabbing}
+.sm-world{position:absolute;left:0;top:0;transform-origin:0 0}
+.sm-edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.sm-edges path{fill:none;stroke:color-mix(in srgb,var(--ink3) 55%,transparent);stroke-width:1.6;transition:stroke .15s,stroke-width .15s,opacity .15s}
+.sm-edges path.hi{stroke:var(--ecol);stroke-width:2.4}
+.sm-edges.focus path:not(.hi){opacity:.15}
+.sm-node{position:absolute;width:210px;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-sm);cursor:grab;user-select:none;transition:box-shadow .15s,border-color .15s,opacity .15s}
+.sm-node:hover{border-color:var(--ink3)}
+.sm-node.sel{border-color:var(--c);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 40%,transparent),var(--shadow-sm)}
+.sm-node.dim{opacity:.32}
+.sm-node .hd{display:flex;align-items:center;gap:7px;padding:7px 10px;border-bottom:1px solid var(--line);font:500 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.sm-node .hd i{width:8px;height:8px;border-radius:2px;background:var(--c);flex:0 0 8px}
+.sm-node .bd{padding:8px 10px 9px}
+.sm-node .t{font-weight:600;font-size:12.5px;color:var(--ink);line-height:1.3}
+.sm-node .s{font-size:11px;color:var(--ink2);margin-top:3px;line-height:1.45}
+.sm-node .m{margin-top:6px;font:500 11px 'IBM Plex Mono',ui-monospace,monospace;color:var(--c)}
+.sm-node .port{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid var(--c);transform:translateY(-50%)}
+.sm-node .port.in{left:-5px}.sm-node .port.out{right:-5px}
+.sm-note{position:absolute;width:190px;background:#fff8e1;color:#3a3220;border-radius:4px;padding:9px 12px;font-size:11px;line-height:1.5;box-shadow:var(--shadow-sm);border-left:4px solid #e0a23a}
+.sm-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink2);align-items:center}
+.sm-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.sm-info{position:absolute;right:14px;bottom:14px;width:320px;max-height:60%;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;z-index:3;box-shadow:0 20px 50px -20px rgba(0,0,0,.35);display:none}
+.sm-info.show{display:block}
+.sm-info .k{font:500 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--ic)}
+.sm-info h4{margin:3px 0 5px;font-size:15px;font-weight:600;color:var(--ink)}
+.sm-info p{margin:0 0 6px;color:var(--ink2);font-size:12px}
+.sm-info dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:6px 0 0;font-size:12px}
+.sm-info dt{color:var(--ink3);font:500 10px 'IBM Plex Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em;padding-top:2px}
+.sm-info dd{margin:0;color:var(--ink)}
+.sm-info .links{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.sm-info .links span{font-size:11px;background:var(--surface2);border:1px solid var(--line);border-radius:99px;padding:2px 9px;color:var(--ink2)}
+.sm-info .x{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer}
+.sm-hint{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--ink3);z-index:2;pointer-events:none}
+.sm-tools{position:absolute;right:14px;top:12px;display:flex;gap:6px;z-index:3}
 
 /* ===== LIVE: login gate ===== */
 #gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#071a2e;overflow:hidden;transition:opacity .5s}
@@ -745,6 +786,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     </div></div>
     <div class="ng open" data-g="it" style="--gc:#9aa5b1"><button type="button" class="navlab" onclick="toggleGroup('it')">ระบบ</button><div class="ngi">
     <button data-v="backup">ข้อมูลกลาง</button>
+    <button data-v="sysmap" class="adminonly">ผังระบบ</button>
     </div></div>
   </nav>
   <div class="brandseg">
@@ -849,12 +891,24 @@ async function sbApi(path, opts={}){
   if(r.status===204) return null;
   const t = await r.text(); return t?JSON.parse(t):null;
 }
+/* ดึงทุกแถว: หน้าแรกขอ count แล้วดึงหน้าที่เหลือพร้อมกัน (เดิมดึงทีละหน้าต่อกัน ทำให้ ar_payments 14k แถวใช้ 15 รอบ) */
+let BOOT_DONE=0, BOOT_TOTAL=0;
+function bootProgress(){ const el=document.getElementById('boot-prog'); if(el) el.textContent='โหลดแล้ว '+BOOT_DONE+' / '+BOOT_TOTAL+' ตาราง'; }
 async function fetchAllRows(table, order){
-  const out=[]; let off=0;
-  while(true){
-    const rows = await sbApi(table+'?select=*&order='+order+'.asc&limit=1000&offset='+off);
-    out.push(...rows); if(rows.length<1000) break; off+=1000;
+  const PAGE=1000, tok=await authToken();
+  const hdr={apikey:SB_KEY, Authorization:'Bearer '+tok, Prefer:'count=exact'};
+  const url=off=>SB_URL+'/rest/v1/'+table+'?select=*&order='+order+'.asc&limit='+PAGE+'&offset='+off;
+  const get=async off=>{ const r=await fetch(url(off),{headers:hdr}); if(!r.ok) throw new Error(table+': '+(await r.text()).slice(0,300)); return r; };
+  const r0=await get(0); const first=await r0.json();
+  const total=parseInt((r0.headers.get('content-range')||'').split('/')[1])||0;
+  let out=first;
+  if(first.length>=PAGE && total>PAGE){
+    const jobs=[]; for(let off=PAGE; off<total; off+=PAGE) jobs.push(get(off).then(r=>r.json()));
+    const rest=await Promise.all(jobs); out=first.concat(...rest);
+  } else if(first.length>=PAGE){ /* ไม่ได้ count → ถอยไปดึงต่อกัน */
+    let off=PAGE; while(true){ const rows=await (await get(off)).json(); out=out.concat(rows); if(rows.length<PAGE) break; off+=PAGE; }
   }
+  BOOT_DONE++; bootProgress();
   return out;
 }
 async function pushPlan(cid){
@@ -946,9 +1000,10 @@ async function boot(){
     }
     closeGate();
   }
-  $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini">Supabase · Elite-Escapes</div></div>';
+  $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ กำลังโหลดข้อมูลจากฐานกลาง…</h3><div class="mini" id="boot-prog">เริ่มดึงข้อมูล…</div><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
     const N=v=>v!=null?Number(v):null;
+    BOOT_DONE=0; BOOT_TOTAL=16; bootProgress();
     const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css, mts, dls] = await Promise.all([
       fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
       fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
@@ -1103,6 +1158,7 @@ function render(){
   if(S.view==='renew') return rRenew();
   if(S.view==='bible') return rBible();
   if(S.view==='backup') return rBackup();
+  if(S.view==='sysmap') return rSysmap();
 }
 
 /* ================= dashboard ================= */
@@ -1336,7 +1392,7 @@ function runCounters(){
 }
 const SKINS=[['verde','ธีมเขียว (Verde)'],['bracket','ธีม Admin แบนราบ (Bracket)'],['apex','ธีมมืด (Apex)'],['classic','ธีมเดิม (Classic)']];
 function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElement.dataset.skin); const nx=SKINS[(i+1)%SKINS.length]; document.documentElement.dataset.skin=nx[0]; try{ localStorage.setItem('ee_skin',nx[0]); }catch(e){} toast(nx[1]); }
-const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'};
+const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.querySelector('.nv')) return; const p=NAV_ICONS[b.dataset.v]; if(!p) return; b.insertAdjacentHTML('afterbegin',`<i class="nv"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`); }); }
 document.addEventListener('DOMContentLoaded',decorateNav);
 /* ===== เมนูจัดกลุ่ม: พับ/กาง จำสถานะ ===== */
@@ -1353,6 +1409,7 @@ function syncTopbar(){
   const nb=document.querySelector('nav button[data-v="todo"] .badge'); const tb=g('tb-badge');
   if(tb){ if(nb&&nb.textContent.trim()){ tb.textContent=nb.textContent.trim(); tb.classList.remove('hide'); } else tb.classList.add('hide'); }
   const u=(typeof USER!=='undefined'&&USER&&USER.email&&USER.email!=='team')?USER:null;
+  document.body.classList.toggle('isadmin', !!(typeof USER!=='undefined'&&USER&&USER.role==='admin'));
   if(g('tb-name')){ g('tb-name').textContent=u?(u.name||u.email):'ทีมงาน'; g('tb-role').textContent=u?({admin:'แอดมิน',editor:'กรอกได้',viewer:'ดูอย่างเดียว'}[u.role]||u.role||'')+' · '+u.email:'Elite Escapes'; g('tb-av').textContent=(u?(u.name||u.email):'EE').replace(/[^A-Za-zก-๙ ]/g,'').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'EE'; }
   const ss=g('sidestats');
   if(ss){
@@ -3056,6 +3113,118 @@ function exportBibleCSV(){
 }
 
 /* ================= backup ================= */
+/* ================= ผังระบบ (node canvas) — admin only ================= */
+function isAdminUser(){ return !!(typeof USER!=='undefined'&&USER&&USER.role==='admin'); }
+const SM_KIND_TH={src:'ไฟล์ต้นทาง',proc:'Cold Line',db:'ตารางฐานกลาง',app:'เมนูในแอป',out:'ผลลัพธ์'};
+const SM_COLOR={src:'#8b93a7',proc:'#2a9d8f',db:'#5b8fd6',app:'#e0a23a',out:'#b07fd8'};
+const SM_COLS={src:0,proc:1,db:2,app:3,out:4}, SM_CX=[40,330,620,910,1200], SM_DY=118;
+function smNodes(){
+  const nf=v=>Number(v||0).toLocaleString('en-US');
+  const cons=allContracts(); const cli=(BASE.clients||[]).length+((OV.customClients||[]).length);
+  const fees=cons.reduce((s,c)=>s+((c.fees||[]).length),0);
+  return [
+   ['bible','src','Sales Bible.xlsx','ทะเบียนสัญญาห้องสัญญา (Club/TCU/Kudo) ฉบับ 08.2026','',{owner:'ห้องสัญญา',note:'ไฟล์เดียวอัปเดตต่อเนื่อง เทียบกับทะเบียนแล้วตรงกัน'}],
+   ['master','src','Masterfile.xlsx','สมาชิก Elite Escapes 2026 (EST/ESG/EVIP/ESP/EX)','',{owner:'ห้องสัญญา'}],
+   ['arx','src','AR Ledger 2016–2026 (.xlsx)','สมุดบัญชีลูกหนี้ 1 ชีต/เดือน T-account ต่อสัญญา','',{owner:'บัญชี',note:'ใช้ 4 ไฟล์เวอร์ชันล่าสุด'}],
+   ['comx','src','CU Sales Commission Master.xlsm','บัญชีผ่อน + คอมฯ ทีมขายราย 15 วัน','รอบ 1–15 ส.ค. 2026',{owner:'บัญชี',note:'มีเลขบัญชี/รหัสในไฟล์ — ไม่นำเข้า'}],
+   ['mktx','src','Marketing Manager Report.xlsx','ผลงาน/ค่าจ้าง OPC รายสัปดาห์ Q/Q+/CT','',{owner:'ทีมการตลาด'}],
+   ['acc','src','Access ×4 (Zineb/Crista/Marielle/Nicky)','แฟ้มสัญญา Welcome call + ลูกค้า + PDF แนบ','645 ไฟล์ PDF',{owner:'ห้องสัญญา',note:'ต่างคนต่างถือ รวมเป็นชุดเดียวแล้ว'}],
+   ['scan','src','ContractScan (PDF)','สแกน Purchase Agreement 2016–2026','16.5 GB',{owner:'ห้องสัญญา',note:'ตัดซ้ำแล้ว เก็บเฉพาะไฟล์ไม่ซ้ำ'}],
+   ['qual','src','Club Unique Qualifications.doc','เกณฑ์ Q ของ reception (อายุ/อาชีพ/บัตร/โรงแรม)','7 ข้อ',{owner:'Reception'}],
+   ['p1','proc','① Market survey','OPC หาแขกตามแหล่งท่องเที่ยว พามาออฟฟิศ','ค่าจ้างทุกศุกร์',{owner:'ทีมการตลาด (OPC)'}],
+   ['p2','proc','② คัดกรอง Q / Q+ / CT','Reception + Yannick ใช้ checklist 7 ข้อ','Q ฿3,000 · Q+ ฿3,500 · CT ฿1,500',{owner:'Reception / GM'}],
+   ['p3','proc','③ ทัวร์ + Presentation 90 นาที','Sales Rep / T/O เสนอขาย · จ่าย OPC เมื่อครบ 90 นาที','Split ตามสัญชาติ',{owner:'ทีมขาย'}],
+   ['p4','proc','④ ปิดดีล → ออกเลขสัญญา','Daily Sale Report: ราคา มัดจำ รายการหัก → Deal Nett','เลขสัญญาเกิดที่นี่',{owner:'ห้องสัญญา'}],
+   ['p5','proc','⑤ รับเงิน / ผ่อนชำระ','บันทึกทุกงวด TYPE + ธนาคาร ยอดค้างอัปเดต','Statement ลูกหนี้',{owner:'บัญชี'}],
+   ['p6','proc','⑥ คอมฯ + ค่าจ้าง','คอมฯ ทีมขายราย 15 วัน · ค่าจ้าง OPC ทุกศุกร์','จาก Deal Nett / เงินรับจริง',{owner:'บัญชี + GM'}],
+   ['p7','proc','⑦ ดูแลสมาชิกรายปี','ค่าบำรุง MFEE · Interval · ต่ออายุ · งานติดตาม','FYO → LYO',{owner:'บริการสมาชิก'}],
+   ['p8','proc','⑧ ขอเข้าพัก / ใช้ Week','เช็คค่าบำรุงจ่ายแล้ว → บันทึก Own/Marketing/II','รับรู้รายได้',{owner:'ฝ่ายจอง'}],
+   ['t_clients','db','clients + contracts + mfee','ทะเบียนลูกค้า/สัญญา/ค่าบำรุงรายปี',`${nf(cli)} · ${nf(cons.length)} · ${nf(fees)}`,{}],
+   ['t_cases','db','case_files + case_customers','แฟ้มสัญญา + ที่อยู่/โทร/อีเมล',`${nf(CF.length)} · ${nf(CK.length)}`,{}],
+   ['t_scans','db','contract_scans','ดัชนีสแกน PA (ไฟล์อยู่ใน Google Drive)',nf(CS.length),{}],
+   ['t_tours','db','mkt_tours + mkt_weekly','รายทัวร์ OPC + สรุปรายสัปดาห์',`${nf(MT.length)} · ${nf(MW.length)}`,{}],
+   ['t_deals','db','sales_deals','ดีลที่เซ็นสัญญา + รายการหัก + Deal Nett',nf(DL.length),{}],
+   ['t_recv','db','receivables + ar_payments','ลูกหนี้ต่อสัญญา + ประวัติรับเงินรายงวด',`${nf(REC.length)} · ${nf(RP.length)}`,{}],
+   ['t_comm','db','commission_periods + lines','คอมฯ ต่อรอบ ต่อสัญญา ต่อตำแหน่ง',`${nf(CP.length)} รอบ · ${nf(CL.length)} บรรทัด`,{}],
+   ['t_week','db','week_usage + payout_plans','การเข้าพัก + แผนจ่ายคืน Fractional',`${nf(WU.length)} · ${nf(Object.keys(OV.plans||{}).length)}`,{}],
+   ['a_ov','app','ภาพรวม · งานที่ต้องทำ','KPI สัญญา/ลูกค้า/ค้าง + รายการที่ต้องติดตาม','',{owner:'ทุกฝ่าย',view:'dash'}],
+   ['a_mkt','app','ทีมการตลาด · Daily Sale Report · ค่าคอมมิชชั่น','กลุ่ม การตลาด & ขาย','',{owner:'OPC / Reception / ทีมขาย / บัญชี',view:'mkt'}],
+   ['a_con','app','ทะเบียนสัญญา · แฟ้มสัญญา','กลุ่ม ห้องสัญญา (+ปุ่มเปิด PDF ใน Drive)','',{owner:'Zineb / Crista / Marielle / Nicky',view:'cases'}],
+   ['a_acc','app','ลูกหนี้ (AR) · ค้างชำระ · การจ่ายคืน','กลุ่ม บัญชี','',{owner:'ทีมบัญชี',view:'recv'}],
+   ['a_mem','app','ลูกค้า · การเข้าพัก · Interval · ใกล้หมดอายุ','กลุ่ม บริการสมาชิก & ฝ่ายจอง','',{owner:'Member service / ฝ่ายจอง',view:'clients'}],
+   ['a_it','app','ข้อมูลกลาง · ผังระบบ','ผู้ใช้ สิทธิ์ ฟีดกิจกรรม (admin)','',{owner:'IT',view:'backup'}],
+   ['o_slip','out','สลิปค่าจ้าง OPC (ศุกร์)','พิมพ์ต่อคน ต่องวด','',{}],
+   ['o_dsr','out','Daily Sale Report (พิมพ์)','ดีลรายวัน/สัปดาห์/เดือน + Deal Nett','',{}],
+   ['o_stmt','out','Statement ลูกหนี้ / ค่าบำรุง','PDF หัวจดหมาย ELITE ESCAPES','',{}],
+   ['o_drive','out','Google Drive › DB Elite Escape','Contracts + Contract Scans (เข้าเฉพาะโฟลเดอร์นี้)','',{}],
+   ['o_csv','out','CSV ทุกโมดูล','ส่งต่อ Excel/บัญชี','',{}],
+  ];
+}
+const SM_EDGES=[
+ ['bible','t_clients'],['master','t_clients'],['acc','t_cases'],['acc','o_drive'],['scan','t_scans'],['scan','o_drive'],['arx','t_recv'],['comx','t_recv'],['comx','t_comm'],['mktx','t_tours'],['qual','p2'],
+ ['p1','p2'],['p2','p3'],['p3','p4'],['p4','p5'],['p5','p6'],['p4','p7'],['p7','p8'],
+ ['p1','t_tours'],['p2','t_tours'],['p3','t_tours'],['p4','t_deals'],['p4','t_clients'],['p4','t_recv'],['p5','t_recv'],['p6','t_comm'],['p6','t_tours'],['p7','t_clients'],['p8','t_week'],
+ ['t_tours','a_mkt'],['t_deals','a_mkt'],['t_comm','a_mkt'],['t_clients','a_con'],['t_cases','a_con'],['t_scans','a_con'],['t_recv','a_acc'],['t_clients','a_acc'],['t_week','a_acc'],['t_clients','a_mem'],['t_week','a_mem'],['t_clients','a_ov'],['t_recv','a_ov'],
+ ['a_mkt','o_slip'],['a_mkt','o_dsr'],['a_acc','o_stmt'],['a_con','o_drive'],['a_mkt','o_csv'],['a_acc','o_csv'],['a_mem','o_csv'],['a_con','o_csv']
+];
+const SM_NOTES=[[40,-70,'ไฟล์ทั้งหมดถูกอ่านและนำเข้าฐานกลางแล้ว — ต้นฉบับไม่ถูกแก้ ทีมกรอกในแอปแทน Excel/Access'],[330,-70,'กระบวนการ Cold Line เรียงตามลำดับจริง เลขสัญญาเกิดในขั้น ④ แล้วตามลูกค้าไปทุกตาราง'],[910,-70,'เมนูจัดกลุ่มตามฝ่าย 6 กลุ่ม เข้าได้เฉพาะ Gmail บริษัท @elite-escapes.club']];
+const SM={pos:{},view:{x:0,y:0,k:1},sel:null,nodes:[],el:{},userAdjusted:false};
+function smDefaultPos(){ const cnt={},p={}; SM.nodes.forEach(n=>{ const c=SM_COLS[n[1]]; cnt[c]=cnt[c]||0; p[n[0]]={x:SM_CX[c],y:20+cnt[c]*SM_DY}; cnt[c]++; }); return p; }
+function smSavePos(){ try{ localStorage.setItem('ee_nodepos',JSON.stringify(SM.pos)); }catch(e){} }
+function rSysmap(){
+  if(!isAdminUser()){ $main.innerHTML='<div class="panel" style="margin-top:30px"><h3>ผังระบบ</h3><div class="note">หน้านี้เปิดได้เฉพาะผู้ดูแลระบบ (admin) เท่านั้น</div></div>'; return; }
+  SM.nodes=smNodes(); SM.sel=null;
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem('ee_nodepos')||'null'); }catch(e){}
+  SM.pos=(saved&&SM.nodes.every(n=>saved[n[0]]))?saved:smDefaultPos();
+  $main.innerHTML=`<div class="pk">System · Map</div><h1>ผังระบบ</h1><p class="sub">โครงสร้างข้อมูล: ไฟล์ต้นทาง → กระบวนการ Cold Line → ตารางฐานกลาง → เมนูในแอป → เอกสารที่ออก · ตัวเลขดึงจากฐานกลางสด</p>
+  <div class="panel" style="padding:12px 14px 10px;margin-bottom:10px"><div class="sm-legend">${Object.keys(SM_KIND_TH).map(k=>`<span><i style="background:${SM_COLOR[k]}"></i>${SM_KIND_TH[k]}</span>`).join('')}<span class="mini" style="margin-left:auto">เห็นเฉพาะ admin · ตำแหน่งโหนดที่ลากจัดจะจำไว้ในเครื่องนี้</span></div></div>
+  <div class="sm-wrap" id="sm-wrap"><div class="sm-stage" id="sm-stage"><div class="sm-world" id="sm-world"><svg class="sm-edges" id="sm-edges" width="1600" height="1200"></svg></div></div>
+   <div class="sm-tools"><button class="btn ghost" onclick="smFit()">จัดให้พอดีจอ</button><button class="btn ghost" onclick="smReset()">รีเซ็ตตำแหน่ง</button></div>
+   <div class="sm-info" id="sm-info"><button class="x" onclick="smClear()">×</button><div class="k" id="smi-k"></div><h4 id="smi-t"></h4><p id="smi-s"></p><dl id="smi-dl"></dl><div class="links" id="smi-l"></div></div>
+   <div class="sm-hint">ลากพื้นหลังเพื่อเลื่อน · ล้อเมาส์เพื่อซูม · ลากโหนดได้ · คลิกโหนดเพื่อดูเส้นเชื่อมและรายละเอียด</div></div>`;
+  smMount();
+}
+function smMount(){
+  const world=document.getElementById('sm-world'), stage=document.getElementById('sm-stage'); SM.el={};
+  SM.nodes.forEach(n=>{ const [id,kind,t,s,m]=n; const el=document.createElement('div'); el.className='sm-node'; el.dataset.id=id; el.style.setProperty('--c',SM_COLOR[kind]);
+    el.innerHTML=`<div class="hd"><i></i>${SM_KIND_TH[kind]}</div><div class="bd"><div class="t">${esc(t)}</div>${s?`<div class="s">${esc(s)}</div>`:''}${m?`<div class="m">${esc(m)}</div>`:''}</div><span class="port in"></span><span class="port out"></span>`;
+    world.appendChild(el); SM.el[id]=el; let drag=null;
+    el.addEventListener('pointerdown',e=>{ e.stopPropagation(); drag={sx:e.clientX,sy:e.clientY,ox:SM.pos[id].x,oy:SM.pos[id].y,moved:false}; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointermove',e=>{ if(!drag) return; const dx=(e.clientX-drag.sx)/SM.view.k, dy=(e.clientY-drag.sy)/SM.view.k; if(Math.abs(dx)+Math.abs(dy)>2) drag.moved=true; SM.pos[id]={x:drag.ox+dx,y:drag.oy+dy}; smPlace(id); smEdges(); });
+    el.addEventListener('pointerup',()=>{ if(drag&&!drag.moved) smSelect(id); if(drag&&drag.moved) smSavePos(); drag=null; });
+  });
+  SM_NOTES.forEach(([x,y,txt])=>{ const d=document.createElement('div'); d.className='sm-note'; d.style.left=x+'px'; d.style.top=y+'px'; d.textContent=txt; world.appendChild(d); });
+  SM.nodes.forEach(n=>smPlace(n[0]));
+  let pan=null;
+  stage.addEventListener('pointerdown',e=>{ if(e.target.closest('.sm-node')) return; pan={sx:e.clientX,sy:e.clientY,ox:SM.view.x,oy:SM.view.y,moved:false}; stage.classList.add('panning'); stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener('pointermove',e=>{ if(!pan) return; SM.view.x=pan.ox+(e.clientX-pan.sx); SM.view.y=pan.oy+(e.clientY-pan.sy); if(Math.abs(e.clientX-pan.sx)>2) pan.moved=true; smApply(); });
+  stage.addEventListener('pointerup',()=>{ if(pan&&!pan.moved) smClear(); if(pan&&pan.moved) SM.userAdjusted=true; pan=null; stage.classList.remove('panning'); });
+  stage.addEventListener('wheel',e=>{ e.preventDefault(); SM.userAdjusted=true; const k0=SM.view.k; const k=Math.min(2.2,Math.max(.3,k0*(e.deltaY<0?1.1:0.9))); const r=stage.getBoundingClientRect(); const mx=e.clientX-r.left,my=e.clientY-r.top; SM.view.x=mx-(mx-SM.view.x)*k/k0; SM.view.y=my-(my-SM.view.y)*k/k0; SM.view.k=k; smApply(); },{passive:false});
+  requestAnimationFrame(()=>{ smEdges(); smFit(); });
+}
+function smPlace(id){ const el=SM.el[id]; if(!el) return; el.style.left=SM.pos[id].x+'px'; el.style.top=SM.pos[id].y+'px'; }
+function smCenter(id,side){ const el=SM.el[id]; const w=el.offsetWidth||210,h=el.offsetHeight||90; return {x:SM.pos[id].x+(side==='out'?w:0),y:SM.pos[id].y+h/2}; }
+function smEdges(){ const svg=document.getElementById('sm-edges'); if(!svg) return; const kindOf={}; SM.nodes.forEach(n=>kindOf[n[0]]=n[1]);
+  svg.innerHTML=SM_EDGES.map(([a,b])=>{ if(!SM.el[a]||!SM.el[b]) return ''; const p1=smCenter(a,'out'),p2=smCenter(b,'in'); const dx=Math.max(60,(p2.x-p1.x)/2); return `<path data-a="${a}" data-b="${b}" style="--ecol:${SM_COLOR[kindOf[a]]}" d="M${p1.x},${p1.y} C${p1.x+dx},${p1.y} ${p2.x-dx},${p2.y} ${p2.x},${p2.y}"/>`; }).join(''); smHi(); }
+function smHi(){ const svg=document.getElementById('sm-edges'); if(!svg) return; const sel=SM.sel; svg.classList.toggle('focus',!!sel); svg.querySelectorAll('path').forEach(p=>p.classList.toggle('hi',!!sel&&(p.dataset.a===sel||p.dataset.b===sel)));
+  const linked=new Set(); if(sel) SM_EDGES.forEach(([a,b])=>{ if(a===sel) linked.add(b); if(b===sel) linked.add(a); });
+  Object.entries(SM.el).forEach(([id,el])=>{ el.classList.toggle('sel',id===sel); el.classList.toggle('dim',!!sel&&id!==sel&&!linked.has(id)); }); }
+function smSelect(id){ SM.sel=id; smHi(); const n=SM.nodes.find(x=>x[0]===id); if(!n) return; const g=x=>document.getElementById(x); const info=g('sm-info'); info.classList.add('show'); info.style.setProperty('--ic',SM_COLOR[n[1]]);
+  g('smi-k').textContent=SM_KIND_TH[n[1]]; g('smi-t').textContent=n[2]; g('smi-s').textContent=n[3]||''; const meta=n[5]||{};
+  g('smi-dl').innerHTML=(n[4]?`<dt>ตัวเลข</dt><dd>${esc(n[4])}</dd>`:'')+(meta.owner?`<dt>ผู้รับผิดชอบ</dt><dd>${esc(meta.owner)}</dd>`:'')+(meta.note?`<dt>หมายเหตุ</dt><dd>${esc(meta.note)}</dd>`:'')+(meta.view?`<dt>เปิดเมนู</dt><dd><a href="#" onclick="go('${meta.view}');return false">ไปที่หน้านี้ →</a></dd>`:'');
+  const name=x=>{ const m=SM.nodes.find(q=>q[0]===x); return m?esc(m[2]):x; };
+  const ins=SM_EDGES.filter(([a,b])=>b===id).map(([a])=>name(a)), outs=SM_EDGES.filter(([a])=>a===id).map(([,b])=>name(b));
+  g('smi-l').innerHTML=(ins.length?`<span style="border-color:var(--ic)">← จาก</span>`+ins.map(x=>`<span>${x}</span>`).join(''):'')+(outs.length?`<span style="border-color:var(--ic)">→ ไป</span>`+outs.map(x=>`<span>${x}</span>`).join(''):''); }
+function smClear(){ SM.sel=null; smHi(); const i=document.getElementById('sm-info'); if(i) i.classList.remove('show'); }
+function smApply(){ const w=document.getElementById('sm-world'); if(w) w.style.transform=`translate(${SM.view.x}px,${SM.view.y}px) scale(${SM.view.k})`; }
+function smFit(){ const stage=document.getElementById('sm-stage'); if(!stage) return; const xs=Object.values(SM.pos); if(!xs.length) return;
+  const minX=Math.min(...xs.map(p=>p.x))-40, minY=Math.min(...xs.map(p=>p.y))-90, maxX=Math.max(...xs.map(p=>p.x))+250, maxY=Math.max(...xs.map(p=>p.y))+150;
+  const r=stage.getBoundingClientRect(); if(r.width<100||r.height<100){ setTimeout(smFit,300); return; }
+  const k=Math.max(.25,Math.min(1.6,(r.width-40)/(maxX-minX),(r.height-70)/(maxY-minY)));
+  SM.view={k,x:(r.width-(maxX-minX)*k)/2-minX*k,y:(r.height-(maxY-minY)*k)/2-minY*k+20}; smApply(); SM.userAdjusted=false; }
+function smReset(){ SM.pos=smDefaultPos(); SM.nodes.forEach(n=>smPlace(n[0])); smSavePos(); smEdges(); smFit(); }
+window.addEventListener('resize',()=>{ if(S.view==='sysmap'&&document.getElementById('sm-stage')){ smEdges(); if(!SM.userAdjusted) smFit(); } });
+
 function rBackup(){
   const nPlans=Object.keys(OV.plans).length;
   let nInst=0,nPaid=0; allInstallments().forEach(x=>{nInst++; if(x.inst.paid)nPaid++;});
