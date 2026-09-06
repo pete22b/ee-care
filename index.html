@@ -643,6 +643,23 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="bracket"] .hero-stats>div:nth-child(4n+4){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/></svg>")}
 [data-skin="bracket"] .hero{border-bottom:1px solid var(--line);padding-bottom:16px}
 @media(max-width:840px){[data-skin="bracket"] .side{grid-row:auto} [data-skin="bracket"] .topbar{position:static} [data-skin="bracket"] .tb-crumb{display:none}}
+</style>
+<style id="nav-groups">
+/* ===== เมนูจัดกลุ่มตามฝ่าย พับ-กางได้ ===== */
+nav{gap:0}
+nav .ng{display:flex;flex-direction:column}
+nav .ng .ngi{display:flex;flex-direction:column;gap:3px;padding-bottom:6px}
+nav .ng:not(.open) .ngi{display:none}
+nav .ng>button.navlab{background:none;border:none;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px 16px 5px;margin:8px 0 2px;border-radius:0;box-shadow:none;letter-spacing:.22em}
+nav .ng>button.navlab::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gc,rgba(255,255,255,.35));flex:0 0 6px}
+nav .ng>button.navlab::after{content:'▾';margin-left:auto;font-size:11px;opacity:.6;transition:transform .15s}
+nav .ng:not(.open)>button.navlab::after{transform:rotate(-90deg)}
+nav .ng>button.navlab:hover{opacity:.95}
+[data-skin="bracket"] nav .ng>button.navlab{padding:9px 18px 4px;color:#7d8794}
+[data-skin="bracket"] nav .ng .ngi{gap:0;padding-bottom:2px}
+[data-skin="verde"] nav .ng>button.navlab{color:rgba(255,255,255,.55)}
+[data-skin="apex"] nav .ng>button.navlab{color:var(--ink3)}
+@media(max-width:840px){nav .ng{flex:1 1 100%} nav .ng .ngi{flex-direction:row;flex-wrap:wrap}}
 
 /* ===== LIVE: login gate ===== */
 #gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#071a2e;overflow:hidden;transition:opacity .5s}
@@ -702,24 +719,33 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button class="skinbtn" onclick="toggleSkin()" title="สลับธีม">◐ สลับธีม</button>
   </div>
   <nav>
-    <div class="navlab">Overview</div>
+    <div class="ng open" data-g="ov"><button type="button" class="navlab" onclick="toggleGroup('ov')">ภาพรวม</button><div class="ngi">
     <button data-v="dash" class="on">ภาพรวม</button>
     <button data-v="todo">งานที่ต้องทำ<span class="badge" id="todobadge" style="display:none"></span></button>
-    <div class="navlab">Operations</div>
-    <button data-v="clients">ลูกค้า</button>
-    <button data-v="payouts">การจ่ายคืน</button>
-    <button data-v="ar">ค้างชำระ</button>
-    <button data-v="recv">ลูกหนี้ (AR)</button>
-    <button data-v="weeks">การเข้าพัก</button>
-<button data-v="cases">แฟ้มสัญญา</button>
-<button data-v="comm">ค่าคอมมิชชั่น</button>
+    </div></div>
+    <div class="ng open" data-g="mkt" style="--gc:#2a9d8f"><button type="button" class="navlab" onclick="toggleGroup('mkt')">การตลาด & ขาย · Cold Line</button><div class="ngi">
 <button data-v="mkt">ทีมการตลาด</button>
 <button data-v="deals">Daily Sale Report</button>
-    <button data-v="interval">Interval</button>
-    <div class="navlab">Registry</div>
-    <button data-v="renew">ใกล้หมดอายุ</button>
+<button data-v="comm">ค่าคอมมิชชั่น</button>
+    </div></div>
+    <div class="ng open" data-g="con" style="--gc:#5b8fd6"><button type="button" class="navlab" onclick="toggleGroup('con')">ห้องสัญญา</button><div class="ngi">
     <button data-v="bible">ทะเบียนสัญญา</button>
+<button data-v="cases">แฟ้มสัญญา</button>
+    </div></div>
+    <div class="ng open" data-g="acc" style="--gc:#e0a23a"><button type="button" class="navlab" onclick="toggleGroup('acc')">บัญชี</button><div class="ngi">
+    <button data-v="recv">ลูกหนี้ (AR)</button>
+    <button data-v="ar">ค้างชำระ</button>
+    <button data-v="payouts">การจ่ายคืน</button>
+    </div></div>
+    <div class="ng open" data-g="mem" style="--gc:#b07fd8"><button type="button" class="navlab" onclick="toggleGroup('mem')">บริการสมาชิก & ฝ่ายจอง</button><div class="ngi">
+    <button data-v="clients">ลูกค้า</button>
+    <button data-v="weeks">การเข้าพัก</button>
+    <button data-v="interval">Interval</button>
+    <button data-v="renew">ใกล้หมดอายุ</button>
+    </div></div>
+    <div class="ng open" data-g="it" style="--gc:#9aa5b1"><button type="button" class="navlab" onclick="toggleGroup('it')">ระบบ</button><div class="ngi">
     <button data-v="backup">ข้อมูลกลาง</button>
+    </div></div>
   </nav>
   <div class="brandseg">
     <button data-b="all" class="on" onclick="setBrand('all')">ทั้งหมด</button>
@@ -1045,7 +1071,7 @@ function natOptions(sel){
 }
 const $main = document.getElementById('main');
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ go(b.dataset.v); });
+document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{ go(b.dataset.v); });
 function go(v){
   S.view=v; S.clientCode=null; S.planEdit=null;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
@@ -1313,6 +1339,12 @@ function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElemen
 const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.querySelector('.nv')) return; const p=NAV_ICONS[b.dataset.v]; if(!p) return; b.insertAdjacentHTML('afterbegin',`<i class="nv"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`); }); }
 document.addEventListener('DOMContentLoaded',decorateNav);
+/* ===== เมนูจัดกลุ่ม: พับ/กาง จำสถานะ ===== */
+function navGroupState(){ try{ return JSON.parse(localStorage.getItem('ee_navgroups')||'{}'); }catch(e){ return {}; } }
+function toggleGroup(g){ const el=document.querySelector(`nav .ng[data-g="${g}"]`); if(!el) return; el.classList.toggle('open'); const st=navGroupState(); st[g]=el.classList.contains('open'); try{ localStorage.setItem('ee_navgroups',JSON.stringify(st)); }catch(e){} }
+function restoreNavGroups(){ const st=navGroupState(); document.querySelectorAll('nav .ng').forEach(el=>{ const g=el.dataset.g; if(g in st) el.classList.toggle('open',!!st[g]); }); }
+function revealActiveGroup(){ const on=document.querySelector('nav button.on'); const ng=on&&on.closest('.ng'); if(ng&&!ng.classList.contains('open')) ng.classList.add('open'); }
+document.addEventListener('DOMContentLoaded',restoreNavGroups);
 /* ===== top bar + sidebar summary (สกิน Bracket) ===== */
 function syncTopbar(){
   const g=id=>document.getElementById(id); if(!g('topbar')) return;
@@ -1341,7 +1373,7 @@ function syncTopbar(){
   }
 }
 document.addEventListener('DOMContentLoaded',()=>{ const q=document.getElementById('tb-q'); if(q) q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ S.q=q.value.trim(); go('clients'); } }); });
-const __render=render; render=function(){ const r=__render.apply(this,arguments); try{ syncTopbar(); }catch(e){} return r; };
+const __render=render; render=function(){ const r=__render.apply(this,arguments); try{ syncTopbar(); revealActiveGroup(); }catch(e){} return r; };
 function areaChart(vals,labs){
   const W=640,H=200,P=26,BW=W-P*2,BH=H-P*2;
   const mx=Math.max(1,...vals);
