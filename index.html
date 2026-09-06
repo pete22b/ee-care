@@ -643,6 +643,31 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="bracket"] .hero-stats>div:nth-child(4n+4){--ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/></svg>")}
 [data-skin="bracket"] .hero{border-bottom:1px solid var(--line);padding-bottom:16px}
 @media(max-width:840px){[data-skin="bracket"] .side{grid-row:auto} [data-skin="bracket"] .topbar{position:static} [data-skin="bracket"] .tb-crumb{display:none}}
+/* --- Verde: top bar แบบเดียวกับ Bracket แต่โทนเขียว-โค้ง (ผู้ใช้ขอ 6 ก.ย.) --- */
+[data-skin="verde"] .app{grid-template-rows:auto 1fr}
+[data-skin="verde"] .side{grid-row:1/3}
+[data-skin="verde"] .app.collapsed{grid-template-columns:0 1fr} [data-skin="verde"] .app.collapsed .side{display:none}
+[data-skin="verde"] .topbar{display:flex;align-items:center;gap:16px;background:rgba(234,241,238,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(47,127,94,.10);padding:0 28px 0 22px;height:64px;position:sticky;top:0;z-index:20}
+[data-skin="verde"] .tb-menu{font:19px/1 sans-serif;background:none;border:none;color:var(--ink2);cursor:pointer;padding:7px 9px;border-radius:10px}
+[data-skin="verde"] .tb-menu:hover{background:#fff;color:var(--s1)}
+[data-skin="verde"] .tb-search{position:relative;flex:0 1 480px}
+[data-skin="verde"] .tb-search input{width:100%;padding:10px 40px 10px 16px;border:1px solid #d9e6df;border-radius:999px;font:inherit;font-size:13.5px;background:#fff;color:var(--ink);outline:none;box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s}
+[data-skin="verde"] .tb-search input::placeholder{color:var(--ink3)}
+[data-skin="verde"] .tb-search input:focus{border-color:var(--s1);box-shadow:0 0 0 3px rgba(47,127,94,.14)}
+[data-skin="verde"] .tb-search .tb-ico{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--s1);font-size:16px}
+[data-skin="verde"] .tb-crumb{margin-left:auto;font-size:12.5px;color:var(--ink3);white-space:nowrap}
+[data-skin="verde"] .tb-crumb a{color:var(--s1);text-decoration:none;font-weight:500} [data-skin="verde"] .tb-crumb b{color:var(--ink);font-weight:600}
+[data-skin="verde"] .tb-bell{position:relative;background:#fff;border:1px solid #d9e6df;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--ink2);box-shadow:var(--shadow-sm);display:inline-flex;align-items:center;justify-content:center}
+[data-skin="verde"] .tb-bell:hover{border-color:var(--s1);color:var(--s1)}
+[data-skin="verde"] .tb-bell span{position:absolute;top:-4px;right:-4px;background:#e0533f;color:#fff;font:700 10px var(--sans);min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 5px;border-radius:999px;border:2px solid var(--bg)}
+[data-skin="verde"] .tb-bell span.hide{display:none}
+[data-skin="verde"] .tb-user{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #d9e6df;border-radius:999px;padding:5px 16px 5px 5px;cursor:pointer;font:inherit;color:var(--ink);text-align:left;box-shadow:var(--shadow-sm)}
+[data-skin="verde"] .tb-user:hover{border-color:var(--s1)}
+[data-skin="verde"] .tb-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4aa87f,#2f7f5e);color:#fff;display:inline-flex;align-items:center;justify-content:center;font:600 12px var(--sans);letter-spacing:.02em}
+[data-skin="verde"] .tb-user b{display:block;font-size:13px;font-weight:600;line-height:1.2;font-family:var(--sans);white-space:nowrap} [data-skin="verde"] .tb-user small{display:block;font-size:11px;color:var(--ink3);line-height:1.25;white-space:nowrap}
+@media(max-width:1180px){[data-skin="verde"] .tb-user small{display:none}}
+[data-skin="verde"] main{padding-top:18px}
+@media(max-width:840px){[data-skin="verde"] .side{grid-row:auto} [data-skin="verde"] .topbar{position:static;padding:0 14px;height:auto;flex-wrap:wrap;row-gap:8px;padding-block:10px} [data-skin="verde"] .tb-crumb{display:none} [data-skin="verde"] .tb-search{flex:1 1 100%;order:9}}
 </style>
 <style id="nav-groups">
 /* ===== เมนูจัดกลุ่มตามฝ่าย พับ-กางได้ ===== */
