@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=Montserrat:wght@500;600;700&family=EB+Garamond:wght@500;600;700&family=Trirong:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>try{document.documentElement.dataset.skin=localStorage.getItem('ee_skin')||'verde';}catch(e){document.documentElement.dataset.skin='verde';}</script>
+<script>try{ let sk=localStorage.getItem('ee_skin'); if(!localStorage.getItem('ee_skin_navy1')){ sk='navy'; localStorage.setItem('ee_skin','navy'); localStorage.setItem('ee_skin_navy1','1'); } document.documentElement.dataset.skin=sk||'navy'; }catch(e){document.documentElement.dataset.skin='navy';}</script>
 <style>
 :root{
   color-scheme:light;
@@ -481,6 +481,170 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="verde"] .pmix{border-radius:99px}
 @media(max-width:840px){[data-skin="verde"] .side{border-radius:0 0 26px 26px}}
 </style>
+<style id="skin-navy">
+/* ===== สกิน Navy — พื้นน้ำเงินเข้ม accent ฟ้าอมเขียว (สร้างจาก verde ด้วย make_navy_skin.py) ===== */
+[data-skin="navy"]{
+  color-scheme:dark;
+  --bg:#0f1420; --surface:#171d2e; --surface2:#1e2538; --line:#2a3247;
+  --ink:#eef1f7; --ink2:#aab3c7; --ink3:#7c86a0;
+  --s1:#3fd3c8; --s2:#2fb8ae; --s3:#3fd3c8; --s8:#ff8a7a;
+  --brand:#3fd3c8; --brand2:#5fe0d6; --deep:#eef1f7; --deep2:#c8d0e0;
+  --gold:#e8c56a; --orange:#f0a04b; --mint:#173b40;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.25),0 10px 28px -16px rgba(0,0,0,.6);
+  --chart-line:#3fd3c8; --chart-line2:#5c6c8f; --chart-fill:rgba(63,211,200,.16); --chart-grid:#222a3d; --chart-axis:#2c354c; --chart-text:#7c86a0; --chart-dot:#171d2e;
+  --bar-fill:linear-gradient(90deg,#3fd3c8,#7fe6de); --bar-track:#222a3d; --col:#2c4d5c; --col-hot:#3fd3c8;
+  --sans:"IBM Plex Sans Thai","Prompt",-apple-system,"Segoe UI",sans-serif;
+}
+[data-skin="navy"] body{font-family:"IBM Plex Sans Thai","Sarabun",sans-serif;font-size:14.5px}
+[data-skin="navy"] h1,[data-skin="navy"] h2,[data-skin="navy"] h3,[data-skin="navy"] h4,[data-skin="navy"] .profile-head h2,[data-skin="navy"] .card .v,[data-skin="navy"] .hero-stats b,[data-skin="navy"] .balance .v,[data-skin="navy"] .donut i b{font-family:var(--sans);font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+[data-skin="navy"] h1{font-size:22px} [data-skin="navy"] h1::after{display:none}
+[data-skin="navy"] a{color:var(--s1);text-decoration-color:rgba(63,211,200,.45)}
+[data-skin="navy"] ::selection{background:rgba(63,211,200,.25)}
+[data-skin="navy"] ::-webkit-scrollbar-thumb{background:#2c354c;border-color:var(--bg)}
+/* sidebar */
+[data-skin="navy"] .app{background:radial-gradient(1100px 520px at 85% -12%,#1c2545 0%,var(--bg) 58%)}
+[data-skin="navy"] .side{background:linear-gradient(180deg,#1d2645 0%,#171e36 35%,#121828 70%,#0d111c 100%);border-radius:0 30px 30px 0;box-shadow:12px 0 40px -24px rgba(0,0,0,.7);border-right:1px solid rgba(63,211,200,.10);padding:28px 18px 22px}
+[data-skin="navy"] .brand{border-bottom:none;padding:0 8px 8px}
+[data-skin="navy"] .wordmark{font-family:var(--sans);font-size:17px;letter-spacing:.02em;color:#fff;font-weight:600;display:flex;align-items:center;gap:10px}
+[data-skin="navy"] .wordmark::before{content:'';display:inline-block;width:30px;height:30px;border-radius:9px;background:#3fd3c8;flex:0 0 30px;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M13 2 5 14h6l-1 8 9-13h-6z' fill='black'/></svg>") center/20px no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M13 2 5 14h6l-1 8 9-13h-6z' fill='black'/></svg>") center/20px no-repeat;background:#3fd3c8}
+[data-skin="navy"] .kick{color:rgba(255,255,255,.65);font-family:var(--sans);letter-spacing:.22em;font-size:9.5px}
+[data-skin="navy"] .tb-sub{color:rgba(255,255,255,.75)}
+[data-skin="navy"] .navlab{color:rgba(255,255,255,.45);font-family:var(--sans);letter-spacing:.24em;font-size:9.5px}
+[data-skin="navy"] nav{gap:4px;margin-top:14px}
+[data-skin="navy"] nav button{font-family:var(--sans);font-size:14px;font-weight:500;letter-spacing:0;color:rgba(255,255,255,.85);border-radius:12px;padding:11px 14px}
+[data-skin="navy"] nav button:hover{background:rgba(255,255,255,.12);color:#fff}
+[data-skin="navy"] nav button.on{background:rgba(255,255,255,.18);color:#fff;box-shadow:none;font-weight:600;position:relative}
+[data-skin="navy"] nav button.on::after{content:'';position:absolute;right:14px;top:50%;width:7px;height:7px;border-radius:50%;background:#fff;transform:translateY(-50%)}
+[data-skin="navy"] nav .badge{background:var(--s1);color:#0b1220}
+[data-skin="navy"] .side .tag{color:rgba(255,255,255,.55);border-top:1px solid rgba(255,255,255,.18);font-size:11px}
+[data-skin="navy"] .brandseg{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);border-radius:99px}
+[data-skin="navy"] .brandseg button{color:rgba(255,255,255,.75);font-family:var(--sans)}
+[data-skin="navy"] .brandseg button.on{background:var(--s1);color:#0b1220}
+[data-skin="navy"] .skinbtn{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.8);border-radius:99px;font-family:var(--sans);letter-spacing:.06em}
+[data-skin="navy"] .skinbtn:hover{background:rgba(255,255,255,.14);color:#fff}
+/* main */
+[data-skin="navy"] main{padding:30px 40px 90px}
+[data-skin="navy"] .sub{color:var(--ink3)}
+[data-skin="navy"] .pk,[data-skin="navy"] .hero-kick,[data-skin="navy"] .sechead small,[data-skin="navy"] .panel h3 .idx{font-family:var(--sans);letter-spacing:.2em;color:var(--s1);font-size:10px;font-weight:600}
+/* hero → header + KPI tiles */
+[data-skin="navy"] .hero{background:none;border:none;border-radius:0;padding:0 0 6px;margin-bottom:18px;box-shadow:none;color:var(--ink);overflow:visible}
+[data-skin="navy"] .hero::before,[data-skin="navy"] .hero::after{display:none}
+[data-skin="navy"] .hero-in{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:20px}
+[data-skin="navy"] .hero h1{color:var(--ink);font-size:24px;margin:0 0 4px}
+[data-skin="navy"] .hero .sub{color:var(--ink3);max-width:80ch}
+[data-skin="navy"] .hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+[data-skin="navy"] .hero-stats>div{background:var(--surface);border:none;border-radius:18px;padding:20px 22px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm);border-left:none}
+[data-skin="navy"] .hero-stats>div>span{order:-1;color:var(--ink3);font-size:11.5px;letter-spacing:.02em;text-transform:none;font-family:var(--sans);font-weight:600}
+[data-skin="navy"] .hero-stats b{font-size:28px;color:var(--ink);font-variant-numeric:tabular-nums}
+[data-skin="navy"] .hero-stats b span{font:inherit;color:inherit;letter-spacing:inherit;text-transform:none;order:0}
+/* cards */
+[data-skin="navy"] .card,[data-skin="navy"] .card.red,[data-skin="navy"] .card.orange,[data-skin="navy"] .card.green,[data-skin="navy"] .card.blue,[data-skin="navy"] .card.gold{background:var(--surface);border:none;border-radius:18px;box-shadow:var(--shadow-sm)}
+[data-skin="navy"] .card.kpi:hover{transform:translateY(-2px);box-shadow:0 12px 30px -16px rgba(0,0,0,.55)}
+[data-skin="navy"] .card .l{color:var(--ink3);text-transform:none;letter-spacing:.02em;font-size:11.5px}
+[data-skin="navy"] .card .v{font-size:28px}
+[data-skin="navy"] .card.red .v{color:var(--s8)}[data-skin="navy"] .card.orange .v{color:var(--orange)}[data-skin="navy"] .card.green .v{color:var(--s1)}[data-skin="navy"] .card.blue .v,[data-skin="navy"] .card.gold .v{color:var(--ink)}
+[data-skin="navy"] .card .m{color:var(--ink3)}
+/* panels */
+[data-skin="navy"] .panel{background:var(--surface);border:none;border-radius:18px;box-shadow:var(--shadow-sm);padding:22px 24px}
+[data-skin="navy"] .panel h3{font-size:15.5px}
+[data-skin="navy"] .panel h3::after{background:none}
+[data-skin="navy"] .panel .cs{color:var(--ink3)}
+[data-skin="navy"] .sechead{font-family:var(--sans);color:var(--ink)}
+/* tables */
+[data-skin="navy"] th{color:var(--ink3);font-size:11px;letter-spacing:.04em;text-transform:none;border-bottom:1px solid var(--line);font-weight:600}
+[data-skin="navy"] td{border-bottom:1px solid var(--line);color:var(--ink2)}
+[data-skin="navy"] td b,[data-skin="navy"] td a{color:var(--ink)}
+[data-skin="navy"] tbody tr.click:hover{background:var(--surface2)}
+/* pills */
+[data-skin="navy"] .pill{border-radius:99px;font-size:11.5px}
+[data-skin="navy"] .p-paid{background:#163a3a;color:#6fe3d8}
+[data-skin="navy"] .p-over{background:#3d1f1f;color:#ff9a8f}
+[data-skin="navy"] .p-soon{background:#3a2c12;color:#f2c163}
+[data-skin="navy"] .p-fut,[data-skin="navy"] .p-welcome{background:#1f2a45;color:#9fb6e8}
+[data-skin="navy"] .p-none{background:#222a3d;color:#8b95ab}
+[data-skin="navy"] .p-cancel{background:#222a3d;color:#6b7488}
+[data-skin="navy"] .p-up{background:#2a2345;color:#b9a3f0}
+[data-skin="navy"] .chip,[data-skin="navy"] .contract-card h4 .chip{background:var(--surface2);border-color:var(--line);color:var(--ink2);border-radius:99px}
+[data-skin="navy"] .bchip.ee{background:#3a2c12;color:#f2c163;border-color:#5a4520}
+[data-skin="navy"] .bchip.cu{background:#163a3a;color:#6fe3d8;border-color:#1f5a58}
+[data-skin="navy"] .fy.paid{background:#163a3a;border-color:#1f5a58;color:#6fe3d8}
+[data-skin="navy"] .fy.due{background:#3d1f1f;border-color:#5a2a2a;color:#ff9a8f}
+/* inputs */
+[data-skin="navy"] .search input[type=text],[data-skin="navy"] .search input[type=search]{border-radius:99px;border:none;box-shadow:var(--shadow-sm);padding:12px 20px;background:var(--surface)}
+[data-skin="navy"] select.flt,[data-skin="navy"] input.flt{border-radius:99px;border:none;box-shadow:var(--shadow-sm);background:var(--surface)}
+[data-skin="navy"] .search input:focus,[data-skin="navy"] .form input:focus,[data-skin="navy"] .form select:focus{border-color:var(--s1);box-shadow:0 0 0 3px rgba(63,211,200,.22)}
+[data-skin="navy"] .form input,[data-skin="navy"] .form select,[data-skin="navy"] .form textarea{border-radius:12px;border-color:var(--line);background:var(--surface2);color:var(--ink)}
+[data-skin="navy"] .form label{color:var(--ink2)}
+/* buttons */
+[data-skin="navy"] .btn{background:var(--s1);border-color:var(--s1);color:#0b1220;border-radius:99px;box-shadow:0 6px 16px -8px rgba(63,211,200,.45);font-weight:600;font-family:var(--sans);letter-spacing:.02em}
+[data-skin="navy"] .btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+[data-skin="navy"] .btn.sec{background:var(--mint);border-color:var(--mint);color:#6fe3d8;box-shadow:none}
+[data-skin="navy"] .btn.sec:hover{background:#1c4a50;border-color:#1c4a50;filter:none}
+[data-skin="navy"] .btn.ghost{background:var(--surface2);border-color:var(--line);color:var(--ink2);box-shadow:none}
+[data-skin="navy"] .btn.ghost:hover{background:var(--surface2)}
+[data-skin="navy"] .btn.danger{background:var(--surface2);border-color:#5a2a2a;color:#ff9a8f;box-shadow:none}
+[data-skin="navy"] .btn.paybtn{background:#2fb8ae;border-color:#2fb8ae}
+[data-skin="navy"] .bk{color:var(--s1)}
+[data-skin="navy"] .tabbtns button{border-radius:99px;border:none;background:var(--surface);color:var(--ink2);box-shadow:var(--shadow-sm)}
+[data-skin="navy"] .tabbtns button:hover{background:var(--surface2)}
+[data-skin="navy"] .tabbtns button.on{background:var(--s1);color:#0b1220;border-color:var(--s1)}
+/* misc */
+[data-skin="navy"] .note{background:var(--surface);border:none;border-left:4px solid var(--s1);border-radius:14px;box-shadow:var(--shadow-sm);color:var(--ink2)}
+[data-skin="navy"] .note.blue{border-left-color:var(--gold)}
+[data-skin="navy"] .contract-card{border:none;border-radius:16px;box-shadow:var(--shadow-sm);background:var(--surface2)}
+[data-skin="navy"] .balance{border:none;border-radius:16px;box-shadow:var(--shadow-sm)}
+[data-skin="navy"] #modalwrap{background:rgba(4,7,14,.7)}
+[data-skin="navy"] #modal{border-radius:22px;border:none}
+[data-skin="navy"] #toast{background:var(--s1);color:#0b1220}
+[data-skin="navy"] .donut{box-shadow:none} [data-skin="navy"] .donut i{box-shadow:none}
+[data-skin="navy"] .bar-h .tr,[data-skin="navy"] .stack .tr{border-radius:99px} [data-skin="navy"] .bar-h .tr i{border-radius:99px}
+[data-skin="navy"] .vb .col{border-radius:8px 8px 0 0}
+[data-skin="navy"] .pmix{border-radius:99px}
+@media(max-width:840px){[data-skin="navy"] .side{border-radius:0 0 26px 26px}}
+
+/* --- จาก topbar/nav-groups --- */
+[data-skin="navy"] nav button .nv,[data-skin="apex"] nav button .nv,[data-skin="bracket"] nav button .nv{display:inline-block}
+[data-skin="navy"] nav button,[data-skin="apex"] nav button,[data-skin="bracket"] nav button{display:flex;align-items:center}
+[data-skin="navy"] .app{grid-template-rows:auto 1fr}
+[data-skin="navy"] .side{grid-row:1/3}
+[data-skin="navy"] .app.collapsed{grid-template-columns:0 1fr} [data-skin="navy"] .app.collapsed .side{display:none}
+[data-skin="navy"] .topbar{display:flex;align-items:center;gap:16px;background:rgba(15,20,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(63,211,200,.14);padding:0 28px 0 22px;height:64px;position:sticky;top:0;z-index:20}
+[data-skin="navy"] .tb-menu{font:19px/1 sans-serif;background:none;border:none;color:var(--ink2);cursor:pointer;padding:7px 9px;border-radius:10px}
+[data-skin="navy"] .tb-menu:hover{background:var(--surface);color:var(--s1)}
+[data-skin="navy"] .tb-search{position:relative;flex:0 1 480px}
+[data-skin="navy"] .tb-search input{width:100%;padding:10px 40px 10px 16px;border:1px solid var(--line);border-radius:999px;font:inherit;font-size:13.5px;background:var(--surface);color:var(--ink);outline:none;box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s}
+[data-skin="navy"] .tb-search input::placeholder{color:var(--ink3)}
+[data-skin="navy"] .tb-search input:focus{border-color:var(--s1);box-shadow:0 0 0 3px rgba(47,127,94,.14)}
+[data-skin="navy"] .tb-search .tb-ico{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--s1);font-size:16px}
+[data-skin="navy"] .tb-crumb{margin-left:auto;font-size:12.5px;color:var(--ink3);white-space:nowrap}
+[data-skin="navy"] .tb-crumb a{color:var(--s1);text-decoration:none;font-weight:500} [data-skin="navy"] .tb-crumb b{color:var(--ink);font-weight:600}
+[data-skin="navy"] .tb-bell{position:relative;background:var(--surface);border:1px solid var(--line);width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--ink2);box-shadow:var(--shadow-sm);display:inline-flex;align-items:center;justify-content:center}
+[data-skin="navy"] .tb-bell:hover{border-color:var(--s1);color:var(--s1)}
+[data-skin="navy"] .tb-bell span{position:absolute;top:-4px;right:-4px;background:#e0533f;color:#fff;font:700 10px var(--sans);min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 5px;border-radius:999px;border:2px solid var(--bg)}
+[data-skin="navy"] .tb-bell span.hide{display:none}
+[data-skin="navy"] .tb-user{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 16px 5px 5px;cursor:pointer;font:inherit;color:var(--ink);text-align:left;box-shadow:var(--shadow-sm)}
+[data-skin="navy"] .tb-user:hover{border-color:var(--s1)}
+[data-skin="navy"] .tb-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#5fe0d6,#2fb8ae);color:#0b1220;display:inline-flex;align-items:center;justify-content:center;font:600 12px var(--sans);letter-spacing:.02em}
+[data-skin="navy"] .tb-user b{display:block;font-size:13px;font-weight:600;line-height:1.2;font-family:var(--sans);white-space:nowrap} [data-skin="navy"] .tb-user small{display:block;font-size:11px;color:var(--ink3);line-height:1.25;white-space:nowrap}
+@media(max-width:1180px){[data-skin="navy"] .tb-user small{display:none}}
+[data-skin="navy"] main{padding-top:18px}
+@media(max-width:840px){[data-skin="navy"] .side{grid-row:auto} [data-skin="navy"] .topbar{position:static;padding:0 14px;height:auto;flex-wrap:wrap;row-gap:8px;padding-block:10px} [data-skin="navy"] .tb-crumb{display:none} [data-skin="navy"] .tb-search{flex:1 1 100%;order:9}}
+[data-skin="navy"] nav .ng>button.navlab{color:rgba(255,255,255,.55)}
+/* navy extras */
+[data-skin="navy"] h1,[data-skin="navy"] .hero h1,[data-skin="navy"] .profile-head h2{font-weight:700;letter-spacing:-.015em}
+[data-skin="navy"] h2,[data-skin="navy"] h3,[data-skin="navy"] h4{font-weight:600}
+[data-skin="navy"] .pk,[data-skin="navy"] .hero-kick,[data-skin="navy"] .sechead small,[data-skin="navy"] .panel h3 .idx,[data-skin="navy"] .kick{font-family:"IBM Plex Mono",ui-monospace,monospace;letter-spacing:.24em;text-transform:uppercase;font-weight:500;font-size:10.5px;color:var(--s1)}
+[data-skin="navy"] .kick{color:rgba(63,211,200,.85)}
+[data-skin="navy"] .hero-stats>div,[data-skin="navy"] .card,[data-skin="navy"] .panel{border:1px solid var(--line)}
+[data-skin="navy"] .hero-stats b,[data-skin="navy"] .card .v{color:#fff}
+[data-skin="navy"] .card.green .v{color:var(--s1)}
+[data-skin="navy"] .fy{background:var(--surface2);border-color:var(--line);color:var(--ink3)}
+[data-skin="navy"] .contract-card h4 .chip{background:var(--surface2);border-color:var(--line);color:var(--ink2)}
+[data-skin="navy"] .sopdoc{--amber:#e0b04f;--red:#e58a7e;--blue:#7fb0dc;--violet:#b39ad9;--gl:rgba(63,211,200,.16)}
+[data-skin="navy"] .sopdoc .sp-note,[data-skin="navy"] .sm-note{background:#2a2a1f;color:#efe6c4;border-left-color:#e0b04f}
+[data-skin="navy"] ::selection{background:rgba(63,211,200,.3)}
+
+</style>
 <style id="skin-bracket">
 /* ===== สกิน Bracket — admin แบนราบ แถบซ้ายเทาถ่าน การ์ดสีทึบ (ตามภาพอ้างอิงที่ 3) ===== */
 [data-skin="bracket"]{
@@ -686,6 +850,22 @@ nav .ng>button.navlab:hover{opacity:.95}
 [data-skin="apex"] nav .ng>button.navlab{color:var(--ink3)}
 @media(max-width:840px){nav .ng{flex:1 1 100%} nav .ng .ngi{flex-direction:row;flex-wrap:wrap}}
 </style>
+<style id="dsr-css">
+/* ===== Daily Sales บนหน้าภาพรวม ===== */
+.panel.dsr{margin-bottom:18px}
+.panel.dsr h3{display:flex;align-items:center;gap:8px}
+.ds-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0 14px}
+@media(max-width:760px){.ds-kpis{grid-template-columns:1fr}}
+.ds-tile{background:var(--surface2);border-radius:14px;padding:14px 16px 12px;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line)}
+.ds-tile span{font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.02em}
+.ds-tile b{font-size:30px;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+.ds-tile small{font-size:12px;color:var(--ink2)}
+.ds-tile em{font-style:normal;font-size:11.5px;color:var(--ink3)}
+.ds-tile.hot{border-color:var(--s1);background:color-mix(in srgb,var(--s1) 9%,var(--surface2))}
+.ds-tile.hot b{color:var(--s1)}
+.panel.dsr .tblwrap{overflow-x:auto}
+.panel.dsr table{min-width:720px}
+</style>
 <style id="sysmap-css">
 /* ===== ผังระบบ (node canvas) — เห็นเฉพาะ admin ===== */
 body:not(.isadmin) .adminonly{display:none!important}
@@ -726,6 +906,18 @@ body:not(.isadmin) .adminonly{display:none!important}
 .sm-info .x{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer}
 .sm-hint{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--ink3);z-index:2;pointer-events:none}
 .sm-tools{position:absolute;right:14px;top:12px;display:flex;gap:6px;z-index:3}
+</style>
+<style id="sop-css">
+/* ===== คู่มือ SOP (สร้างจาก sop.html ด้วย make_sop_view.py) ===== */
+.sopdoc{--paper:var(--surface);--paper2:var(--surface2);--g:var(--s3);--g2:var(--s3);--gl:color-mix(in srgb,var(--s3) 16%,transparent);
+ --amber:#b9791a;--ambl:color-mix(in srgb,#e0a23a 16%,transparent);--red:#b8483c;--redl:color-mix(in srgb,#b8483c 14%,transparent);--blue:#3a6f9b;--bluel:color-mix(in srgb,#3a6f9b 14%,transparent);--violet:#7a5ea8;--viol:color-mix(in srgb,#7a5ea8 14%,transparent);
+ --shadow:var(--shadow-sm);--disp:"Prompt","IBM Plex Sans Thai",var(--sans,sans-serif);--body:inherit;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+[data-skin="apex"] .sopdoc{--amber:#e0b04f;--red:#e58a7e;--blue:#7fb0dc;--violet:#b39ad9}
+.sopdoc *{box-sizing:border-box}.sopdoc{color:var(--ink);font-size:14.5px;line-height:1.65}.sopdoc a{color:var(--g);text-decoration:none}.sopdoc a:hover{text-decoration:underline}.sopdoc h1, .sopdoc h2, .sopdoc h3, .sopdoc h4{font-family:var(--disp);font-weight:600;letter-spacing:-.01em;text-wrap:balance;margin:0}.sopdoc .sp-wrap{max-width:1180px;margin:0 auto;padding:36px 28px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:36px}@media(max-width:900px){.sopdoc .sp-wrap{grid-template-columns:1fr;padding:22px 16px 60px}.sopdoc .sp-toc{position:static!important}}.sopdoc .sp-toc{position:sticky;top:24px;align-self:start;font-size:13.5px}.sopdoc .sp-toc .sp-kick{font:500 10.5px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}.sopdoc .sp-toc a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--ink2)}.sopdoc .sp-toc a:hover{background:var(--paper);text-decoration:none;color:var(--ink)}.sopdoc .sp-toc a i{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--c,var(--ink3))}.sopdoc .sp-toc .sp-sub{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line)}.sopdoc .sp-toc .sp-sub a{font-size:12.5px;padding:5px 10px}.sopdoc header.sp-hd{margin-bottom:26px}.sopdoc .sp-kick{font:500 11px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--g)}.sopdoc header h1{font-size:30px;line-height:1.2;margin:6px 0 8px}.sopdoc header p{margin:0;color:var(--ink2);max-width:66ch}.sopdoc .sp-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:12.5px;color:var(--ink3)}.sopdoc .sp-meta b{color:var(--ink2);font-weight:500}.sopdoc .sp-flow{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:30px;overflow-x:auto}.sopdoc .sp-flow h2{font-size:15px;margin-bottom:12px}.sopdoc .sp-lane{display:grid;grid-template-columns:repeat(8,minmax(118px,1fr));gap:8px;min-width:980px}.sopdoc .sp-lane .sp-st{background:var(--paper2);border-radius:10px;padding:10px 11px;position:relative;border-top:3px solid var(--c)}.sopdoc .sp-lane .sp-st::after{content:'›';position:absolute;right:-9px;top:8px;color:var(--ink3);font-size:18px}.sopdoc .sp-lane .sp-st:last-child::after{display:none}.sopdoc .sp-lane .sp-n{font:500 11px var(--mono);color:var(--c);letter-spacing:.06em}.sopdoc .sp-lane .sp-t{font-family:var(--disp);font-weight:600;font-size:13px;line-height:1.3;margin:2px 0 4px;color:var(--ink)}.sopdoc .sp-lane .sp-w{font-size:11.5px;color:var(--ink2);line-height:1.4}.sopdoc section.sp-dept{margin-bottom:34px;scroll-margin-top:20px}.sopdoc .sp-dhead{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-bottom:14px}.sopdoc .sp-dhead .sp-ic{width:44px;height:44px;border-radius:12px;background:var(--c);display:grid;place-items:center;color:#fff}.sopdoc .sp-dhead .sp-ic svg{width:22px;height:22px}.sopdoc .sp-dhead h2{font-size:21px;line-height:1.25}.sopdoc .sp-dhead .sp-who{font-size:13px;color:var(--ink2);margin-top:2px}.sopdoc .sp-dhead .sp-who b{font-weight:600;color:var(--ink)}.sopdoc .sp-owner{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}@media(max-width:700px){.sopdoc .sp-owner{grid-template-columns:1fr}}.sopdoc .sp-owner div{background:var(--paper2);border-radius:10px;padding:10px 13px;font-size:13px;line-height:1.5}.sopdoc .sp-owner small{display:block;font:500 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:2px}.sopdoc .sp-steps{background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.sopdoc .sp-step{display:grid;grid-template-columns:54px minmax(0,1fr);border-top:1px solid var(--line)}.sopdoc .sp-step:first-child{border-top:none}.sopdoc .sp-step .sp-no{background:var(--paper2);display:flex;justify-content:center;padding-top:16px;font:500 13px var(--mono);color:var(--c)}.sopdoc .sp-step .sp-bd{padding:14px 18px 15px;min-width:0}.sopdoc .sp-step h3{font-size:15px;line-height:1.35;margin-bottom:5px}.sopdoc .sp-step p{margin:0 0 6px;color:var(--ink2);font-size:14px;max-width:72ch}.sopdoc .sp-step ul{margin:4px 0 6px;padding-left:18px;color:var(--ink2);font-size:14px}.sopdoc .sp-step li{margin:2px 0}.sopdoc .sp-row{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:8px}.sopdoc .sp-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;border-radius:999px;padding:3px 10px;background:var(--paper2);color:var(--ink2);border:1px solid var(--line)}.sopdoc .sp-chip.sp-menu{background:var(--gl);color:var(--g2);border-color:transparent;font-weight:500}.sopdoc .sp-chip.sp-menu::before{content:'▣';font-size:10px}.sopdoc .sp-chip.sp-to{background:var(--bluel);color:var(--blue);border-color:transparent}.sopdoc .sp-chip.sp-to::before{content:'→'}.sopdoc .sp-chip.sp-when{background:var(--ambl);color:var(--amber);border-color:transparent}.sopdoc .sp-chip.sp-when::before{content:'⏱'}.sopdoc .sp-chip.sp-doc{background:var(--viol);color:var(--violet);border-color:transparent}.sopdoc .sp-chip.sp-doc::before{content:'⎙'}.sopdoc .sp-check{margin-top:9px;padding:9px 12px;border-left:3px solid var(--g);background:var(--paper2);border-radius:0 8px 8px 0;font-size:13px;color:var(--ink2)}.sopdoc .sp-check b{color:var(--ink);font-weight:600}.sopdoc .sp-warn{margin-top:9px;padding:9px 12px;border-left:3px solid var(--amber);background:var(--ambl);border-radius:0 8px 8px 0;font-size:13px;color:var(--ink2)}.sopdoc .sp-warn b{color:var(--amber);font-weight:600}.sopdoc code{font:500 12.5px var(--mono);background:var(--paper2);padding:1px 6px;border-radius:5px;color:var(--ink)}.sopdoc .sp-rates{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}.sopdoc .sp-rates div{background:var(--paper2);border-radius:8px;padding:8px 11px;font-size:12.5px;color:var(--ink2)}.sopdoc .sp-rates b{display:block;font:500 15px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}.sopdoc .sp-raci{background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:30px;overflow-x:auto}.sopdoc .sp-raci h2{font-size:18px;margin-bottom:4px}.sopdoc .sp-raci p{margin:0 0 12px;color:var(--ink2);font-size:13.5px}.sopdoc table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}.sopdoc th{font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}.sopdoc td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}.sopdoc td:first-child{color:var(--ink);font-weight:500}.sopdoc td.sp-c{text-align:center;font:500 13px var(--mono)}.sopdoc .sp-R{color:var(--g);font-weight:600}.sopdoc .sp-A{color:var(--red)}.sopdoc .sp-C{color:var(--blue)}.sopdoc .sp-I{color:var(--ink3)}.sopdoc .sp-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink3);margin-top:10px}.sopdoc .sp-rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.sopdoc .sp-rules div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px 15px;font-size:13.5px;color:var(--ink2);box-shadow:var(--shadow)}.sopdoc .sp-rules b{display:block;font-family:var(--disp);font-weight:600;color:var(--ink);margin-bottom:3px;font-size:14px}.sopdoc .sp-pend{background:var(--paper);border:1px dashed var(--line);border-radius:12px;padding:14px 18px;font-size:13.5px;color:var(--ink2);margin-top:26px}.sopdoc .sp-pend b{color:var(--ink)}.sopdoc .sp-pend ul{margin:6px 0 0;padding-left:18px}@media print{.sopdoc{background:#fff}.sopdoc .sp-toc{display:none}.sopdoc .sp-wrap{grid-template-columns:1fr;padding:0}.sopdoc .sp-steps, .sopdoc .sp-flow, .sopdoc .sp-raci, .sopdoc .sp-rules div{box-shadow:none;break-inside:avoid}.sopdoc section.sp-dept{break-inside:avoid-page}}
+.sopdoc .sp-wrap{max-width:none;padding:0;grid-template-columns:200px minmax(0,1fr);gap:28px}
+.sopdoc .sp-toc{top:76px}
+@media(max-width:1100px){.sopdoc .sp-wrap{grid-template-columns:1fr}.sopdoc .sp-toc{position:static;display:flex;flex-wrap:wrap;gap:2px 6px}.sopdoc .sp-toc .sp-kick,.sopdoc .sp-toc .sp-sub{display:none}}
+
 
 /* ===== LIVE: login gate ===== */
 #gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#071a2e;overflow:hidden;transition:opacity .5s}
@@ -788,6 +980,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <div class="ng open" data-g="ov"><button type="button" class="navlab" onclick="toggleGroup('ov')">ภาพรวม</button><div class="ngi">
     <button data-v="dash" class="on">ภาพรวม</button>
     <button data-v="todo">งานที่ต้องทำ<span class="badge" id="todobadge" style="display:none"></span></button>
+    <button data-v="sop">คู่มือ SOP</button>
     </div></div>
     <div class="ng open" data-g="mkt" style="--gc:#2a9d8f"><button type="button" class="navlab" onclick="toggleGroup('mkt')">การตลาด & ขาย · Cold Line</button><div class="ngi">
 <button data-v="mkt">ทีมการตลาด</button>
@@ -1231,6 +1424,7 @@ function render(){
   if(S.view==='bible') return rBible();
   if(S.view==='backup') return rBackup();
   if(S.view==='sysmap') return rSysmap();
+  if(S.view==='sop') return rSop();
 }
 
 /* ================= dashboard ================= */
@@ -1288,6 +1482,25 @@ function addonStats(){
   return o;
 }
 
+/* Daily Sales บนหน้าภาพรวม — สรุปดีลจาก Daily Sale Report วันนี้ / สัปดาห์นี้ / เดือนนี้ */
+function dashDailySales(){
+  const live=(DL||[]).filter(d=>d.deal_date && !/cancel|cxl|canx/i.test(d.status||''));
+  const dow=(new Date(TODAY+'T00:00:00').getDay()+6)%7; const wkStart=addDaysISO(TODAY,-dow), wkEnd=addDaysISO(wkStart,6);
+  const mon=TODAY.slice(0,7);
+  const sum=(arr)=>({n:arr.length, gross:arr.reduce((s,d)=>s+(d.purchase_price||0),0), nett:arr.reduce((s,d)=>s+(d.deal_nett!=null?d.deal_nett:(d.purchase_price||0)),0), dep:arr.reduce((s,d)=>s+(d.deposit||0),0)});
+  const today=sum(live.filter(d=>d.deal_date===TODAY)), week=sum(live.filter(d=>d.deal_date>=wkStart&&d.deal_date<=wkEnd)), month=sum(live.filter(d=>d.deal_date.slice(0,7)===mon));
+  const usd=v=>'US$'+Math.round(v||0).toLocaleString();
+  const tile=(lab,sub,s,hot)=>`<div class="ds-tile${hot?' hot':''}"><span>${lab}</span><b>${s.n}</b><small>ดีล · ${usd(s.gross)} · Nett ${usd(s.nett)}</small><em>${sub}</em></div>`;
+  const latest=live.slice().sort((a,b)=>a.deal_date<b.deal_date?1:(a.deal_date>b.deal_date?-1:0)).slice(0,8);
+  const rows=latest.map(d=>{ const t=d.team||{}; const rep=t.rep||t.closer||t.to||Object.values(t).find(v=>typeof v==='string'&&v)||''; return `<tr class="click" onclick="S.dq='${esc(d.contract_no||'')}';go('deals')"><td>${fmtD(d.deal_date)}</td><td><b>${esc(d.contract_no||'—')}</b></td><td>${esc(d.client_name||'')}<div class="mini">${esc(d.nationality||'')}</div></td><td>${esc(d.product||'')} ${d.term_years?d.term_years+' ปี':''}</td><td class="n">${usd(d.purchase_price)}</td><td class="n"><b>${usd(d.deal_nett!=null?d.deal_nett:d.purchase_price)}</b></td><td>${esc(rep)}</td></tr>`; }).join('');
+  return `<div class="panel dsr">
+    <h3><span class="idx">DS</span>Daily Sales · ดีลจาก Daily Sale Report <a class="bk" href="#" onclick="go('deals');return false" style="margin-left:auto;font-size:12.5px">เปิด Daily Sale Report →</a></h3>
+    <div class="cs">วันนี้ ${fmtD(TODAY)} · สัปดาห์นี้ ${fmtD(wkStart)} – ${fmtD(wkEnd)} · เดือนนี้ — ยอด US$ จากราคาขาย และ Deal Nett หลังหักรายการที่มากับดีล</div>
+    <div class="ds-kpis">${tile('วันนี้',today.n?('มัดจำรับ '+usd(today.dep)):'ยังไม่มีดีลวันนี้',today,true)}${tile('สัปดาห์นี้','มัดจำรับ '+usd(week.dep),week)}${tile('เดือนนี้','มัดจำรับ '+usd(month.dep),month)}</div>
+    ${latest.length?`<div class="tblwrap"><table><thead><tr><th>วันที่</th><th>เลขสัญญา</th><th>ลูกค้า</th><th>สินค้า</th><th class="n">ราคาขาย</th><th class="n">Deal Nett</th><th>ทีมขาย</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :`<div class="mini" style="margin-top:8px">ยังไม่มีดีลใน Daily Sale Report — ทีมขายกรอกที่เมนู <a href="#" onclick="go('deals');return false">Daily Sale Report</a> เลขสัญญาจะออกอัตโนมัติและมาแสดงที่นี่</div>`}
+  </div>`;
+}
 function rDash(){
   const st = bibleStats();
   const fc = st.fee[st.cur]||{due:0,paid:0,billed:0,none:0};
@@ -1335,12 +1548,6 @@ function rDash(){
       <h1>ภาพรวม</h1>
       <p class="sub">ข้อมูลสดจากฐานข้อมูลกลาง (Supabase) · ปีปัจจุบัน ${st.cur} · ณ ${fmtD(TODAY)}</p>
     </div>
-    <div class="hero-stats">
-      <div><b class="cnt" data-n="${st.nAct}">0</b><span>สัญญา Active</span></div>
-      <div><b class="cnt" data-n="${allClients().length}">0</b><span>ลูกค้าทั้งหมด</span></div>
-      <div><b>$<span class="cnt" data-n="${Math.round(st.billedAmt)}">0</span></b><span>ยอดรอตามเก็บ</span></div>
-      <div><b class="cnt" data-n="${st.exp5}">0</b><span>หมดอายุใน 5 ปี</span></div>
-    </div>
   </div></div>
   <div class="cards">
     <div class="card kpi blue"><div class="v">${st.nAct.toLocaleString()}</div><div class="l">สัญญา Active</div><div class="m">ลูกค้า ${allClients().length.toLocaleString()} ราย · สัญญาทั้งหมด ${allContracts().length.toLocaleString()}</div></div>
@@ -1348,6 +1555,7 @@ function rDash(){
     <div class="card kpi orange"><div class="v sm">US$${Math.round(st.billedAmt).toLocaleString()}</div><div class="l">ออกบิลแล้ว ยังไม่มีบันทึกชำระ</div><div class="m">${st.billedCnt.toLocaleString()} รายการ (ทุกปี)</div></div>
     <div class="card kpi gold"><div class="v">${st.exp5.toLocaleString()}</div><div class="l">สัญญาหมดอายุปี ${st.cur}–${st.cur+4}</div><div class="m">ควรเริ่มแคมเปญต่ออายุ · ดูหน้า "ใกล้หมดอายุ"</div></div>
   </div>
+  ${dashDailySales()}
   <div class="row2">
     <div class="panel">
       <h3><span class="idx">01</span>การบันทึกค่าบำรุงรายปี เทียบกับสัญญาที่ถึงกำหนด</h3>
@@ -1462,9 +1670,9 @@ function runCounters(){
     setTimeout(()=>{ if(document.body.contains(el)) el.textContent=target.toLocaleString(); }, dur+250);
   });
 }
-const SKINS=[['verde','ธีมเขียว (Verde)'],['bracket','ธีม Admin แบนราบ (Bracket)'],['apex','ธีมมืด (Apex)'],['classic','ธีมเดิม (Classic)']];
+const SKINS=[['navy','ธีมน้ำเงินเข้ม (Navy)'],['verde','ธีมเขียว (Verde)'],['bracket','ธีม Admin แบนราบ (Bracket)'],['apex','ธีมมืด (Apex)'],['classic','ธีมเดิม (Classic)']];
 function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElement.dataset.skin); const nx=SKINS[(i+1)%SKINS.length]; document.documentElement.dataset.skin=nx[0]; try{ localStorage.setItem('ee_skin',nx[0]); }catch(e){} toast(nx[1]); }
-const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12'};
+const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.querySelector('.nv')) return; const p=NAV_ICONS[b.dataset.v]; if(!p) return; b.insertAdjacentHTML('afterbegin',`<i class="nv"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`); }); }
 document.addEventListener('DOMContentLoaded',decorateNav);
 /* ===== เมนูจัดกลุ่ม: พับ/กาง จำสถานะ ===== */
@@ -3185,6 +3393,301 @@ function exportBibleCSV(){
 }
 
 /* ================= backup ================= */
+/* ================= คู่มือ SOP ================= */
+const SOP_HTML=`
+<nav class="sp-toc">
+  <div class="sp-kick">สารบัญ</div>
+  <a href="#" onclick="sopGo('flow');return false"><i style="--c:var(--ink3)"></i>ภาพรวม Cold Line</a>
+  <a href="#" onclick="sopGo('mkt');return false"><i style="--c:#2a9d8f"></i>ทีมการตลาด (OPC)</a>
+  <a href="#" onclick="sopGo('rec');return false"><i style="--c:#1f8a70"></i>Reception</a>
+  <a href="#" onclick="sopGo('sales');return false"><i style="--c:#e0a23a"></i>ทีมขาย</a>
+  <a href="#" onclick="sopGo('con');return false"><i style="--c:#5b8fd6"></i>ห้องสัญญา</a>
+  <a href="#" onclick="sopGo('acc');return false"><i style="--c:#b8483c"></i>บัญชี</a>
+  <a href="#" onclick="sopGo('mem');return false"><i style="--c:#7a5ea8"></i>บริการสมาชิก & ฝ่ายจอง</a>
+  <a href="#" onclick="sopGo('it');return false"><i style="--c:#6b7a72"></i>IT / ผู้ดูแลระบบ</a>
+  <div class="sp-sub"><a href="#" onclick="sopGo('raci');return false">ตาราง RACI</a><a href="#" onclick="sopGo('rules');return false">กฎร่วมทุกฝ่าย</a><a href="#" onclick="sopGo('pend');return false">รอยืนยัน</a></div>
+</nav>
+
+<main>
+<header class="sp-hd">
+  <div class="sp-kick">Standard Operating Procedure · Club Unique / Elite Escapes</div>
+  <h1>SOP งานหน้าบ้าน — ใครทำอะไร ขั้นไหน ในแอปเมนูไหน</h1>
+  <p>คู่มือปฏิบัติงานตามสายงาน "Cold Line" ตั้งแต่หาแขกจนถึงดูแลสมาชิกรายปี ทุกขั้นตอนบันทึกในระบบกลาง <a href="#" onclick="return false">app.elite-escapes.club</a> ด้วยเลขสัญญาเป็นคีย์เดียว ไม่กรอกซ้ำใน Excel/Access</p>
+  <div class="sp-meta"><span>ฉบับ <b>7 ก.ย. 2026</b></span><span>เข้าใช้ด้วย <b>Gmail บริษัท @elite-escapes.club</b> เท่านั้น</span><span>สิทธิ์ <b>admin / กรอกได้ / ดูอย่างเดียว</b></span><span>เอกสารประกอบ: ผังโหนดระบบ (admin) · Workflow map</span></div>
+</header>
+
+<div class="sp-flow" id="flow">
+  <h2>ภาพรวมสายงาน Cold Line — 8 ขั้น ใครถือไม้ต่อ</h2>
+  <div class="sp-lane">
+    <div class="sp-st" style="--c:#2a9d8f"><div class="sp-n">①</div><div class="sp-t">Market survey</div><div class="sp-w">OPC หาแขกตามแหล่งท่องเที่ยว พามาออฟฟิศ</div></div>
+    <div class="sp-st" style="--c:#1f8a70"><div class="sp-n">②</div><div class="sp-t">คัดกรอง Q / Q+ / CT</div><div class="sp-w">Reception + GM ใช้ checklist 7 ข้อ</div></div>
+    <div class="sp-st" style="--c:#e0a23a"><div class="sp-n">③</div><div class="sp-t">ทัวร์ + Presentation 90 นาที</div><div class="sp-w">Sales Rep / T/O</div></div>
+    <div class="sp-st" style="--c:#e0a23a"><div class="sp-n">④</div><div class="sp-t">ปิดดีล → เลขสัญญา</div><div class="sp-w">ทีมขายกรอก Daily Sale Report</div></div>
+    <div class="sp-st" style="--c:#5b8fd6"><div class="sp-n">⑤</div><div class="sp-t">เปิดแฟ้ม + Welcome call</div><div class="sp-w">ห้องสัญญา สแกน PA เข้า Drive</div></div>
+    <div class="sp-st" style="--c:#b8483c"><div class="sp-n">⑥</div><div class="sp-t">รับเงิน / ผ่อน / คอมฯ</div><div class="sp-w">บัญชี — AR ทุกวัน, คอมฯ ทุก 15 วัน, OPC ทุกศุกร์</div></div>
+    <div class="sp-st" style="--c:#7a5ea8"><div class="sp-n">⑦</div><div class="sp-t">ดูแลสมาชิกรายปี</div><div class="sp-w">ค่าบำรุง MFEE · Interval · ต่ออายุ</div></div>
+    <div class="sp-st" style="--c:#7a5ea8"><div class="sp-n">⑧</div><div class="sp-t">ขอเข้าพัก / ใช้ Week</div><div class="sp-w">ฝ่ายจองเช็ค MFEE กับบัญชีก่อนอนุมัติ</div></div>
+  </div>
+</div>
+
+<!-- ================= OPC ================= -->
+<section class="sp-dept" id="mkt" style="--c:#2a9d8f">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></div>
+    <div><h2>ทีมการตลาด (OPC) และผู้จัดการการตลาด</h2><div class="sp-who">รับผิดชอบขั้น ① และการรายงานผลรายสัปดาห์ · เมนูหลัก <b>ทีมการตลาด</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>OPC ทุกคน (รหัสพนักงาน) · ผู้จัดการการตลาด</div>
+    <div><small>ผู้ตรวจ / อนุมัติ</small>ผู้จัดการการตลาด ตรวจสลิปก่อนส่งบัญชี · GM อนุมัติกรณีพิเศษ</div>
+    <div><small>รอบเวลา</small>บันทึกทัวร์ทุกวัน · สัปดาห์จ่าย เสาร์→ศุกร์ · จ่ายทุกวันศุกร์</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>หาแขก (Market survey) และพามาออฟฟิศ</h3>
+      <p>ชวนแขกตามแหล่งท่องเที่ยว บอกเงื่อนไขเบื้องต้น (คู่ อายุ อาชีพ พักโรงแรมระดับ 4–5 ดาว) นัดวันเวลา แล้วเรียกแท็กซี่มาออฟฟิศ Club Unique — บริษัทจ่ายค่าแท็กซี่</p>
+      <div class="sp-row"><span class="sp-chip sp-when">ทุกวัน</span><span class="sp-chip sp-to">ส่งแขกให้ Reception</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>บันทึกทัวร์ทันทีที่แขกถึงออฟฟิศ</h3>
+      <p>เปิด <b>ทีมการตลาด › รายทัวร์ / ค่าจ้างวันศุกร์ › + บันทึกทัวร์</b> กรอก: วันที่ทัวร์, รหัส/ชื่อ OPC, ชื่อแขก, จำนวนคน, กลุ่มสัญชาติ (AUS / NZ / USA / UK / FR / SCANDI / FIN / OTHER), พบแขกช่วง <b>กลางวัน</b> หรือ <b>กลางคืน</b> (night booking = หาตอนกลางคืน จองทัวร์เช้า), โรงแรมที่พัก, ค่าแท็กซี่</p>
+      <p>ช่อง "ผลคัดกรอง" ปล่อยว่างไว้ให้ Reception เป็นคนกรอก</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ทีมการตลาด › รายทัวร์</span><span class="sp-chip">ตาราง mkt_tours</span><span class="sp-chip sp-to">Reception กรอกผลคัดกรอง</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>ตรวจยอดค่าจ้างของตัวเองก่อนวันศุกร์</h3>
+      <p>ระบบคำนวณค่าจ้างอัตโนมัติเมื่อ Reception/ทีมขายติ๊ก "แขกมาจริง" และ "ฟัง presentation ครบ 90 นาที" — ถ้าไม่ครบ 90 นาที ไม่จ่าย</p>
+      <div class="sp-rates">
+        <div>Q (Qualified)<b>฿3,000</b>จ่ายไม่ว่าจะปิดดีลหรือไม่</div>
+        <div>Q+ (ทัวร์ Kudo)<b>฿3,500</b></div>
+        <div>CT (Cold Tour)<b>฿1,500</b>ไม่มี split</div>
+        <div>Split AUS / NZ / FR / SCANDI / FIN<b>+2,000 / +1,000</b>night / daytime (บวกจากเรท Q)</div>
+        <div>Split USA<b>+2,000 / +500</b>night / day · +1,000 ถ้าปิดดีล</div>
+        <div>Split UK<b>+1,000</b>เฉพาะปิดดีล</div>
+      </div>
+      <div class="sp-row"><span class="sp-chip">กรองตามสัปดาห์จ่าย · OPC</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>ผู้จัดการการตลาด: สรุปสัปดาห์และพิมพ์สลิป</h3>
+      <p>ทุก<b>ศุกร์เช้า</b> เลือกสัปดาห์จ่าย → ตรวจว่าทุกทัวร์มีผลคัดกรองและติ๊กมาจริง/90 นาทีครบ → กด <b>พิมพ์สลิป</b> ต่อคน → กรอกสรุปสัปดาห์ที่ <b>ทีมการตลาด › รายสัปดาห์</b> (Q / Q+ / CT ต่อคน โบนัส Pack/Full ถ้ายังใช้) → ส่งสลิปให้บัญชีจ่าย</p>
+      <div class="sp-check"><b>เช็คก่อนส่ง:</b> ทัวร์ที่ไม่มีผลคัดกรอง = ยังไม่จ่าย · ทัวร์ที่ปิดดีลต้องมีเลขสัญญาผูกแล้ว · ค่าแท็กซี่รวมยอดถูกต้อง</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ทีมการตลาด › รายสัปดาห์</span><span class="sp-chip sp-doc">สลิปค่าจ้าง OPC</span><span class="sp-chip sp-doc">CSV</span><span class="sp-chip sp-when">ทุกศุกร์</span><span class="sp-chip sp-to">บัญชี</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= RECEPTION ================= -->
+<section class="sp-dept" id="rec" style="--c:#1f8a70">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+    <div><h2>Reception (คัดกรอง) ร่วมกับ GM</h2><div class="sp-who">รับผิดชอบขั้น ② และของแถมแขก · ทำงานบนรายการทัวร์ที่ OPC เปิดไว้</div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>Reception ประจำวัน</div>
+    <div><small>ผู้ตัดสินกรณีก้ำกึ่ง</small>Yannick (GM) — โดยเฉพาะประเภทที่พัก/สัญชาติ</div>
+    <div><small>รอบเวลา</small>ก่อนแขกขึ้นทัวร์ทุกครั้ง</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>คัดกรองด้วย checklist 7 ข้อ</h3>
+      <p>เปิดรายการทัวร์ของแขก → ติ๊ก checklist: คู่/โสด อายุ 35–71 · ทำงานประจำหรือเกษียณมี pension · อยู่ด้วยกัน ≥2 ปี · มีบัตรเครดิต/เดบิต (โสดต้องโชว์) · ค่าห้อง ≥฿1,000/คืน · อยู่บนเกาะ ≥24 ชม. ไม่กลับวันเดียวกับ presentation · ตกลงฟัง 90 นาที</p>
+      <p>ผล: <b>Q</b> ผ่านครบ · <b>Q+</b> เฉพาะทัวร์ Kudo · <b>CT</b> อายุน้อยกว่า 35 หรือดูไม่น่าปิดดีล · <b>NQ</b> ไม่ผ่าน ไม่ขึ้นทัวร์ (ระบบแนะนำผลให้ แต่ Reception เป็นผู้ตัดสินและบันทึกเอง)</p>
+      <div class="sp-warn"><b>ไม่ผ่านแน่นอน:</b> กำลังหย่า · กลุ่ม ≥4 ผู้ใหญ่ · มีเด็ก &lt;5 ปี · ทำงานท่องเที่ยว/timeshare · อาศัยในไทย/มีแฟนไทย · มาคนเดียวแต่คู่อยู่ที่โรงแรม · ทหาร/เรือครูซ · Canadians / Israelis</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ทีมการตลาด › รายทัวร์ › แก้ไข</span><span class="sp-chip sp-to">ทีมขายรับช่วง</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>จัดของแถมและอาหารเช้า</h3>
+      <p>Night booking เลือก <b>1 จาก 3</b>: สปา ฿1,800 / ทัวร์เกาะพีพี ฿1,800 / Kudo voucher · Daytime ได้ <b>฿1,500</b> · <b>อาหารเช้าได้ทุกคน</b> — บันทึกในช่อง "ของแถม" ของทัวร์นั้น</p>
+      <div class="sp-row"><span class="sp-chip">gift: spa / pp / kudo / cash1500</span><span class="sp-chip sp-to">บัญชีเห็นต้นทุนของแถมอัตโนมัติ</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>ยืนยันแขกมาจริง</h3>
+      <p>เมื่อแขกมาถึงและเข้าห้อง presentation ติ๊ก <b>แขกมาจริง (showed)</b> ส่วน <b>ฟังครบ 90 นาที</b> ให้ทีมขายติ๊กหลังจบ</p>
+      <div class="sp-check"><b>สำคัญ:</b> สองช่องนี้คือเงื่อนไขจ่ายค่าจ้าง OPC — ห้ามติ๊กล่วงหน้า</div></div></div>
+  </div>
+</section>
+
+<!-- ================= SALES ================= -->
+<section class="sp-dept" id="sales" style="--c:#e0a23a">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5"/></svg></div>
+    <div><h2>ทีมขาย (Sales Rep · T/O · Closer)</h2><div class="sp-who">รับผิดชอบขั้น ③–④ · เมนูหลัก <b>Daily Sale Report</b> · เลขสัญญาเกิดที่นี่</div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>Sales Rep ที่รับแขก · T/O (Take-over) · Closer</div>
+    <div><small>ผู้ตรวจ</small>Sales Manager ตรวจ Daily Sale Report ทุกเย็น · GM อนุมัติ overprice / trade-in</div>
+    <div><small>รอบเวลา</small>กรอกดีลทันทีหลังเซ็น · พิมพ์รายงานทุกวัน</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Presentation 90 นาที แล้วปิดผลทัวร์</h3>
+      <p>จบ presentation → ที่รายการทัวร์ ติ๊ก <b>ฟังครบ 90 นาที</b> และถ้าเซ็นสัญญา ติ๊ก <b>ปิดดีล</b> (เลขสัญญาจะถูกผูกอัตโนมัติจากขั้นถัดไป)</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ทีมการตลาด › รายทัวร์</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>กรอก Daily Sale Report — ออกเลขสัญญาทันที</h3>
+      <p><b>Daily Sale Report › + ดีลใหม่</b> เลือกทัวร์ที่มาจากขั้นก่อน (ชื่อแขก/สัญชาติดึงมาให้) แล้วกรอก: สินค้า (Club / TCU / Kudo / EST / ESG …), ปี, แผน A รายปี / B รายสองปี, ฤดู H / L, ห้อง T0 / T1, ประเภทขาย (ใหม่ / อัปเกรด / Member IH), ราคาเต็ม, ราคาขายจริง, มัดจำ, ค่า Admin (1,000 หรือ 1,500 ถ้า 20 ปี), Trade-in, Refund, ทีมขาย (Rep / T/O / Closer / Manager)</p>
+      <p>กด <b>ออกเลขสัญญา</b> → ได้รูปแบบ <code>PROD/SEQ/YEARS/AH/T1</code> เลขลำดับต่อจากทะเบียนเดิมอัตโนมัติ</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Daily Sale Report</span><span class="sp-chip">ตาราง sales_deals</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>ใส่รายการที่มากับดีล (หักก่อนคิดคอมฯ)</h3>
+      <div class="sp-rates">
+        <div>Interval 5Y Gold<b>US$388</b></div><div>Interval 5Y Platinum<b>US$615</b></div><div>Interval 10Y Gold<b>US$776</b></div>
+        <div>Travel Hack 5 ปี / 10 ปี<b>£330 / £630</b>แปลงด้วยเรต GBP ในฟอร์ม</div><div>Airport transfer<b>US$52</b></div><div>Management fee (ถ้าเซลส์เสนอ)<b>US$585</b>ช่อง Other</div>
+        <div>Rental night<b>7 คืน/ปี</b>สิทธิ์ ไม่หัก</div><div>Marketing week<b>฿15,400/คืน</b>บริษัทจ่าย ไม่หักเซลส์</div>
+      </div>
+      <p style="margin-top:8px">ระบบคำนวณ <b>Deal Nett = ราคาขาย − Admin − รายการหัก − Trade-in − Refund</b> ให้ทันที</p></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>บันทึก → ระบบส่งต่อให้ทุกฝ่ายอัตโนมัติ</h3>
+      <p>เมื่อกดบันทึก ระบบสร้าง: ลูกหนี้ในเมนู <b>ลูกหนี้ (AR)</b> (ราคา/มัดจำ/ยอดค้าง) · รายการรับเงินมัดจำงวดแรก · ลูกค้าและสัญญาในทะเบียน (สถานะ Welcome, FYO = ปีถัดไป) · ผูกทัวร์ของ OPC ว่าปิดดีล</p>
+      <div class="sp-check"><b>เช็คก่อนบันทึก:</b> อีเมลลูกค้าถูกต้อง (ใช้ส่ง Statement) · สัญชาติตรงกับทัวร์ · มัดจำตรงกับสลิปธนาคาร/บัตร</div>
+      <div class="sp-row"><span class="sp-chip sp-to">ห้องสัญญา เปิดแฟ้ม</span><span class="sp-chip sp-to">บัญชี ตรวจมัดจำ</span><span class="sp-chip sp-to">OPC ได้ split ปิดดีล</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>พิมพ์ Daily Sale Report ส่ง GM และบัญชี</h3>
+      <p>ทุกเย็น เลือกช่วง วัน / สัปดาห์ / เดือน → <b>พิมพ์รายงาน</b> (ยอดขาย, Deal Nett, รายการหักรวม) หรือส่งออก CSV</p>
+      <div class="sp-row"><span class="sp-chip sp-doc">Daily Sale Report</span><span class="sp-chip sp-when">ทุกวัน</span><span class="sp-chip sp-to">GM · บัญชี</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= CONTRACTS ================= -->
+<section class="sp-dept" id="con" style="--c:#5b8fd6">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/></svg></div>
+    <div><h2>ห้องสัญญา (Contract Room)</h2><div class="sp-who">รับผิดชอบขั้น ⑤ และความถูกต้องของทะเบียนตลอดอายุสัญญา · เมนู <b>ทะเบียนสัญญา</b> และ <b>แฟ้มสัญญา</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>Zineb · Crista · Marielle · Nicky (เดิมแยกไฟล์ Access คนละไฟล์ — ตอนนี้ใช้ฐานเดียว)</div>
+    <div><small>ผู้ตรวจ</small>หัวหน้าห้องสัญญาสุ่มตรวจแฟ้ม Welcome call ทุกสัปดาห์</div>
+    <div><small>รอบเวลา</small>เปิดแฟ้มภายในวันที่เซ็น · Welcome call ภายใน 7 วัน</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>เปิดแฟ้มสัญญาจากดีลใหม่</h3>
+      <p>เมนู <b>แฟ้มสัญญา</b> จะเห็นสัญญาใหม่จาก Daily Sale Report → กด <b>เปิดแฟ้ม</b> กรอก: หมวด <b>Welcome call</b>, ผู้รับผิดชอบ, กำหนดเสร็จ, สรุปดีลและแผนผ่อน (Description), ที่อยู่/โทร/อีเมลลูกค้า</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">แฟ้มสัญญา</span><span class="sp-chip">case_files · case_customers</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>สแกน Purchase Agreement เข้า Google Drive</h3>
+      <p>สแกน PA ฉบับเซ็น → บันทึกลง Drive บริษัทที่ <code>DB Elite Escape / Contracts / &lt;เลขสัญญา&gt;</code> (ใช้ <code>-&gt;</code> แทนเครื่องหมาย /) ตั้งชื่อไฟล์ด้วยเลขสัญญา — <b>ไม่เก็บ PDF ในเครื่องส่วนตัวหรือใน Access</b></p>
+      <p>ในแฟ้มสัญญามีปุ่ม <b>📂 เปิดไฟล์สัญญาใน Google Drive</b> ค้นหาให้อัตโนมัติ</p>
+      <div class="sp-check"><b>เก็บเฉพาะไฟล์ไม่ซ้ำ:</b> สแกนซ้ำหลายรอบให้เก็บฉบับล่าสุดฉบับเดียว</div>
+      <div class="sp-row"><span class="sp-chip sp-doc">PDF บน Google Drive</span><span class="sp-chip">เข้าได้เฉพาะโฟลเดอร์ DB Elite Escape</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Welcome call และติดตาม</h3>
+      <p>โทรลูกค้าภายใน 7 วัน ยืนยันความเข้าใจสัญญา แผนผ่อน สิทธิ์เข้าพัก และช่องทางติดต่อ → บันทึกผลใน Comments พร้อมวันที่ → เปลี่ยนหมวดเป็น <b>Completed</b></p>
+      <p>กรณีพิเศษเปลี่ยนหมวดตามจริง: <b>Trade in</b> · <b>Cxl</b> (ยกเลิก) · <b>Refund</b> พร้อมเหตุผล — ไม่ลบแฟ้ม</p>
+      <div class="sp-row"><span class="sp-chip sp-when">ภายใน 7 วัน</span><span class="sp-chip sp-to">บัญชี (กรณี Cxl / Refund)</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>ดูแลทะเบียนสัญญา (Bible) ให้ตรง</h3>
+      <p>เมนู <b>ทะเบียนสัญญา</b> ตรวจสัญญาใหม่มีครบ: สินค้า, แผน, ฤดู, ห้อง, วันเสร็จ, FYO / LYO, ตารางค่าบำรุงรายปี · แก้สถานะสัญญาที่ยกเลิก/โอน · ปุ่ม <b>เชื่อมโยงข้อมูลอื่น</b> ในบัตรสัญญาใช้ตรวจว่า AR, คอมฯ, การเข้าพัก, สแกน ตรงกัน</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ทะเบียนสัญญา</span><span class="sp-chip sp-menu">ลูกค้า › โปรไฟล์</span><span class="sp-chip sp-to">บริการสมาชิก</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= ACCOUNTING ================= -->
+<section class="sp-dept" id="acc" style="--c:#b8483c">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3zM3 11h18M7 15h4"/></svg></div>
+    <div><h2>บัญชี (Accounting)</h2><div class="sp-who">รับผิดชอบขั้น ⑥ · เมนู <b>ลูกหนี้ (AR)</b> · <b>ค้างชำระ</b> · <b>ค่าคอมมิชชั่น</b> · <b>การจ่ายคืน</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>acm@elite-escapes.club และทีมบัญชี</div>
+    <div><small>ผู้ตรวจ / อนุมัติ</small>หัวหน้าบัญชีตรวจก่อนจ่ายทุกรอบ · GM อนุมัติจ่ายคอมฯ</div>
+    <div><small>รอบเวลา</small>รับเงินบันทึกวันเดียวกัน · OPC ทุกศุกร์ · คอมฯ ทุก 15 วัน · ปิดเดือน</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>บันทึกเงินรับทุกงวด</h3>
+      <p><b>ลูกหนี้ (AR)</b> ค้นเลขสัญญา → <b>รับเงิน</b>: จำนวน (US$ หรือ ฿ ตามสกุลสัญญา), วันที่, <b>TYPE</b> (Bank Transfer / Credit Card / Cash), <b>SOURCE</b> ธนาคาร, หมายเหตุ → ยอดค้างอัปเดตทันที ประวัติดูที่ปุ่ม <b>📜</b> (มีทั้งงวดปกติ trade-in ส่วนลด ตัดหนี้ คืนเงิน)</p>
+      <div class="sp-check"><b>ตรวจมัดจำจากทีมขาย:</b> ดีลใหม่จะมีงวดมัดจำรออยู่แล้ว — เทียบกับสลิปธนาคาร/บัตร ถ้าไม่ตรง แก้ที่ ✏️ พร้อมหมายเหตุ ไม่ลบ</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ลูกหนี้ (AR)</span><span class="sp-chip">receivables · ar_payments</span><span class="sp-chip sp-when">วันเดียวกับที่รับเงิน</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>ค่าบำรุงรายปี (MFEE) และ Statement</h3>
+      <p><b>ค้างชำระ</b> แสดงค่าบำรุงที่ถึงกำหนด → เมื่อรับเงินติ๊กจ่ายแล้วพร้อมวันที่ · ส่ง <b>Statement</b> (พิมพ์/PDF หัวจดหมาย) จากโปรไฟล์ลูกค้าหรือจาก AR</p>
+      <p>สัญญาที่บริษัทจ่ายให้ (Paid by CU) มีหมายเหตุอยู่แล้ว ไม่ต้องทวง</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ค้างชำระ</span><span class="sp-chip sp-doc">Statement ลูกหนี้ / ค่าบำรุง</span><span class="sp-chip sp-to">ฝ่ายจอง ใช้เช็คก่อนอนุมัติเข้าพัก</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>จ่ายค่าจ้าง OPC ทุกวันศุกร์</h3>
+      <p>รับสลิปจากผู้จัดการการตลาด → เปิด <b>ทีมการตลาด › รายทัวร์</b> กรองสัปดาห์จ่ายเดียวกัน ตรวจยอดตรงกับสลิป (base + split + ค่าแท็กซี่) → จ่าย → เก็บสลิปเป็นหลักฐาน</p>
+      <div class="sp-row"><span class="sp-chip sp-when">ทุกศุกร์</span><span class="sp-chip sp-doc">สลิป OPC</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>คอมมิชชั่นทีมขาย ทุก 15 วัน</h3>
+      <p>รอบ 1–15 และ 16–สิ้นเดือน: เมนู <b>ค่าคอมมิชชั่น</b> แสดงต่อสัญญาต่อตำแหน่ง (Rep / T/O / Closer / Manager …) คิดจาก <b>เงินรับเข้าจริงในรอบ</b> หลังหักรายการที่มากับดีล (Admin, Gift, Trade-in, Refund, Overprice) → ตรวจกับ AR → พิมพ์ Pay Slip → GM อนุมัติ → จ่าย</p>
+      <div class="sp-warn"><b>รอยืนยัน:</b> สูตร % ต่อตำแหน่งเพื่อให้ระบบคำนวณอัตโนมัติจาก Deal Nett — ตอนนี้แสดง snapshot จาก Commission Master</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ค่าคอมมิชชั่น</span><span class="sp-chip sp-when">ทุก 15 วัน</span><span class="sp-chip sp-to">GM อนุมัติ</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>ต้นทุนการเข้าพักและการจ่ายคืน Fractional</h3>
+      <p><b>การเข้าพัก</b> แสดงประเภท Own / <b>Marketing Week ฿15,400/คืน</b> / II Exchange พร้อมต้นทุนห้อง = คืน × เรท ใช้รับรู้รายได้ · <b>การจ่ายคืน</b> บันทึกงวดจ่ายคืนสัญญา Fractional พร้อมติ๊กจ่ายแล้ว</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">การเข้าพัก</span><span class="sp-chip sp-menu">การจ่ายคืน</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">6</div><div class="sp-bd"><h3>ปิดเดือน</h3>
+      <p>ส่งออก CSV จาก AR, ค้างชำระ, การเข้าพัก, Daily Sale Report → กระทบยอดกับธนาคาร → เก็บไฟล์ในโฟลเดอร์บัญชีของ Drive</p>
+      <div class="sp-row"><span class="sp-chip sp-doc">CSV ทุกโมดูล</span><span class="sp-chip sp-when">สิ้นเดือน</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= MEMBER SERVICE ================= -->
+<section class="sp-dept" id="mem" style="--c:#7a5ea8">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2"/></svg></div>
+    <div><h2>บริการสมาชิก & ฝ่ายจอง</h2><div class="sp-who">รับผิดชอบขั้น ⑦–⑧ · เมนู <b>ลูกค้า</b> · <b>การเข้าพัก</b> · <b>Interval</b> · <b>ใกล้หมดอายุ</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>คุณนาตาลี (ฝ่ายจอง) · Member service</div>
+    <div><small>ผู้ตรวจ</small>บัญชียืนยันสถานะค่าบำรุงก่อนอนุมัติ</div>
+    <div><small>รอบเวลา</small>คำขอเข้าพักตอบภายใน 1 วันทำการ · ต่ออายุเริ่มติดต่อล่วงหน้า 12 เดือน</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>รับคำขอเข้าพัก → เช็คค่าบำรุงก่อนเสมอ</h3>
+      <p>เปิด <b>ลูกค้า</b> ค้นชื่อ/เลขสัญญา → ดูบัตรสัญญา: ค่าบำรุงปีที่ขอเข้าพัก <b>จ่ายแล้ว</b> หรือยัง (ดึงจากบัญชี) · สัญญาไม่ยกเลิก · ปีที่ขออยู่ในช่วง FYO–LYO</p>
+      <div class="sp-warn"><b>ยังไม่จ่าย = ยังไม่อนุมัติ</b> ส่ง Statement ให้ลูกค้าและแจ้งบัญชี</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ลูกค้า › โปรไฟล์</span><span class="sp-chip sp-menu">ค้างชำระ</span><span class="sp-chip sp-to">บัญชี</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>บันทึกการเข้าพัก</h3>
+      <p><b>การเข้าพัก › + บันทึก</b>: ปีที่ใช้สิทธิ์, เช็คอิน/เช็คเอาต์ (คืนคำนวณเอง), ห้อง, ประเภท <b>Own Week</b> / <b>Marketing Week</b> (บริษัทจ่าย ฿15,400/คืน ไม่หัก week สมาชิก) / <b>II Exchange</b>, เรทต่อคืน, หมายเหตุ · แก้ไขได้ภายหลังจากรายการเดิม</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">การเข้าพัก</span><span class="sp-chip">week_usage</span><span class="sp-chip sp-to">บัญชี รับรู้รายได้</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Interval International</h3>
+      <p>เมนู <b>Interval</b> ดูสมาชิกที่ซื้อ Interval มากับดีล (5Y Gold / 5Y Platinum / 10Y Gold) วันหมดอายุ และประสานการฝาก/แลก week</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Interval</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>ต่ออายุ / อัปเกรดสมาชิกใกล้หมดอายุ</h3>
+      <p><b>ใกล้หมดอายุ</b> แสดงสัญญาที่ LYO อยู่ในปีนี้และปีถัดไป → ติดต่อลูกค้า บันทึกผลใน Comments ของแฟ้มสัญญา → ถ้าตกลงอัปเกรด ส่งให้ทีมขายกรอก Daily Sale Report เป็นดีล <b>อัปเกรด / Member IH</b> (คิดคอมฯ ตามปกติ)</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ใกล้หมดอายุ</span><span class="sp-chip sp-when">ล่วงหน้า 12 เดือน</span><span class="sp-chip sp-to">ทีมขาย</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>เพิ่มลูกค้า/สัญญาที่ไม่ได้มาจากดีลใหม่</h3>
+      <p>สมาชิกโอนสิทธิ์ ครอบครัว หรือรายการเก่าที่ตกหล่น: <b>ลูกค้า › + เพิ่มลูกค้า</b> (รหัส EE-xxxx ออกให้อัตโนมัติ) แล้วเพิ่มสัญญาในโปรไฟล์ — แจ้งห้องสัญญาให้เปิดแฟ้ม</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ลูกค้า</span><span class="sp-chip sp-to">ห้องสัญญา</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= IT ================= -->
+<section class="sp-dept" id="it" style="--c:#6b7a72">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>
+    <div><h2>IT / ผู้ดูแลระบบ</h2><div class="sp-who">ดูแลสิทธิ์ ความปลอดภัย และฐานกลาง · เมนู <b>ข้อมูลกลาง</b> · <b>ผังระบบ</b> (เห็นเฉพาะ admin)</div></div></div>
+  <div class="sp-owner">
+    <div><small>ผู้ปฏิบัติ</small>it@elite-escapes.club (admin เดียวของฐานนี้ แยกจากทีม Patong Bay Hill)</div>
+    <div><small>ผู้อนุมัติ</small>GM อนุมัติการเพิ่ม/ถอนสิทธิ์ผู้ใช้</div>
+    <div><small>รอบเวลา</small>เพิ่มผู้ใช้เมื่อมีคำขอ · ตรวจ activity feed ทุกสัปดาห์ · สำรองข้อมูลทุกเดือน</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>เพิ่ม / ถอนผู้ใช้และกำหนดสิทธิ์</h3>
+      <p><b>ข้อมูลกลาง › ผู้ใช้งานระบบ</b> เพิ่มอีเมล <code>@elite-escapes.club</code> เท่านั้น เลือกสิทธิ์: <b>admin</b> (IT) · <b>กรอกได้</b> (ทีมปฏิบัติงาน) · <b>ดูอย่างเดียว</b> (ผู้บริหาร/ผู้ตรวจ) · พนักงานที่ลาออกให้ <b>ลบสิทธิ์</b> ทันที</p>
+      <div class="sp-check"><b>กฎความปลอดภัย:</b> เข้าได้เฉพาะ Gmail บริษัทผ่าน app.elite-escapes.club · ฐานข้อมูลล็อกด้วย RLS ต้องอยู่ในรายชื่อผู้ใช้จึงเห็นข้อมูล · ไม่แชร์ลิงก์ Supabase หรือคีย์ให้ใคร</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">ข้อมูลกลาง</span><span class="sp-chip">app_users</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>ตรวจความเคลื่อนไหวและข้อมูลผิดปกติ</h3>
+      <p>ดู <b>ฟีดกิจกรรม</b> ใน ข้อมูลกลาง (ใครแก้อะไรล่าสุด) · ตรวจงานที่ต้องทำที่ค้างนาน · เลขสัญญาที่พิมพ์ผิดหรือซ้ำ แจ้งห้องสัญญาแก้</p>
+      <div class="sp-row"><span class="sp-chip sp-when">ทุกสัปดาห์</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Google Drive และไฟล์สัญญา</h3>
+      <p>บัญชี it@ เป็นเจ้าของโฟลเดอร์ <code>DB Elite Escape</code> (Contracts · Contract Scans) แชร์ให้ห้องสัญญาแบบแก้ไขได้ <b>เฉพาะโฟลเดอร์นี้</b> · ตรวจพื้นที่ Drive · ไฟล์ซ้ำให้ย้ายเข้าโฟลเดอร์กัก ไม่ลบทันที</p></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>สำรองข้อมูลและปล่อยเวอร์ชันใหม่</h3>
+      <p>ทุกเดือนส่งออก CSV ทุกโมดูลเก็บใน Drive · ก่อนปล่อยเวอร์ชันใหม่ของแอปทดสอบไฟล์ Live ทุกหน้าด้วยการจำลองล็อกอินก่อนอัปโหลด GitHub Pages · ดู <b>ผังระบบ</b> เพื่อทบทวนเส้นทางข้อมูลเมื่อมีตารางใหม่</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">ผังระบบ (admin)</span><span class="sp-chip sp-doc">CSV</span><span class="sp-chip sp-when">ทุกเดือน</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= RACI ================= -->
+<div class="sp-raci" id="raci">
+  <h2>ตาราง RACI — ใครทำ ใครรับผิด ใครต้องปรึกษา ใครแค่รับทราบ</h2>
+  <p>R = ทำ (Responsible) · A = รับผิดชอบผลลัพธ์/อนุมัติ (Accountable) · C = ต้องปรึกษาก่อน (Consulted) · I = รับทราบ (Informed)</p>
+  <table>
+    <thead><tr><th>ขั้นตอน</th><th>OPC</th><th>ผจก.การตลาด</th><th>Reception</th><th>ทีมขาย</th><th>ห้องสัญญา</th><th>บัญชี</th><th>ฝ่ายจอง</th><th>GM</th><th>IT</th></tr></thead>
+    <tbody>
+      <tr><td>① หาแขก + บันทึกทัวร์</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td></tr>
+      <tr><td>② คัดกรอง Q / Q+ / CT + ของแถม</td><td class="sp-c sp-I">I</td><td class="sp-c sp-I">I</td><td class="sp-c sp-R">R</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>③ Presentation 90 นาที</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>④ Daily Sale Report / ออกเลขสัญญา</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑤ เปิดแฟ้ม + Welcome call + สแกน PA</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-I">I</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥a รับเงิน / AR / Statement</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥b ค่าจ้าง OPC ทุกศุกร์</td><td class="sp-c sp-I">I</td><td class="sp-c sp-R">R</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥c คอมมิชชั่นทีมขาย ทุก 15 วัน</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑦ ค่าบำรุง / Interval / ต่ออายุ</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑧ อนุมัติเข้าพัก + บันทึก Week</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>สิทธิ์ผู้ใช้ / ความปลอดภัย / สำรองข้อมูล</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c sp-R">R</td></tr>
+    </tbody>
+  </table>
+  <div class="sp-legend"><span><span class="sp-R">R</span> ทำ</span><span><span class="sp-A">A</span> อนุมัติ/รับผิดชอบ</span><span><span class="sp-C">C</span> ปรึกษา</span><span><span class="sp-I">I</span> รับทราบ</span></div>
+</div>
+
+<!-- ================= RULES ================= -->
+<section id="rules" style="margin-bottom:10px">
+  <h2 style="font-size:18px;margin-bottom:12px">กฎร่วมทุกฝ่าย</h2>
+  <div class="sp-rules">
+    <div><b>เลขสัญญาคือคีย์เดียว</b>ทุกตาราง ทุกไฟล์ ทุกโฟลเดอร์อ้างเลขสัญญารูปแบบเดียว <code>PROD/SEQ/YEARS/AH/T1</code> พิมพ์ผิดหนึ่งตัว = ข้อมูลหลุดจากกัน</div>
+    <div><b>กรอกในแอป ไม่กรอกซ้ำใน Excel/Access</b>ไฟล์เดิม (Bible, AR Ledger, Commission Master, Access) นำเข้าแล้วและถือเป็นประวัติ ทีมกรอกที่แอปเท่านั้นเพื่อให้ทุกฝ่ายเห็นชุดเดียวกัน</div>
+    <div><b>ไม่ลบ — ให้ยกเลิก / แก้ / หมายเหตุ</b>รายการเงิน แฟ้ม สัญญา ที่ผิดให้แก้ที่ ✏️ พร้อมเหตุผล ระบบเก็บชื่อผู้แก้และเวลา</div>
+    <div><b>PDF อยู่บน Google Drive เท่านั้น</b>โฟลเดอร์ DB Elite Escape เก็บฉบับเดียวไม่ซ้ำ ในฐานเก็บแค่ดัชนี ไม่ส่งไฟล์สัญญาทางแชตส่วนตัว</div>
+    <div><b>จ่ายเมื่อเงื่อนไขครบ</b>OPC ได้ค่าจ้างเมื่อแขกมาจริง + ฟัง 90 นาที · เข้าพักได้เมื่อค่าบำรุงจ่ายแล้ว · คอมฯ คิดจากเงินรับจริงหลังหักรายการที่มากับดีล</div>
+    <div><b>Gmail บริษัทเท่านั้น</b>ทุกคนล็อกอินด้วย @elite-escapes.club ของตัวเอง ไม่ใช้บัญชีร่วม ลาออกให้ IT ถอนสิทธิ์วันเดียวกัน</div>
+  </div>
+</section>
+
+<div class="sp-pend" id="pend"><b>ข้อที่ยังรอยืนยันจากผู้บริหาร / บัญชี</b> (ระบบทำงานได้ แต่ยังคำนวณ/แสดงตามข้อมูลเดิม)
+  <ul>
+    <li>สูตร % คอมมิชชั่นต่อตำแหน่ง (Rep / T/O / Closer / Manager) เพื่อคำนวณอัตโนมัติจาก Deal Nett ทุกรอบ 15 วัน</li>
+    <li>USA และ UK ได้เรทฐาน Q ฿3,000 ก่อนบวก split ใช่หรือไม่</li>
+    <li>โบนัส Pack / Full ของ OPC ยังใช้อยู่หรือยกเลิกแล้ว</li>
+    <li>ไฟล์ Commission Master รอบเก่า (2016–ก.ค. 2026) เพื่อเติมประวัติคอมฯ ย้อนหลัง</li>
+  </ul>
+</div>
+</main>
+`;
+function rSop(){ $main.innerHTML='<div class="sopdoc"><div class="sp-wrap">'+SOP_HTML+'</div></div>'; window.scrollTo(0,0); }
+function sopGo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+
 /* ================= ผังระบบ (node canvas) — admin only ================= */
 function isAdminUser(){ return !!(typeof USER!=='undefined'&&USER&&USER.role==='admin'); }
 const SM_KIND_TH={src:'ไฟล์ต้นทาง',proc:'Cold Line',db:'ตารางฐานกลาง',app:'เมนูในแอป',out:'ผลลัพธ์'};
