@@ -931,6 +931,22 @@ body:not(.isadmin) .adminonly{display:none!important}
 @media(max-width:1100px){.sopdoc .sp-wrap{grid-template-columns:1fr}.sopdoc .sp-toc{position:static;display:flex;flex-wrap:wrap;gap:2px 6px}.sopdoc .sp-toc .sp-kick,.sopdoc .sp-toc .sp-sub{display:none}}
 
 </style>
+<style id="kpirow-css">
+/* Dashboard KPI row: gradient dark -> light across the 4 cards (navy) */
+[data-skin="navy"] .kpirow .card.kpi{border:1px solid var(--line)}
+[data-skin="navy"] .kpirow .card.kpi:nth-child(1){background:linear-gradient(135deg,#0d1322,#141d31)}
+[data-skin="navy"] .kpirow .card.kpi:nth-child(2){background:linear-gradient(135deg,#141d31,#1b2740)}
+[data-skin="navy"] .kpirow .card.kpi:nth-child(3){background:linear-gradient(135deg,#1b2740,#24314f)}
+[data-skin="navy"] .kpirow .card.kpi:nth-child(4){background:linear-gradient(135deg,#24314f,#2e3d5e)}
+[data-skin="verde"] .kpirow .card.kpi:nth-child(1){background:linear-gradient(135deg,#1f5b42,#2f7f5e)}
+[data-skin="verde"] .kpirow .card.kpi:nth-child(2){background:linear-gradient(135deg,#2f7f5e,#3f9a72)}
+[data-skin="verde"] .kpirow .card.kpi:nth-child(3){background:linear-gradient(135deg,#3f9a72,#5bb98d)}
+[data-skin="verde"] .kpirow .card.kpi:nth-child(4){background:linear-gradient(135deg,#5bb98d,#e8f3ee)}
+[data-skin="verde"] .kpirow .card.kpi:nth-child(-n+3) .v,[data-skin="verde"] .kpirow .card.kpi:nth-child(-n+3) .l,[data-skin="verde"] .kpirow .card.kpi:nth-child(-n+3) .m{color:#fff}
+[data-skin="navy"] .kpirow .card.kpi .v,[data-skin="navy"] .kpirow .card.kpi .l,[data-skin="navy"] .kpirow .card.kpi .m{color:#eaf0fb}
+[data-skin="navy"] .kpirow .card.kpi .l,[data-skin="navy"] .kpirow .card.kpi .m{color:#aab6cf}
+[data-skin="navy"] .kpirow .card.kpi .v{color:#fff}
+</style>
 <style id="signout-css">
 .topbar .tb-signout{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink2);cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .topbar .tb-signout:hover{border-color:var(--s8);color:var(--s8)}
@@ -1579,7 +1595,7 @@ function rDash(){
       <p class="sub">Live data from the central database (Supabase) · current year ${st.cur} · as of ${fmtD(TODAY)}</p>
     </div>
   </div></div>
-  <div class="cards">
+  <div class="cards kpirow">
     <div class="card kpi blue"><div class="v">${st.nAct.toLocaleString()}</div><div class="l">Active contracts</div><div class="m">Customers ${allClients().length.toLocaleString()} customers · total contracts ${allContracts().length.toLocaleString()}</div></div>
     <div class="card kpi red"><div class="v">${dueUnrec.toLocaleString()}</div><div class="l">Maintenance fee due for year ${st.cur} but no record</div><div class="m">${duePct}% of contracts due ${fc.due.toLocaleString()} contract</div></div>
     <div class="card kpi orange"><div class="v sm">US$${Math.round(st.billedAmt).toLocaleString()}</div><div class="l">Billed, no payment recorded yet</div><div class="m">${st.billedCnt.toLocaleString()} items (all years)</div></div>
