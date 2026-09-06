@@ -856,7 +856,7 @@ const SBC = (AUTH_MODE!=='off' && window.supabase)
   ? window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}})
   : null;
 let USER = (AUTH_MODE==='off') ? {email:'team', name:'ทีมงาน', role:'admin'} : null;
-function logout(){ if(SBC) SBC.auth.signOut().then(()=>location.reload()); else location.reload(); }
+function logout(){ const go=()=>location.reload(); idbClear().finally(()=>{ if(SBC) SBC.auth.signOut().then(go,go); else go(); }); }
 function renderLogin(msg){
   const old=document.getElementById('gate'); if(old) old.remove();
   document.body.insertAdjacentHTML('beforeend', `<div id="gate">
@@ -935,6 +935,36 @@ async function fetchAllRows(table, order){
   }
   BOOT_DONE++; bootProgress();
   return out;
+}
+/* ===== cache ในเบราว์เซอร์ (IndexedDB) + ดึงเฉพาะแถวที่เปลี่ยนตั้งแต่ครั้งก่อน (updated_at) =====
+   ครั้งแรกดึงเต็ม (~13 MB) ครั้งต่อไปดึงแค่ส่วนต่าง; ตรวจจำนวนแถวรวมกับ server ถ้าไม่ตรง (มีการลบ) หรือ cache เก่ากว่า 24 ชม. → ดึงเต็มใหม่ */
+const TBL_PK={clients:['code'],contracts:['id'],mfee:['contract_id','year'],payout_plans:['contract_id'],payout_installments:['id'],receivables:['contract_no'],week_usage:['id'],ar_payments:['id'],case_files:['contract_no'],case_customers:['id'],commission_periods:['period'],commission_lines:['id'],mkt_weekly:['id'],contract_scans:['sha1'],mkt_tours:['id'],sales_deals:['id']};
+function idb(){ return new Promise((res,rej)=>{ if(!window.indexedDB) return rej(new Error('no idb')); const r=indexedDB.open('ee_cache',1); r.onupgradeneeded=()=>r.result.createObjectStore('t'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbGet(k){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const q=db.transaction('t').objectStore('t').get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); }catch(e){ return null; } }
+async function idbSet(k,v){ try{ const db=await idb(); await new Promise((res,rej)=>{ const tx=db.transaction('t','readwrite'); tx.objectStore('t').put(v,k); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }catch(e){} }
+async function idbClear(){ try{ const db=await idb(); await new Promise((res,rej)=>{ const tx=db.transaction('t','readwrite'); tx.objectStore('t').clear(); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }catch(e){} }
+const rowKey=(t,r)=>TBL_PK[t].map(k=>r[k]).join('|');
+function maxUpd(rows){ let m=null; rows.forEach(r=>{ if(r.updated_at&&(!m||r.updated_at>m)) m=r.updated_at; }); return m; }
+function sortBy(rows,k){ return rows.sort((a,b)=>a[k]<b[k]?-1:a[k]>b[k]?1:0); }
+let CACHE_STATS={hit:0,full:0};
+async function loadTable(table, order){
+  const owner=(USER&&USER.email)||'team';
+  const full=async()=>{ const rows=await fetchAllRows(table,order); CACHE_STATS.full++; await idbSet(table,{owner,rows,max:maxUpd(rows),at:Date.now()}); return rows; };
+  const c=await idbGet(table);
+  if(!c || c.owner!==owner || !Array.isArray(c.rows) || !c.max || (Date.now()-(c.at||0))>86400000) return full();
+  try{
+    const tok=await authToken(); const hdr={apikey:SB_KEY, Authorization:'Bearer '+tok};
+    const [delta,total]=await Promise.all([
+      fetch(SB_URL+'/rest/v1/'+table+'?select=*&updated_at=gt.'+encodeURIComponent(c.max)+'&order=updated_at.asc&limit=1000',{headers:hdr}).then(async r=>{ if(!r.ok) throw new Error(await r.text()); return r.json(); }),
+      fetch(SB_URL+'/rest/v1/'+table+'?select='+TBL_PK[table][0]+'&limit=1',{method:'HEAD',headers:Object.assign({Prefer:'count=exact'},hdr)}).then(r=>parseInt((r.headers.get('content-range')||'').split('/')[1]))
+    ]);
+    const map=new Map(c.rows.map(r=>[rowKey(table,r),r])); delta.forEach(r=>map.set(rowKey(table,r),r));
+    const rows=sortBy([...map.values()],order);
+    if(delta.length>=1000 || !Number.isFinite(total) || rows.length!==total) return full();   /* มีการลบ/เปลี่ยนมาก → ดึงเต็ม */
+    CACHE_STATS.hit++; BOOT_DONE++; bootProgress();
+    if(delta.length) await idbSet(table,{owner,rows,max:maxUpd(rows),at:c.at});
+    return rows;
+  }catch(e){ return full(); }
 }
 async function pushPlan(cid){
   try{
@@ -1029,25 +1059,40 @@ async function boot(){
   try{
     const N=v=>v!=null?Number(v):null;
     BOOT_DONE=0; BOOT_TOTAL=16; bootProgress();
-    const [cls, cons, fees, plans, insts, recs, wus, rps, cfs, cks, cps, cls2, mws, css, mts, dls] = await Promise.all([
-      fetchAllRows('clients','code'), fetchAllRows('contracts','id'), fetchAllRows('mfee','contract_id'),
-      fetchAllRows('payout_plans','contract_id'), fetchAllRows('payout_installments','id'),
-      fetchAllRows('receivables','contract_no'), fetchAllRows('week_usage','id'), fetchAllRows('ar_payments','id'),
-      fetchAllRows('case_files','contract_no'), fetchAllRows('case_customers','id'),
-      fetchAllRows('commission_periods','period'), fetchAllRows('commission_lines','id'), fetchAllRows('mkt_weekly','id'),
-      fetchAllRows('contract_scans','sha1'), fetchAllRows('mkt_tours','id'), fetchAllRows('sales_deals','id')
+    /* เฟส 1: ตารางหลักที่หน้าแรกต้องใช้ → แสดงผลทันที; เฟส 2 (ประวัติรับเงิน/แฟ้มสัญญา/สแกน/คอมฯ ~8 MB) โหลดตามหลัง */
+    const t0=performance.now();
+    const [cls, cons, fees, plans, insts, recs, wus, cps, mws, mts, dls] = await Promise.all([
+      loadTable('clients','code'), loadTable('contracts','id'), loadTable('mfee','contract_id'),
+      loadTable('payout_plans','contract_id'), loadTable('payout_installments','id'),
+      loadTable('receivables','contract_no'), loadTable('week_usage','id'),
+      loadTable('commission_periods','period'), loadTable('mkt_weekly','id'),
+      loadTable('mkt_tours','id'), loadTable('sales_deals','id')
     ]);
+    const mapCS=css=>css.map(s=>({sha1:s.sha1,contract_no:s.contract_no,contract_key:s.contract_key,file_name:s.file_name,size:s.size,copies:s.copies,drive_folder:s.drive_folder}));
+    const mapCL=cls2=>cls2.map(l=>({id:l.id,period:l.period,contract_no:l.contract_no,customer:l.customer,sale_type:l.sale_type,status:l.status,purchase_price:N(l.purchase_price),paid_to_date:N(l.paid_to_date),new_payment:N(l.new_payment),total_instalments:N(l.total_instalments),balance:N(l.balance),cash_in_pct:N(l.cash_in_pct),roles:l.roles||{},blocks:l.blocks||{},remark:l.remark}));
+    const mapCF=cfs=>cfs.map(f=>({contract_no:f.contract_no,status:f.status,category:f.category,priority:f.priority,opened_date:f.opened_date,due_date:f.due_date,resolved_date:f.resolved_date,description:f.description,comments:f.comments,attachments:f.attachments||[],assigned_to:f.assigned_to,opened_by:f.opened_by,customer_id:f.customer_id,source_db:f.source_db,source_ids:f.source_ids||{},updated_by:f.updated_by}));
+    const mapRP=rps=>rps.map(p=>({id:p.id,contract_no:p.contract_no,amount:N(p.amount)||0,paid_date:p.paid_date,pay_type:p.pay_type,source:p.source,note:p.note,kind:p.kind||'payment',balance_after:N(p.balance_after),updated_by:p.updated_by}));
+    const phase2=async()=>{
+      const t1=performance.now();
+      const [rps, cfs, cks, cls2, css] = await Promise.all([
+        loadTable('ar_payments','id'), loadTable('case_files','contract_no'), loadTable('case_customers','id'),
+        loadTable('commission_lines','id'), loadTable('contract_scans','sha1')
+      ]);
+      RP=mapRP(rps); CF=mapCF(cfs); CK=cks; CL=mapCL(cls2); CS=mapCS(css);
+      invalidate();
+      const modalOpen=!document.getElementById('modalwrap').classList.contains('hide');
+      const typing=/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');
+      if(!modalOpen && !typing) render();
+      if(performance.now()-t1>2000) toast('☁️ โหลดประวัติรับเงิน / แฟ้มสัญญา / สแกน ครบแล้ว');
+      LAST_SYNC=new Date(); updateSync();
+      console.info('boot phase2', Math.round(performance.now()-t1)+'ms', CACHE_STATS);
+    };
     DL = dls.map(d=>({id:d.id,deal_date:d.deal_date,contract_no:d.contract_no,client_name:d.client_name,email:d.email,nationality:d.nationality,product:d.product,term_years:d.term_years,plan:d.plan,season:d.season,suite:d.suite,sale_type:d.sale_type,generator:d.generator,upgrade_from:d.upgrade_from,list_price:N(d.list_price),purchase_price:N(d.purchase_price),overprice:N(d.overprice),admin_fee:N(d.admin_fee),deposit:N(d.deposit),trade_in:N(d.trade_in),refund:N(d.refund),items:d.items||[],gbp_rate:N(d.gbp_rate),deductions_usd:N(d.deductions_usd),deal_nett:N(d.deal_nett),instalments:d.instalments,instalment_amount:N(d.instalment_amount),first_due:d.first_due,pay_plan:d.pay_plan,team:d.team||{},opc_tour_id:d.opc_tour_id,client_code:d.client_code,bible_contract_id:d.bible_contract_id,status:d.status,note:d.note,updated_by:d.updated_by}));
     MT = mts.map(t=>({id:t.id,tour_date:t.tour_date,pay_friday:t.pay_friday,opc_code:t.opc_code,opc_name:t.opc_name,guest_name:t.guest_name,guests:t.guests,line:t.line,qualify:t.qualify,found:t.found,showed:t.showed!==false,presentation_90:t.presentation_90!==false,deal:!!t.deal,contract_no:t.contract_no,gift:t.gift,breakfast:t.breakfast!==false,taxi:N(t.taxi),hotel:t.hotel,checklist:t.checklist||{},note:t.note,pay_total:N(t.pay_total),updated_by:t.updated_by}));
-    CS = css.map(s=>({sha1:s.sha1,contract_no:s.contract_no,contract_key:s.contract_key,file_name:s.file_name,size:s.size,copies:s.copies,drive_folder:s.drive_folder}));
     CP = cps.map(p=>({period:p.period,period_start:p.period_start,period_end:p.period_end,pay_day:p.pay_day,fx_rate:p.fx_rate!=null?Number(p.fx_rate):null,blocks:p.blocks||[],staff_pay:p.staff_pay||[],note:p.note}));
-    CL = cls2.map(l=>({id:l.id,period:l.period,contract_no:l.contract_no,customer:l.customer,sale_type:l.sale_type,status:l.status,purchase_price:N(l.purchase_price),paid_to_date:N(l.paid_to_date),new_payment:N(l.new_payment),total_instalments:N(l.total_instalments),balance:N(l.balance),cash_in_pct:N(l.cash_in_pct),roles:l.roles||{},blocks:l.blocks||{},remark:l.remark}));
     MW = mws.map(w=>({id:w.id,week_no:w.week_no,year:w.year,dates:w.dates,role:w.role,staff_code:w.staff_code,name:w.name,q:N(w.q),qplus:N(w.qplus),ct:N(w.ct),pack_q:N(w.pack_q),pack_ct:N(w.pack_ct),full_q:N(w.full_q),full_ct:N(w.full_ct),bonus_total:N(w.bonus_total),total:N(w.total),extra:w.extra,note:w.note,updated_by:w.updated_by}));
-    CF = cfs.map(f=>({contract_no:f.contract_no,status:f.status,category:f.category,priority:f.priority,opened_date:f.opened_date,due_date:f.due_date,resolved_date:f.resolved_date,description:f.description,comments:f.comments,attachments:f.attachments||[],assigned_to:f.assigned_to,opened_by:f.opened_by,customer_id:f.customer_id,source_db:f.source_db,source_ids:f.source_ids||{},updated_by:f.updated_by}));
-    CK = cks;
     REC = recs.map(r=>({contract_no:r.contract_no,contract_date:r.contract_date,client_name:r.client_name,product:r.product,price:N(r.price),deposit:N(r.deposit),balance:N(r.balance),status:r.status,unit_type:r.unit_type,email:r.email,nationality:r.nationality,term:r.term,rep:r.rep,paid_note:r.paid_note,admin_fee:N(r.admin_fee),mfee_cost:N(r.mfee_cost),sale_type:r.sale_type,generator:r.generator,list_price:N(r.list_price),gift:N(r.gift),trade_in:N(r.trade_in),refund:N(r.refund),deal_nett:N(r.deal_nett),overprice:N(r.overprice),team:r.team||null,currency:r.currency||'USD',discount:N(r.discount)}));
     WU = wus.map(w=>({id:w.id,client_code:w.client_code,contract_no:w.contract_no,client_name:w.client_name,use_year:w.use_year,check_in:w.check_in,check_out:w.check_out,nights:w.nights,room:w.room,note:w.note,week_type:w.week_type||'own',rate_per_night:N(w.rate_per_night),updated_by:w.updated_by}));
-    RP = rps.map(p=>({id:p.id,contract_no:p.contract_no,amount:N(p.amount)||0,paid_date:p.paid_date,pay_type:p.pay_type,source:p.source,note:p.note,kind:p.kind||'payment',balance_after:N(p.balance_after),updated_by:p.updated_by}));
     const feesBy={};
     fees.forEach(f=>{ (feesBy[f.contract_id]=feesBy[f.contract_id]||[]).push({year:f.year,amount:f.amount!=null?Number(f.amount):null,amount_raw:f.amount_raw,paid:f.paid,paid_date:f.paid_date,paid_note:f.paid_note}); });
     const contracts = cons.map(c=>({id:c.id,sheet:c.sheet,product:c.product,pa:c.pa,name:c.name,nat:c.nat,plan:c.plan,term:c.term,suite:c.suite,season:c.season,status:c.status,status_note:c.status_note,comp_date:c.comp_date,fyo:c.fyo,lyo:c.lyo,row:c.row_no,client:c.client,addons:c.addons||undefined,fees:(feesBy[c.id]||[]).sort((a,b)=>a.year-b.year),custom:c.custom}));
@@ -1062,6 +1107,8 @@ async function boot(){
     document.body.classList.toggle('ro', !!(USER&&USER.role==='viewer'));
     invalidate(); render();
     LAST_SYNC=new Date(); updateSync();
+    console.info('boot phase1', Math.round(performance.now()-t0)+'ms', CACHE_STATS);
+    phase2().catch(e=>{ console.warn('phase2', e); toast('⚠️ โหลดข้อมูลส่วนหลัง (ประวัติรับเงิน/แฟ้ม/สแกน) ไม่สำเร็จ: '+e.message); });
   }catch(e){
     $main.innerHTML='<div class="note" style="margin-top:40px"><b>โหลดข้อมูลจากฐานกลางไม่สำเร็จ:</b> '+esc(e.message)+'<br>ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรชหน้า</div>';
   }
