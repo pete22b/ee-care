@@ -1094,7 +1094,11 @@ const SBC = (AUTH_MODE!=='off' && window.supabase)
   ? window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}})
   : null;
 let USER = (AUTH_MODE==='off') ? {email:'team', name:'Team', role:'admin'} : null;
-function logout(){ const go=()=>location.reload(); idbClear().finally(()=>{ if(SBC) SBC.auth.signOut().then(go,go); else go(); }); }
+function logout(){ const go=()=>location.reload(); const done=()=>idbClear().finally(()=>{ if(SBC) SBC.auth.signOut().then(go,go); else go(); });
+  Promise.race([audit('logout','auth',(typeof USER!=='undefined'&&USER&&USER.email)||null,{}), new Promise(r=>setTimeout(r,800))]).finally(done); }
+/* log every data export / file download (a.download) — "who took data out" */
+(function(){ try{ const proto=HTMLAnchorElement.prototype; const _clk=proto.click;
+  proto.click=function(){ try{ if(this && this.download){ audit('export','file',this.download,{}); } }catch(e){} return _clk.apply(this,arguments); }; }catch(e){} })();
 function renderLogin(msg){
   const old=document.getElementById('gate'); if(old) old.remove();
   document.body.insertAdjacentHTML('beforeend', `<div id="gate">
@@ -1151,8 +1155,30 @@ async function sbApi(path, opts={}){
     apikey:SB_KEY, Authorization:'Bearer '+tok, 'Content-Type':'application/json',
     Prefer:(opts.prefer||'')}, opts.headers||{})}));
   if(!r.ok) throw new Error((await r.text()).slice(0,300));
+  try{ auditWrite(path, opts); }catch(e){}
   if(r.status===204) return null;
   const t = await r.text(); return t?JSON.parse(t):null;
+}
+/* ===== Audit log: who changed / removed what, and who took data out ===== */
+let AUDIT_READY=false;
+async function audit(action, entity, entity_id, detail){
+  try{
+    const tok=await authToken();
+    await fetch(SB_URL+'/rest/v1/audit_log',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+tok,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify([{actor:(typeof USER!=='undefined'&&USER&&USER.email)||'unknown',action:action,entity:entity||null,entity_id:entity_id!=null?String(entity_id).slice(0,120):null,detail:detail||null,lang:(typeof EE_LANG!=='undefined'?EE_LANG:null)}])});
+  }catch(e){}
+}
+function auditWrite(path, opts){
+  const m=(opts&&opts.method||'GET').toUpperCase();
+  if(m==='GET'||m==='HEAD') return;
+  const table=String(path).split('?')[0];
+  if(table==='audit_log') return;                 /* never log the audit itself */
+  let key=null, n=null, row=null;
+  try{ if(opts&&opts.body){ const b=JSON.parse(opts.body); if(Array.isArray(b)){ n=b.length; row=b[0]; } else row=b;
+        if(row) key=row.id||row.contract_no||row.code||row.contract_id||row.email||row.period||null; } }catch(e){}
+  if(key==null && m==='DELETE'){ const q=String(path).split('?')[1]||''; const mm=q.match(/([a-z_]+)=eq\.([^&]+)/); if(mm) key=decodeURIComponent(mm[2]); }
+  let det=null; try{ if(row){ det={}; Object.keys(row).slice(0,14).forEach(k=>{ let v=row[k]; if(typeof v==='string'&&v.length>120) v=v.slice(0,120); if(typeof v!=='object'||v===null) det[k]=v; }); if(n>1) det.__rows=n; } }catch(e){}
+  audit(m==='DELETE'?'delete':(m==='PATCH'?'update':'save'), table, key, det);
 }
 /* Fetch all rows: first page requests count then fetches the rest in parallel (previously page-by-page in sequence, making ar_payments 14k rows take 15 round-trips) */
 let BOOT_DONE=0, BOOT_TOTAL=0;
@@ -1292,6 +1318,7 @@ async function boot(){
       await SBC.auth.signOut(); renderLogin('Access only via company Gmail @elite-escapes.club'); return;
     }
     closeGate();
+    audit('login','auth',USER.email,{role:USER.role,name:USER.name});
   }
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ Loading data from the central database…</h3><div class="mini" id="boot-prog">Starting to fetch data…</div><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
@@ -3900,8 +3927,13 @@ function rBackup(){
     <button class="btn sec" onclick="addAppUser()">➕ Add user</button>
   </div>`:''}
   <div class="panel">
-    <h3><span class="idx">${USER&&USER.role==='admin'?'03':'02'}</span>Latest activity</h3>
-    <div class="cs">who changed what and when — from every machine using this system (click a row to open the profile)</div>
+    <h3><span class="idx">${USER&&USER.role==='admin'?'03':'02'}</span>Audit log — who edited / removed / exported what</h3>
+    <div class="cs">Append-only record from every machine · the operator name comes from the verified login (cannot be forged) and rows cannot be edited or deleted</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px">
+      <input class="flt" style="flex:1 1 240px" placeholder="Filter by name / action / contract / amount…" value="${esc(AUDIT_Q||'')}" oninput="AUDIT_Q=this.value" onkeydown="if(event.key==='Enter')loadActivity()">
+      <button class="btn ghost" onclick="loadActivity()">🔎 Search</button>
+      <button class="btn ghost" onclick="exportAuditCSV()">⬇️ Export CSV</button>
+    </div>
     <div id="actfeed" class="mini">Loading…</div>
   </div>`;
   if(USER&&USER.role==='admin') loadUsers();
@@ -3936,31 +3968,32 @@ function canEdit(){ return USER && USER.role!=='viewer'; }
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('Your account has view-only access'); return; } return orig.apply(this,arguments); };
 });
-/* ===== LIVE: activity feed ===== */
+/* ===== LIVE: audit log viewer (who changed / removed / exported what) ===== */
+const AUDIT_ACT={save:'✎ edit',update:'✎ edit',delete:'🗑 delete',export:'⬇ export',login:'→ sign in',logout:'← sign out'};
+let AUDIT_Q='';
+function auditDetail(x){
+  if(x.action==='export') return 'downloaded file: '+(x.entity_id||'');
+  if(x.action==='login'||x.action==='logout') return (x.detail&&x.detail.role?('role '+x.detail.role):'');
+  const d=x.detail||{}; const skip={updated_by:1,updated_at:1,custom:1,__rows:1};
+  const parts=Object.keys(d).filter(k=>!skip[k]&&d[k]!=null&&d[k]!=='').slice(0,6).map(k=>k+': '+d[k]);
+  return (x.entity_id?('#'+x.entity_id+'  '):'')+parts.join(' · ')+(d.__rows?('  ('+d.__rows+' rows)'):'');
+}
 async function loadActivity(){
   const el=document.getElementById('actfeed'); if(!el) return;
+  el.innerHTML='<div class="mini">Loading…</div>';
   try{
-    const flt='updated_by=not.is.null&updated_by=neq.migration&order=updated_at.desc&limit=12';
-    const [fees,insts,plans,arp,wus]=await Promise.all([
-      sbApi('mfee?select=contract_id,year,paid,updated_by,updated_at&'+flt),
-      sbApi('payout_installments?select=contract_id,label,paid,updated_by,updated_at&'+flt),
-      sbApi('payout_plans?select=contract_id,updated_by,updated_at&'+flt),
-      sbApi('ar_payments?select=contract_no,amount,pay_type,updated_by,updated_at&'+flt).catch(()=>[]),
-      sbApi('week_usage?select=client_code,client_name,contract_no,check_in,updated_by,updated_at&'+flt).catch(()=>[])
-    ]);
-    const items=[];
-    arp.forEach(p=>items.push({at:p.updated_at,by:p.updated_by,txt:'Receivable receipts US$'+Number(p.amount||0).toLocaleString()+(p.pay_type?' ('+p.pay_type+')':'')+' — '+p.contract_no,code:null}));
-    wus.forEach(w=>items.push({at:w.updated_at,by:w.updated_by,txt:'Record a stay '+(w.client_name||'')+' — '+(w.contract_no||'')+' (check-in '+(w.check_in||'')+')',code:w.client_code}));
-    fees.forEach(f=>{const c=contractById(f.contract_id); items.push({at:f.updated_at,by:f.updated_by,txt:'Record the maintenance-fee year '+f.year+' ('+(f.paid?'Paid':'Not paid yet')+') — '+(c?c.pa:f.contract_id),code:c&&c.client});});
-    insts.forEach(i=>{const c=contractById(i.contract_id); items.push({at:i.updated_at,by:i.updated_by,txt:(i.paid?'Record payment ':'Update ')+(i.label||'installment')+' — '+(c?c.pa:i.contract_id),code:c&&c.client});});
-    plans.forEach(p=>{const c=contractById(p.contract_id); items.push({at:p.updated_at,by:p.updated_by,txt:'Edit payout plan — '+(c?c.pa:p.contract_id),code:c&&c.client});});
-    items.sort((a,b)=>a.at<b.at?1:-1);
+    let q='audit_log?select=*&order=ts.desc&limit=200';
+    const rows=await sbApi(q);
+    const flt=(AUDIT_Q||'').trim().toLowerCase();
+    let items=rows||[];
+    if(flt) items=items.filter(x=>((x.actor||'')+' '+(x.action||'')+' '+(x.entity||'')+' '+(x.entity_id||'')+' '+JSON.stringify(x.detail||'')).toLowerCase().includes(flt));
     const fmtT=(iso)=>{const d=new Date(iso); return d.getDate()+' '+TH_M[d.getMonth()]+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
-    el.innerHTML = items.length? '<div class="scroll"><table><thead><tr><th>when</th><th>By operator</th><th>item</th></tr></thead><tbody>'+
-      items.slice(0,15).map(x=>`<tr class="${x.code?'click':''}" ${x.code?`onclick="openClient('${x.code}','backup')"`:''}><td style="white-space:nowrap">${fmtT(x.at)}</td><td>${x.by==='team'?'Team':esc(x.by)}</td><td>${esc(x.txt)}</td></tr>`).join('')+'</tbody></table></div>'
-      : '<div class="mini">No team activity yet</div>';
+    el.innerHTML = items.length? '<div class="scroll"><table><thead><tr><th>when</th><th>By operator</th><th>action</th><th>where</th><th>detail</th></tr></thead><tbody>'+
+      items.slice(0,200).map(x=>`<tr><td style="white-space:nowrap">${fmtT(x.ts)}</td><td>${x.actor==='team'?'Team':esc(x.actor||'')}</td><td style="white-space:nowrap">${esc(AUDIT_ACT[x.action]||x.action||'')}</td><td>${esc(x.entity||'')}</td><td class="mini">${esc(auditDetail(x))}</td></tr>`).join('')+'</tbody></table></div>'
+      : '<div class="mini">No records yet</div>';
   }catch(e){ el.textContent='Failed to load: '+e.message; }
 }
+function exportAuditCSV(){ sbApi('audit_log?select=*&order=ts.desc&limit=5000').then(rows=>{ const cols=['ts','actor','action','entity','entity_id','lang','detail']; const csv=[cols.join(',')].concat((rows||[]).map(r=>cols.map(c=>{ let v=c==='detail'?JSON.stringify(r[c]||''):(r[c]==null?'':r[c]); v=String(v).replace(/"/g,'""'); return /[",\n]/.test(v)?'"'+v+'"':v; }).join(','))).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='audit-log-'+TODAY+'.csv'; a.click(); }); }
 /* ===== LIVE: command palette + sync clock ===== */
 let LAST_SYNC=null;
 function updateSync(){
