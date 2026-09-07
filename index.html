@@ -1838,7 +1838,11 @@ function areaChart(vals,labs){
 /* ================= clients ================= */
 function norm(s){ return String(s||'').toLowerCase(); }
 /* ===== upgrade detection + contract chain ===== */
-function upgradeTargetOf(c){ const n=(c&&c.status_note)||''; const m=n.match(/(?:UG|DG|upgrad\w*|downgrad\w*)\s*(?:to|→)?\s*([A-Za-z0-9][A-Za-z0-9.\/\\-]{3,})/i); return m?m[1]:null; }
+function upgradeTargetOf(c){ const n=(c&&c.status_note)||'';
+  const m=n.match(/(?:UG|DG|upgrad\w*|downgrad\w*)\s*(?:to|→)?\s*([A-Za-z]{2,6})\s*[\/\s]\s*(\d{3,5})/i);
+  if(m) return (m[1]+'/'+m[2]).toUpperCase();
+  const m2=n.match(/(?:UG|DG|upgrad\w*|downgrad\w*)\s*(?:to|→)?\s*([A-Za-z0-9][A-Za-z0-9.\/\\-]{3,})/i);
+  return m2?m2[1]:null; }
 function upgradeSourceOf(c){ if(!c) return null; const k=normCno(c.pa); const d=(typeof DL!=='undefined'?DL:[]).find(x=>normCno(x.contract_no)===k && x.upgrade_from); return d?d.upgrade_from:null; }
 function isUpgraded(c){ if(!c) return false;
   if(/^(Upgraded|Downgraded)$/i.test(c.status||'')) return true;
