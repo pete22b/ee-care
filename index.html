@@ -1977,7 +1977,9 @@ function contractCard(c){
       <div><h4>${esc(c.pa)} <span class="chip">${esc(c.product)}</span>${brandChip(c)}</h4>
       <div class="kv">Contract term <b>${esc(c.term||'-')}</b> · Suite <b>${esc(c.suite||'-')}</b> · Season <b>${esc(c.season||'-')}</b> · contract completed <b>${c.comp_date?fmtD(c.comp_date):'-'}</b> · use-year ${c.fyo||'?'}–${c.lyo||'?'}</div>
       ${c.status_note?'<div class="mini">'+esc(c.status_note)+'</div>':''}
-      ${(()=>{ const tgt=upgradeTargetOf(c), src=upgradeSourceOf(c); const jump=x=>{ const k=normCno(x); const t=allContracts().find(cc=>normCno(cc.pa)===k); return t?`<a href="#" onclick="openClient('${t.client}','clients');return false"><b>${esc(x)}</b></a>`:'<b>'+esc(x)+'</b>'; };
+      ${(()=>{ const tgt=upgradeTargetOf(c), src=upgradeSourceOf(c);
+        const findC=x=>{ const k=normCno(x); if(!k) return null; return allContracts().find(cc=>normCno(cc.pa)===k) || allContracts().find(cc=>normCno(cc.pa).indexOf(k)===0) || allContracts().find(cc=>normCno(cc.pa).indexOf(k)>-1); };
+        const jump=x=>{ const t=findC(x); return t?`<a href="#" onclick="openClient('${t.client}','clients');return false"><b>${esc(t.pa)}</b></a>${t.client!==c.client?' <span class="mini">(under '+esc((clientByCode(t.client)||{}).name||t.client)+')</span>':''}`:'<b>'+esc(x)+'</b> <span class="mini">(not in the registry)</span>'; };
         let h='';
         if(src) h+='<div class="kv" style="color:var(--s1);margin-top:4px">⤴ Contract continuity: upgraded from '+jump(src)+'</div>';
         if(tgt) h+='<div class="kv" style="color:var(--s1);margin-top:4px">⤴ Contract continuity: upgraded to '+jump(tgt)+'</div>';
