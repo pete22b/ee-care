@@ -1453,7 +1453,7 @@ let MW=[];   /* marketing team weekly results/pay (mkt_weekly) */
 let MT=[];   /* OPC tour log (mkt_tours) */
 let DL=[];   /* Daily Sale Report — signed deals (sales_deals) */
 Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all', dq:'', dper:'month', dprod:'all'});
-Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all'});
+Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all', cUp:false});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
   const cnt={};
@@ -1827,6 +1827,19 @@ function areaChart(vals,labs){
 
 /* ================= clients ================= */
 function norm(s){ return String(s||'').toLowerCase(); }
+/* ===== upgrade detection + contract chain ===== */
+function upgradeTargetOf(c){ const n=(c&&c.status_note)||''; const m=n.match(/(?:UG|DG|upgrad\w*|downgrad\w*)\s*(?:to|→)?\s*([A-Za-z0-9][A-Za-z0-9.\/\\-]{3,})/i); return m?m[1]:null; }
+function upgradeSourceOf(c){ if(!c) return null; const k=normCno(c.pa); const d=(typeof DL!=='undefined'?DL:[]).find(x=>normCno(x.contract_no)===k && x.upgrade_from); return d?d.upgrade_from:null; }
+function isUpgraded(c){ if(!c) return false;
+  if(/^(Upgraded|Downgraded)$/i.test(c.status||'')) return true;
+  if(/\b(UG|DG)\b|upgrad|downgrad/i.test(c.status_note||'')) return true;
+  const k=normCno(c.pa);
+  if((typeof DL!=='undefined'?DL:[]).some(d=>d.upgrade_from && (normCno(d.contract_no)===k || normCno(d.upgrade_from)===k))) return true;
+  const r=(typeof REC!=='undefined'?REC:[]).find(x=>normCno(x.contract_no)===k);
+  if(r && /\bupgrade\b/i.test((r.sale_type||''))) return true;
+  return false;
+}
+function clientUpgraded(cl){ return (cl.contract_ids||[]).some(id=>isUpgraded(contractById(id))); }
 function searchClients(q){
   q=norm(q.trim());
   if(!q) return [];
@@ -1844,8 +1857,9 @@ function rClients(){
   <h1>Customer</h1>
   <p class="sub">Search by name, email, contract no. (e.g. FR1/1001) or customer code (EE-xxxx)</p>
   <div class="search">
-    <input type="text" id="cq" placeholder="🔍 Type customer name / email / contract no…" value="${esc(S.q)}" autocomplete="off">
+    <input type="text" id="cq" placeholder="🔍 Type customer name / email / contract no… (type &quot;upgraded&quot; to see the upgrade group)" value="${esc(S.q)}" autocomplete="off">
     <select class="flt" onchange="S.cNat=this.value;renderClientResults()">${natOptions(S.cNat)}</select>
+    <button type="button" class="btn ghost${S.cUp?' on':''}" id="cupbtn" onclick="S.cUp=!S.cUp;this.classList.toggle('on',S.cUp);renderClientResults()">⤴ Upgraded only</button>
     <button class="btn sec" onclick="openNewClientModal()">➕ Add a new customer</button>
   </div>
   <div id="cres"></div>`;
@@ -1856,9 +1870,14 @@ function rClients(){
 }
 function renderClientResults(){
   const el=document.getElementById('cres'); if(!el) return;
-  if(!S.q.trim() && S.cNat==='all'){ el.innerHTML='<div class="hint">Type a keyword or choose a nationality — total customers '+allClients().length.toLocaleString()+' customers</div>'; return; }
-  let all = S.q.trim()? searchClients(S.q) : allClients();
+  /* full-word "upgrade"/"upgraded" in the box = show the upgrade group (exact word, not partial) */
+  const qw=S.q.trim().toLowerCase();
+  const upWord = qw==='upgrade'||qw==='upgraded'||qw==='ug';
+  const upOnly = S.cUp || upWord;
+  if(!S.q.trim() && S.cNat==='all' && !upOnly){ el.innerHTML='<div class="hint">Type a keyword or choose a nationality — total customers '+allClients().length.toLocaleString()+' customers</div>'; return; }
+  let all = (S.q.trim() && !upWord)? searchClients(S.q) : allClients();
   if(S.cNat!=='all') all=all.filter(cl=>(cl.nat||'').trim()===S.cNat);
+  if(upOnly) all=all.filter(clientUpgraded);
   const total=all.length;
   const res=all.slice(0,100);
   if(!res.length){ el.innerHTML='<div class="hint">No customers match the selected filters</div>'; return; }
@@ -1871,8 +1890,9 @@ function renderClientResults(){
       let over=0; plans.forEach(c=>{ over+=planTotals(OV.plans[c.id]).over>0?1:0; });
       planTxt = over? '<span class="pill p-over">Has outstanding</span>' : '<span class="pill p-paid">Has a plan '+plans.length+' contract</span>';
     }
-    return `<tr class="click" onclick="openClient('${cl.code}','clients')"><td>${esc(cl.code)}</td><td><b>${esc(cl.name)}</b><br><span class="mini">${esc((cl.emails||[])[0]||'')}</span></td><td>${esc(cl.nat||'')}</td>
-    <td>${cons.map(c=>'<span class="chip">'+esc(c.pa)+'</span>').join('')}</td><td>${planTxt}</td></tr>`; }).join('')}
+    const up=clientUpgraded(cl);
+    return `<tr class="click" onclick="openClient('${cl.code}','clients')"><td>${esc(cl.code)}</td><td><b>${esc(cl.name)}</b>${up?' <span class="pill p-up">⤴ Upgraded</span>':''}<br><span class="mini">${esc((cl.emails||[])[0]||'')}</span></td><td>${esc(cl.nat||'')}</td>
+    <td>${cons.map(c=>'<span class="chip">'+esc(c.pa)+(isUpgraded(c)?' ⤴':'')+'</span>').join('')}</td><td>${planTxt}</td></tr>`; }).join('')}
   </tbody></table></div>${total>100?'<div class="mini" style="margin-top:8px">Found '+total.toLocaleString()+' customers — showing the first 100, type to search and narrow</div>':''}</div>`;
 }
 
@@ -1946,7 +1966,13 @@ function contractCard(c){
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><h4>${esc(c.pa)} <span class="chip">${esc(c.product)}</span>${brandChip(c)}</h4>
       <div class="kv">Contract term <b>${esc(c.term||'-')}</b> · Suite <b>${esc(c.suite||'-')}</b> · Season <b>${esc(c.season||'-')}</b> · contract completed <b>${c.comp_date?fmtD(c.comp_date):'-'}</b> · use-year ${c.fyo||'?'}–${c.lyo||'?'}</div>
-      ${c.status_note?'<div class="mini">'+esc(c.status_note)+'</div>':''}</div>
+      ${c.status_note?'<div class="mini">'+esc(c.status_note)+'</div>':''}
+      ${(()=>{ const tgt=upgradeTargetOf(c), src=upgradeSourceOf(c); const jump=x=>{ const k=normCno(x); const t=allContracts().find(cc=>normCno(cc.pa)===k); return t?`<a href="#" onclick="openClient('${t.client}','clients');return false"><b>${esc(x)}</b></a>`:'<b>'+esc(x)+'</b>'; };
+        let h='';
+        if(src) h+='<div class="kv" style="color:var(--s1);margin-top:4px">⤴ Contract continuity: upgraded from '+jump(src)+'</div>';
+        if(tgt) h+='<div class="kv" style="color:var(--s1);margin-top:4px">⤴ Contract continuity: upgraded to '+jump(tgt)+'</div>';
+        else if(/^(Upgraded|Downgraded)$/i.test(c.status||'')&&!src) h+='<div class="kv" style="color:var(--s1);margin-top:4px">⤴ This contract was upgraded/replaced</div>';
+        return h; })()}</div>
       <div style="text-align:right">${statusPill(c.status)}${caseOf(c.pa)?`<br><button class="btn sm ghost" style="margin-top:6px" onclick="openCase('${esc(c.pa)}')">📁 Case file</button>`:''}</div>
     </div>
     ${1?`<div class="feegrid">${fees.map(f=>`<div class="fy ${f.paid?'paid':'due'}" style="cursor:pointer" title="Click to record/edit payment" onclick="openFeeModal(${c.id},${f.year})"><b>${f.year}</b>${f.amount?'$'+f.amount:''}<br>${f.paid?'Paid':'No record'}</div>`).join('')}<div class="fy" style="cursor:pointer;border-style:dashed" onclick="promptFeeYear(${c.id})"><b>＋</b>Save<br>Other years</div></div>
