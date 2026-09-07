@@ -950,6 +950,13 @@ body:not(.isadmin) .adminonly{display:none!important}
 [data-skin="navy"] .kpirow .card.kpi .l,[data-skin="navy"] .kpirow .card.kpi .m{color:#aab6cf}
 [data-skin="navy"] .kpirow .card.kpi .v{color:#fff}
 </style>
+<style id="modal-read-css">
+/* clearer modal labels/text for readability */
+#modal .form>div>label{color:var(--ink2);font-weight:600}
+#modal .form .kv{color:var(--ink)}
+#modal .mini{color:var(--ink3)}
+[data-skin="navy"] #modal .form>div>label{color:#c3ccdd}
+</style>
 <style id="signout-css">
 .topbar .tb-signout{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink2);cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .topbar .tb-signout:hover{border-color:var(--s8);color:var(--s8)}
@@ -2872,22 +2879,23 @@ function openCase(cno){
   const k=caseCustomer(f); const c=contractByPa(f.contract_no);
   const canEd=(typeof canEdit==='function')?canEdit():true;
   const cats=[...new Set(CASE_CATS.concat(CF.map(caseCat)))].filter(x=>x&&x!=='—').sort((a,b)=>a.localeCompare(b));
-  const pre=t=>t?`<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;background:var(--surface2);border-radius:10px;padding:10px 12px">${esc(t)}</div>`:'<div class="mini">—</div>';
-  openModal(`<h3>📁 Case file ${esc(f.contract_no)}</h3>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">${caseCatPill(caseCat(f))}${f.priority?`<span class="chip">${esc(f.priority)}</span>`:''}<span class="mini">Open case ${f.opened_date?fmtD(f.opened_date.slice(0,10)):'—'} · staff ${esc(f.assigned_to||'—')} · source: file ${esc(Object.keys(f.source_ids||{}).join(', ')||f.source_db||'')}</span></div>
+  const pre=t=>t?`<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.7;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--s1);border-radius:10px;padding:12px 14px">${esc(t)}</div>`:'<div class="mini">—</div>';
+  const hd=t=>`<b style="display:block;color:var(--ink);font-size:13.5px;font-weight:600;margin:2px 0 6px;letter-spacing:.01em">${t}</b>`;
+  openModal(`<h3 style="color:var(--ink)">📁 Case file ${esc(f.contract_no)}</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">${caseCatPill(caseCat(f))}${f.priority?`<span class="chip">${esc(f.priority)}</span>`:''}<span class="mini">Open case ${f.opened_date?fmtD(f.opened_date.slice(0,10)):'—'} · staff ${esc(f.assigned_to||'—')} · source: file ${esc(Object.keys(f.source_ids||{}).join(', ')||f.source_db||'')}</span></div>
   <div class="form">
-    <div class="full"><b style="font-size:13px">Customer</b>${k?`<div class="kv" style="margin-top:4px"><b>${esc(custName(k))}</b>${k.email?' · '+esc(k.email):''}${k.mobile?' · 📱 '+esc(k.mobile):''}<br>${esc([k.address,k.city,k.state,k.zip,k.country].filter(Boolean).join(', '))}${k.notes?'<br><span class="mini">'+esc(k.notes)+'</span>':''}</div>`:'<div class="mini">No contact info</div>'}
+    <div class="full">${hd('Customer')}${k?`<div class="kv" style="margin-top:0;color:var(--ink)"><b style="color:var(--ink)">${esc(custName(k))}</b>${k.email?' · '+esc(k.email):''}${k.mobile?' · 📱 '+esc(k.mobile):''}<br><span style="color:var(--ink2)">${esc([k.address,k.city,k.state,k.zip,k.country].filter(Boolean).join(', '))}</span>${k.notes?'<br><span class="mini">'+esc(k.notes)+'</span>':''}</div>`:'<div class="mini">No contact info</div>'}
       ${c?`<div style="margin-top:6px"><a href="#" onclick="closeModal();openClient('${esc(c.client)}','cases');return false">↗ Open the profile in the registry (${esc(c.product)} · ${esc(c.status||'')})</a></div>`:'<div class="mini" style="margin-top:6px">This contract is not in the Bible registry yet</div>'}</div>
-    <div class="full"><b style="font-size:13px">Deal summary / payment plan (Description)</b>${pre(f.description)}</div>
-    <div class="full"><b style="font-size:13px">Attachment (${(f.attachments||[]).length})</b><div class="mini">${(f.attachments||[]).map(esc).join(' · ')||'—'}</div>
+    <div class="full">${hd('Deal summary / payment plan')}${pre(f.description)}</div>
+    <div class="full">${hd('Attachment ('+(f.attachments||[]).length+')')}<div class="mini">${(f.attachments||[]).map(esc).join(' · ')||'—'}</div>
       ${(f.attachments||[]).length?`<a class="btn sm sec" style="margin-top:6px;display:inline-block" target="_blank" rel="noopener" href="https://drive.google.com/drive/search?q=${encodeURIComponent('"'+f.contract_no.replace(/\//g,'-')+'"')}">📂 Open the contract file in Google Drive</a> <span class="mini">(Google Drive › DB Elite Escape › Contracts › ${esc(f.contract_no.replace(/\//g,'-'))} — requires company Google login and folder permission)</span>`:''}</div>
     ${canEd?`
-    <div><label>Category (Category)</label><select id="cs_cat">${cats.map(x=>`<option ${caseCat(f)===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+    <div><label>Category</label><select id="cs_cat">${cats.map(x=>`<option ${caseCat(f)===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
     <div><label>Priority</label><input type="text" id="cs_pri" value="${esc(f.priority||'')}" placeholder="e.g. (1) Welcome Call"></div>
     <div><label>Supervisor</label><input type="text" id="cs_off" value="${esc(f.assigned_to||'')}"></div>
     <div><label>Due date</label><input type="date" id="cs_due" value="${esc(f.due_date||'')}"></div>
     <div class="full"><label>Follow-up notes (Comments) — append a new line</label><textarea id="cs_com" rows="6" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">${esc(f.comments||'')}</textarea></div>`
-    :`<div class="full"><b style="font-size:13px">Follow-up notes (Comments)</b>${pre(f.comments)}</div>`}
+    :`<div class="full">${hd('Follow-up notes (Comments)')}${pre(f.comments)}</div>`}
   </div>
   <div class="right">${canEd?`<button class="btn ghost" onclick="closeModal()">Close</button><button class="btn" onclick="saveCase('${esc(f.contract_no)}')">💾 Save case file</button>`:`<button class="btn ghost" onclick="closeModal()">Close</button>`}</div>`);
 }
