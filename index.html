@@ -910,13 +910,10 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 /* ===== Department-grouped menu, collapsible ===== */
 nav{gap:0}
 nav .ng{display:flex;flex-direction:column}
-nav .ng .ngi{display:flex;flex-direction:column;gap:3px;padding-bottom:6px}
-nav .ng:not(.open) .ngi{display:none}
-nav .ng>button.navlab{background:none;border:none;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px 16px 5px;margin:8px 0 2px;border-radius:0;box-shadow:none;letter-spacing:.22em}
+nav .ng .ngi{display:flex!important;flex-direction:column;gap:3px;padding-bottom:6px}
+nav .ng>button.navlab{background:none;border:none;width:100%;text-align:left;cursor:default;display:flex;align-items:center;gap:8px;padding:8px 16px 5px;margin:8px 0 2px;border-radius:0;box-shadow:none;letter-spacing:.22em}
 nav .ng>button.navlab::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gc,rgba(255,255,255,.35));flex:0 0 6px}
-nav .ng>button.navlab::after{content:'▾';margin-left:auto;font-size:11px;opacity:.6;transition:transform .15s}
-nav .ng:not(.open)>button.navlab::after{transform:rotate(-90deg)}
-nav .ng>button.navlab:hover{opacity:.95}
+.side{overflow-y:auto}
 [data-skin="bracket"] nav .ng>button.navlab{padding:9px 18px 4px;color:#7d8794}
 [data-skin="bracket"] nav .ng .ngi{gap:0;padding-bottom:2px}
 [data-skin="verde"] nav .ng>button.navlab{color:rgba(255,255,255,.55)}
@@ -1863,18 +1860,11 @@ function setLang(l){ try{ localStorage.setItem('ee_lang',l); }catch(e){} locatio
 function toggleLang(){ setLang(EE_LANG==='th'?'en':'th'); }
 
 /* ===== Grouped menu: collapse/expand, remember state ===== */
-/* ===== เมนูแบบ accordion: เปิดทีละกลุ่ม ลดความรกของเมนู ===== */
-function openOnlyGroup(g){ document.querySelectorAll('nav .ng').forEach(el=>el.classList.toggle('open', el.dataset.g===g)); }
-function toggleGroup(g){ const el=document.querySelector(`nav .ng[data-g="${g}"]`); if(!el) return;
-  const willOpen=!el.classList.contains('open');
-  document.querySelectorAll('nav .ng').forEach(x=>x.classList.remove('open'));
-  if(willOpen) el.classList.add('open');
-  try{ localStorage.setItem('ee_navgroup', willOpen?g:''); }catch(e){} }
-function restoreNavGroups(){ let g=''; try{ g=localStorage.getItem('ee_navgroup')||''; }catch(e){}
-  if(g) openOnlyGroup(g); else document.querySelectorAll('nav .ng').forEach(el=>el.classList.remove('open')); }
-let _lastNavView=null;
-function revealActiveGroup(){ if(typeof S!=='undefined' && S.view===_lastNavView) return; if(typeof S!=='undefined') _lastNavView=S.view;
-  const on=document.querySelector('nav button.on'); const ng=on&&on.closest('.ng'); if(ng){ openOnlyGroup(ng.dataset.g); try{ localStorage.setItem('ee_navgroup',ng.dataset.g); }catch(e){} } }
+/* ===== เมนู: กางทุกกลุ่มค้างไว้ (โชว์ทั้งหมดเหมือนภาพอ้างอิง) ===== */
+function openAllGroups(){ document.querySelectorAll('nav .ng').forEach(el=>el.classList.add('open')); }
+function toggleGroup(){ openAllGroups(); }
+function restoreNavGroups(){ openAllGroups(); }
+function revealActiveGroup(){ openAllGroups(); }
 document.addEventListener('DOMContentLoaded',restoreNavGroups);
 /* ===== top bar + sidebar summary (Bracket skin) ===== */
 function syncTopbar(){
