@@ -663,6 +663,43 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="navy"] .sopdoc{--amber:#e0b04f;--red:#e58a7e;--blue:#7fb0dc;--violet:#b39ad9;--gl:rgba(63,211,200,.16)}
 [data-skin="navy"] .sopdoc .sp-note,[data-skin="navy"] .sm-note{background:#2a2a1f;color:#efe6c4;border-left-color:#e0b04f}
 [data-skin="navy"] ::selection{background:rgba(63,211,200,.3)}
+/* ===== modern UI polish ===== */
+[data-skin="navy"] main{padding:30px 42px 96px}
+[data-skin="navy"] h1{font-size:26px}
+[data-skin="navy"] .sub{font-size:13.5px}
+/* glassy panels & cards: bigger radius, layered soft shadow, smooth motion */
+[data-skin="navy"] .panel{border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 40%),var(--surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 38px -22px rgba(0,0,0,.6);transition:box-shadow .22s ease,transform .22s ease}
+[data-skin="navy"] .card,[data-skin="navy"] .contract-card,[data-skin="navy"] .balance{border-radius:18px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+[data-skin="navy"] .card.kpi{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 45%),var(--surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 12px 30px -20px rgba(0,0,0,.55)}
+[data-skin="navy"] .card.kpi:hover{transform:translateY(-3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 18px 40px -18px rgba(0,0,0,.65);border-color:color-mix(in srgb,var(--s1) 40%,var(--line))}
+/* primary buttons: gradient + lift */
+[data-skin="navy"] .btn{background:linear-gradient(135deg,#57e2d6,#2fb3a9);border-color:transparent;color:#08201e;font-weight:600;box-shadow:0 6px 16px -8px rgba(63,211,200,.55);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+[data-skin="navy"] .btn:hover{transform:translateY(-1px);box-shadow:0 12px 24px -10px rgba(63,211,200,.6);filter:brightness(1.04)}
+[data-skin="navy"] .btn:active{transform:translateY(0)}
+[data-skin="navy"] .btn.ghost{background:var(--surface2);border:1px solid var(--line);color:var(--ink2);box-shadow:none}
+[data-skin="navy"] .btn.ghost:hover{border-color:var(--s1);color:var(--ink);background:color-mix(in srgb,var(--s1) 10%,var(--surface2))}
+[data-skin="navy"] .btn.sec{background:color-mix(in srgb,var(--s1) 16%,var(--surface2));color:var(--s1);border-color:transparent;box-shadow:none}
+[data-skin="navy"] .btn.danger{background:color-mix(in srgb,var(--s8) 14%,var(--surface2));color:var(--s8);border-color:transparent}
+/* nav micro-interaction */
+[data-skin="navy"] nav button[data-v]{transition:background .16s ease,color .16s ease,transform .1s ease;border-radius:12px}
+[data-skin="navy"] nav button[data-v]:active{transform:scale(.985)}
+[data-skin="navy"] nav .ng .ngi{overflow:hidden}
+/* inputs: rounded, soft focus ring */
+[data-skin="navy"] .search input,[data-skin="navy"] input.flt,[data-skin="navy"] select.flt,[data-skin="navy"] .form input,[data-skin="navy"] .form select,[data-skin="navy"] .form textarea{border-radius:12px;background:var(--surface2);border:1px solid var(--line);transition:border-color .15s ease,box-shadow .15s ease}
+[data-skin="navy"] .search input:focus,[data-skin="navy"] input.flt:focus,[data-skin="navy"] select.flt:focus,[data-skin="navy"] .form input:focus,[data-skin="navy"] .form select:focus,[data-skin="navy"] .form textarea:focus{border-color:var(--s1);box-shadow:0 0 0 3px rgba(63,211,200,.16);outline:none}
+/* tables: airier rows, subtle hover */
+[data-skin="navy"] th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border-bottom:1px solid var(--line);padding-top:12px;padding-bottom:10px}
+[data-skin="navy"] td{border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent);padding-top:11px;padding-bottom:11px}
+[data-skin="navy"] tbody tr.click{transition:background .14s ease}
+[data-skin="navy"] tbody tr.click:hover{background:color-mix(in srgb,var(--s1) 8%,transparent)}
+/* pills: pill radius already; add weight */
+[data-skin="navy"] .pill{font-weight:600;letter-spacing:.01em}
+/* modal: rounded, layered shadow, smooth */
+[data-skin="navy"] #modal{border-radius:22px;box-shadow:0 40px 100px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)}
+/* KPI gradient row: modern glass edge */
+[data-skin="navy"] .kpirow .card.kpi{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 34px -22px rgba(0,0,0,.6)}
+/* reduce motion respect */
+@media(prefers-reduced-motion:reduce){[data-skin="navy"] *{transition:none!important}}
 
 </style>
 <style id="skin-bracket">
