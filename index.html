@@ -698,6 +698,18 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 [data-skin="navy"] #modal{border-radius:22px;box-shadow:0 40px 100px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)}
 /* KPI gradient row: modern glass edge */
 [data-skin="navy"] .kpirow .card.kpi{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 34px -22px rgba(0,0,0,.6)}
+/* ===== sidebar: larger readable type + white pill active item (ตามภาพอ้างอิง) ===== */
+[data-skin="navy"] nav{gap:3px;margin-top:16px}
+[data-skin="navy"] nav button[data-v]{font-size:14.5px;font-weight:500;line-height:1.35;padding:11px 15px;color:rgba(255,255,255,.84);border-radius:13px}
+[data-skin="navy"] nav button[data-v]:hover{background:rgba(255,255,255,.09);color:#fff}
+[data-skin="navy"] nav button[data-v].on{background:#ffffff;color:#132445;font-weight:600;box-shadow:0 8px 20px -10px rgba(0,0,0,.5)}
+[data-skin="navy"] nav button[data-v].on::after{display:none}
+[data-skin="navy"] nav button[data-v] .nv{opacity:.9}
+[data-skin="navy"] nav button[data-v].on .nv{color:#132445;opacity:1}
+[data-skin="navy"] nav button[data-v].on .badge{background:#2fb8ae;color:#fff}
+[data-skin="navy"] nav .ng>button.navlab{color:rgba(63,211,200,.92);font-size:10.5px;font-weight:600;letter-spacing:.18em;padding:13px 15px 6px;margin:6px 0 2px}
+[data-skin="navy"] nav .ng>button.navlab::before{background:var(--s1);width:7px;height:7px}
+[data-skin="navy"] nav .ng>button.navlab::after{color:rgba(255,255,255,.5)}
 /* reduce motion respect */
 @media(prefers-reduced-motion:reduce){[data-skin="navy"] *{transition:none!important}}
 
@@ -975,6 +987,16 @@ body:not(.isadmin) .adminonly{display:none!important}
 .sopdoc .sp-toc{top:76px}
 @media(max-width:1100px){.sopdoc .sp-wrap{grid-template-columns:1fr}.sopdoc .sp-toc{position:static;display:flex;flex-wrap:wrap;gap:2px 6px}.sopdoc .sp-toc .sp-kick,.sopdoc .sp-toc .sp-sub{display:none}}
 
+</style>
+<style id="tierseg-css">
+/* customer value-group filter chips */
+.tierseg{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.tierseg button{display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 15px;cursor:pointer;color:var(--ink2);box-shadow:var(--shadow-sm);transition:border-color .15s,background .15s,transform .12s}
+.tierseg button i{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.tierseg button b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.tierseg button:hover{border-color:var(--ink3)}
+.tierseg button:active{transform:scale(.98)}
+.tierseg button.on{border-color:var(--s1);background:color-mix(in srgb,var(--s1) 12%,var(--surface));color:var(--ink)}
 </style>
 <style id="kpirow-css">
 /* Dashboard KPI row: gradient dark -> light across the 4 cards (navy) */
@@ -1505,7 +1527,7 @@ let MW=[];   /* marketing team weekly results/pay (mkt_weekly) */
 let MT=[];   /* OPC tour log (mkt_tours) */
 let DL=[];   /* Daily Sale Report — signed deals (sales_deals) */
 Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all', dq:'', dper:'month', dprod:'all'});
-Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all', cUp:false});
+Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all', cUp:false, tier:''});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
   const cnt={};
@@ -1904,6 +1926,36 @@ function isUpgraded(c){ if(!c) return false;
   return false;
 }
 function clientUpgraded(cl){ return (cl.contract_ids||[]).some(id=>isUpgraded(contractById(id))); }
+/* ===== customer value tiers (for upsell / upgrade targeting) =====
+   prime  = active contract + pays on time  → ready to pitch renewal / upgrade / add-on
+   watch  = active but pays irregularly / has outstanding → collect first, then pitch
+   expired= no active contract (all past LYO or cancelled) → win-back candidate */
+const TIER_DEF={prime:['Prime','Ready to pitch upgrade / add-on','#10b981'],watch:['Active','Pays irregularly · collect first','#e0a23a'],expired:['Expired','Contract ended · win-back','#8a94a0']};
+let _tierCache=null,_tierCounts=null,_tierSig='',_recByCno=null;
+function tierEnsure(){ const sig=allClients().length+'|'+REC.length+'|'+(BASE.cur_year||'');
+  if(_tierSig===sig && _tierCache) return;
+  _tierSig=sig; _recByCno=new Map(); REC.forEach(r=>_recByCno.set(normCno(r.contract_no),r));
+  _tierCache=new Map(); _tierCounts={prime:0,watch:0,expired:0};
+  const cur=BASE.cur_year||Number(TODAY.slice(0,4));
+  allClients().forEach(cl=>{ const t=_computeTier(cl,cur); _tierCache.set(cl.code,t); _tierCounts[t]++; }); }
+function _computeTier(cl,cur){
+  const cons=(cl.contract_ids||[]).map(id=>contractById(id)).filter(Boolean);
+  if(!cons.length) return 'expired';
+  const active=cons.filter(c=>!/cancel|canx|cxl/i.test(c.status||'') && (c.lyo==null||c.lyo>=cur));
+  if(!active.length) return 'expired';
+  let dueY=0,unpaidY=0,arOwe=0;
+  active.forEach(c=>{
+    (c.fees||[]).forEach(f=>{ if(f.year<=cur && f.year>=cur-3){ dueY++; if(!f.paid) unpaidY++; } });
+    const r=_recByCno.get(normCno(c.pa)); if(r && (r.currency||'USD')!=='THB' && recStatus(r)==='owing') arOwe+=(r.balance||0);
+  });
+  const miss=dueY?unpaidY/dueY:0;
+  if((unpaidY>=2 && miss>=0.4) || arOwe>1500) return 'watch';
+  return 'prime';
+}
+function custTier(cl){ tierEnsure(); return _tierCache.get(cl.code)||'expired'; }
+function tierCounts(){ tierEnsure(); return _tierCounts; }
+function tierPill(t){ const d=TIER_DEF[t]||TIER_DEF.expired; return `<span class="pill" style="background:color-mix(in srgb,${d[2]} 18%,transparent);color:${d[2]}">${d[0]}</span>`; }
+function toggleTier(t){ S.tier=(S.tier===t?'':t); renderClientResults(); }
 function searchClients(q){
   q=norm(q.trim());
   if(!q) return [];
@@ -1926,6 +1978,11 @@ function rClients(){
     <button type="button" class="btn ghost${S.cUp?' on':''}" id="cupbtn" onclick="S.cUp=!S.cUp;this.classList.toggle('on',S.cUp);renderClientResults()">⤴ Upgraded only</button>
     <button class="btn sec" onclick="openNewClientModal()">➕ Add a new customer</button>
   </div>
+  <div class="tierseg" id="tierseg">
+    <button type="button" data-tier="prime" onclick="toggleTier('prime')"><i style="background:#10b981"></i>Prime · ready to pitch <b id="tc-prime">–</b></button>
+    <button type="button" data-tier="watch" onclick="toggleTier('watch')"><i style="background:#e0a23a"></i>Active · pays irregularly <b id="tc-watch">–</b></button>
+    <button type="button" data-tier="expired" onclick="toggleTier('expired')"><i style="background:#8a94a0"></i>Expired · win-back <b id="tc-expired">–</b></button>
+  </div>
   <div id="cres"></div>`;
   const inp=document.getElementById('cq');
   inp.oninput=()=>{ S.q=inp.value; renderClientResults(); };
@@ -1938,10 +1995,13 @@ function renderClientResults(){
   const qw=S.q.trim().toLowerCase();
   const upWord = qw==='upgrade'||qw==='upgraded'||qw==='ug';
   const upOnly = S.cUp || upWord;
-  if(!S.q.trim() && S.cNat==='all' && !upOnly){ el.innerHTML='<div class="hint">Type a keyword or choose a nationality — total customers '+allClients().length.toLocaleString()+' customers</div>'; return; }
+  /* tier chip counts + active state */
+  const tcs=tierCounts(); ['prime','watch','expired'].forEach(t=>{ const b=document.getElementById('tc-'+t); if(b) b.textContent=tcs[t].toLocaleString(); const btn=document.querySelector(`#tierseg button[data-tier="${t}"]`); if(btn) btn.classList.toggle('on',S.tier===t); });
+  if(!S.q.trim() && S.cNat==='all' && !upOnly && !S.tier){ el.innerHTML='<div class="hint">Type a keyword, choose a nationality, or pick a value group above — total customers '+allClients().length.toLocaleString()+' customers</div>'; return; }
   let all = (S.q.trim() && !upWord)? searchClients(S.q) : allClients();
   if(S.cNat!=='all') all=all.filter(cl=>(cl.nat||'').trim()===S.cNat);
   if(upOnly) all=all.filter(clientUpgraded);
+  if(S.tier) all=all.filter(cl=>custTier(cl)===S.tier);
   const total=all.length;
   const res=all.slice(0,100);
   if(!res.length){ el.innerHTML='<div class="hint">No customers match the selected filters</div>'; return; }
@@ -1954,10 +2014,10 @@ function renderClientResults(){
       let over=0; plans.forEach(c=>{ over+=planTotals(OV.plans[c.id]).over>0?1:0; });
       planTxt = over? '<span class="pill p-over">Has outstanding</span>' : '<span class="pill p-paid">Has a plan '+plans.length+' contract</span>';
     }
-    const up=clientUpgraded(cl);
-    return `<tr class="click" onclick="openClient('${cl.code}','clients')"><td>${esc(cl.code)}</td><td><b>${esc(cl.name)}</b>${up?' <span class="pill p-up">⤴ Upgraded</span>':''}<br><span class="mini">${esc((cl.emails||[])[0]||'')}</span></td><td>${esc(cl.nat||'')}</td>
+    const up=clientUpgraded(cl); const tr=custTier(cl);
+    return `<tr class="click" onclick="openClient('${cl.code}','clients')"><td>${esc(cl.code)}</td><td><b>${esc(cl.name)}</b> ${tierPill(tr)}${up?' <span class="pill p-up">⤴ Upgraded</span>':''}<br><span class="mini">${esc((cl.emails||[])[0]||'')}</span></td><td>${esc(cl.nat||'')}</td>
     <td>${cons.map(c=>'<span class="chip">'+esc(c.pa)+(isUpgraded(c)?' ⤴':'')+'</span>').join('')}</td><td>${planTxt}</td></tr>`; }).join('')}
-  </tbody></table></div>${total>100?'<div class="mini" style="margin-top:8px">Found '+total.toLocaleString()+' customers — showing the first 100, type to search and narrow</div>':''}</div>`;
+  </tbody></table></div>${total>100?'<div class="mini" style="margin-top:8px">Found '+total.toLocaleString()+' customers — showing the first 100, narrow with search or filters</div>':'<div class="mini" style="margin-top:8px">'+total.toLocaleString()+' customers'+(S.tier?(' in group '+TIER_DEF[S.tier][0]+' — '+TIER_DEF[S.tier][1]):'')+'</div>'}</div>`;
 }
 
 /* ================= client profile ================= */
