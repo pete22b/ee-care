@@ -699,15 +699,19 @@ nav button .nv{display:none;width:17px;height:17px;margin-right:12px;vertical-al
 /* KPI gradient row: modern glass edge */
 [data-skin="navy"] .kpirow .card.kpi{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 34px -22px rgba(0,0,0,.6)}
 /* ===== sidebar: larger readable type + white pill active item (ตามภาพอ้างอิง) ===== */
-[data-skin="navy"] nav{gap:3px;margin-top:16px}
-[data-skin="navy"] nav button[data-v]{font-size:14.5px;font-weight:500;line-height:1.35;padding:11px 15px;color:rgba(255,255,255,.84);border-radius:13px}
-[data-skin="navy"] nav button[data-v]:hover{background:rgba(255,255,255,.09);color:#fff}
-[data-skin="navy"] nav button[data-v].on{background:#ffffff;color:#132445;font-weight:600;box-shadow:0 8px 20px -10px rgba(0,0,0,.5)}
+[data-skin="navy"] nav{gap:3px;margin-top:14px}
+[data-skin="navy"] nav button[data-v]{color:rgba(255,255,255,.88);border-radius:14px}
+[data-skin="navy"] nav button[data-v] .nt{font-size:15.5px}
+[data-skin="navy"] nav button[data-v] .nsub{color:rgba(255,255,255,.55);opacity:1}
+[data-skin="navy"] nav button[data-v]:hover{background:rgba(255,255,255,.10);color:#fff}
+[data-skin="navy"] nav button[data-v].on{background:#ffffff;box-shadow:0 8px 22px -10px rgba(0,0,0,.55)}
+[data-skin="navy"] nav button[data-v].on .nt{color:#132445}
+[data-skin="navy"] nav button[data-v].on .nsub{color:#5a6a86}
 [data-skin="navy"] nav button[data-v].on::after{display:none}
-[data-skin="navy"] nav button[data-v] .nv{opacity:.9}
-[data-skin="navy"] nav button[data-v].on .nv{color:#132445;opacity:1}
+[data-skin="navy"] nav button[data-v] .nv{opacity:.85}
+[data-skin="navy"] nav button[data-v].on .nv{color:#2fb8ae;opacity:1}
 [data-skin="navy"] nav button[data-v].on .badge{background:#2fb8ae;color:#fff}
-[data-skin="navy"] nav .ng>button.navlab{color:rgba(63,211,200,.92);font-size:10.5px;font-weight:600;letter-spacing:.18em;padding:13px 15px 6px;margin:6px 0 2px}
+[data-skin="navy"] nav .ng>button.navlab{color:rgba(63,211,200,.95);font-size:11px;font-weight:600;letter-spacing:.16em;padding:14px 15px 6px;margin:6px 0 2px}
 [data-skin="navy"] nav .ng>button.navlab::before{background:var(--s1);width:7px;height:7px}
 [data-skin="navy"] nav .ng>button.navlab::after{color:rgba(255,255,255,.5)}
 /* reduce motion respect */
@@ -918,6 +922,14 @@ nav .ng>button.navlab:hover{opacity:.95}
 [data-skin="verde"] nav .ng>button.navlab{color:rgba(255,255,255,.55)}
 [data-skin="apex"] nav .ng>button.navlab{color:var(--ink3)}
 @media(max-width:840px){nav .ng{flex:1 1 100%} nav .ng .ngi{flex-direction:row;flex-wrap:wrap}}
+/* ===== larger, readable 2-line menu items (like reference) — all skins ===== */
+nav button[data-v]{display:flex;align-items:center;gap:12px;padding:11px 15px;line-height:1.2}
+nav button[data-v] .nv{flex:0 0 18px;display:inline-flex}
+nav .ntxt{display:flex;flex-direction:column;min-width:0;flex:1}
+nav .nt{font-size:15px;font-weight:600;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav .nsub{font-size:10.5px;font-weight:400;opacity:.6;margin-top:2px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav .ng>button.navlab{font-size:11px;letter-spacing:.14em;padding:12px 15px 6px;margin:8px 0 3px;text-transform:uppercase}
+nav button[data-v] .badge{margin-left:auto}
 </style>
 <style id="dsr-css">
 /* ===== Daily Sales on the dashboard ===== */
@@ -1820,7 +1832,13 @@ function runCounters(){
 const SKINS=[['navy','Deep navy theme (Navy)'],['verde','Green theme (Verde)'],['bracket','Flat admin theme (Bracket)'],['apex','Dark theme (Apex)'],['classic','Original theme (Classic)']];
 function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElement.dataset.skin); const nx=SKINS[(i+1)%SKINS.length]; document.documentElement.dataset.skin=nx[0]; try{ localStorage.setItem('ee_skin',nx[0]); }catch(e){} toast(nx[1]); }
 const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4'};
-function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.querySelector('.nv')) return; const p=NAV_ICONS[b.dataset.v]; if(!p) return; b.insertAdjacentHTML('afterbegin',`<i class="nv"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`); }); }
+const NAV_SUB={dash:'Overview & KPIs',todo:'Follow-up tasks',mkt:'OPC tours · Friday pay',deals:'Close deal · contract no.',comm:'Sales commission',bible:'Contract registry',cases:'Welcome call · files',recv:'Accounts receivable',ar:'Maintenance fee due',payouts:'Fractional pay-back',clients:'Members · value tiers',weeks:'Stay usage',interval:"Interval Int'l",renew:'Expiring contracts',sop:'Who does what',backup:'Users · activity · export',sysmap:'Data flow (admin)'};
+function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.dataset.dec) return; b.dataset.dec='1';
+  const v=b.dataset.v; const p=NAV_ICONS[v]; const badge=b.querySelector('.badge');
+  let label=''; b.childNodes.forEach(n=>{ if(n.nodeType===3) label+=n.textContent; }); label=(label.trim()||b.textContent.trim());
+  const sub=NAV_SUB[v]||'';
+  b.innerHTML=(p?`<i class="nv"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg></i>`:'')+`<span class="ntxt"><span class="nt">${esc(label)}</span>${sub?`<small class="nsub">${esc(sub)}</small>`:''}</span>`+(badge?badge.outerHTML:'');
+}); }
 document.addEventListener('DOMContentLoaded',decorateNav);
 
 /* ===== TH/EN language toggle (runtime) ===== */
@@ -1862,7 +1880,7 @@ document.addEventListener('DOMContentLoaded',restoreNavGroups);
 function syncTopbar(){
   const g=id=>document.getElementById(id); if(!g('topbar')) return;
   const onBtn=document.querySelector('nav button.on'); const crumb=g('tb-crumb');
-  if(crumb) crumb.textContent = S.view==='client' ? 'Customer / profile' : (onBtn ? onBtn.textContent.replace(/\d+\s*$/,'').trim() : 'Dashboard');
+  if(crumb) crumb.textContent = S.view==='client' ? 'Customer / profile' : (onBtn ? ((onBtn.querySelector('.nt')?onBtn.querySelector('.nt').textContent:onBtn.textContent).replace(/\d+\s*$/,'').trim()) : 'Dashboard');
   const nb=document.querySelector('nav button[data-v="todo"] .badge'); const tb=g('tb-badge');
   if(tb){ if(nb&&nb.textContent.trim()){ tb.textContent=nb.textContent.trim(); tb.classList.remove('hide'); } else tb.classList.add('hide'); }
   const u=(typeof USER!=='undefined'&&USER&&USER.email&&USER.email!=='team')?USER:null;
