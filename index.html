@@ -1018,6 +1018,25 @@ body:not(.isadmin) .adminonly{display:none!important}
 @media(max-width:1100px){.sopdoc .sp-wrap{grid-template-columns:1fr}.sopdoc .sp-toc{position:static;display:flex;flex-wrap:wrap;gap:2px 6px}.sopdoc .sp-toc .sp-kick,.sopdoc .sp-toc .sp-sub{display:none}}
 
 </style>
+<style id="owner-css">
+/* Owner / CFO dashboard */
+.otabs{margin:0 0 16px}
+.okpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-bottom:6px}
+.okpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px 12px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:4px;transition:transform .16s,box-shadow .16s;position:relative;overflow:hidden}
+.okpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ink3);opacity:.5}
+.okpi.g::before{background:#10b981;opacity:1}.okpi.y::before{background:#e0a23a;opacity:1}.okpi.r::before{background:#e0533f;opacity:1}
+.okpi:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(0,0,0,.45)}
+.okpi .ok-l{font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.02em}
+.okpi .ok-v{font-size:24px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.okpi .ok-s{font-size:11.5px;color:var(--ink2)}
+.oalert{display:flex;gap:8px;align-items:flex-start;padding:9px 12px;border-radius:10px;margin-top:8px;font-size:13px;background:var(--surface2);border:1px solid var(--line);color:var(--ink)}
+.oalert.r{border-color:color-mix(in srgb,#e0533f 45%,var(--line));background:color-mix(in srgb,#e0533f 10%,var(--surface2))}
+.oalert.y{border-color:color-mix(in srgb,#e0a23a 45%,var(--line));background:color-mix(in srgb,#e0a23a 10%,var(--surface2))}
+.oalert.g{border-color:color-mix(in srgb,#10b981 45%,var(--line));background:color-mix(in srgb,#10b981 10%,var(--surface2))}
+.ochk{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line);font-size:13.5px}
+.ochk:last-of-type{border-bottom:none}
+.ochk.no span:nth-child(2){color:var(--ink2)}
+</style>
 <style id="herohead-css">
 /* dashboard header: title left, live/date meta top-right (all skins) */
 .subhide{display:none}
@@ -1161,6 +1180,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     </div></div>
     <div class="ng open" data-g="it" style="--gc:#9aa5b1"><button type="button" class="navlab" onclick="toggleGroup('it')">System</button><div class="ngi">
     <button data-v="sop">SOP guide</button>
+    <button data-v="owner">Owner Dashboard</button>
     <button data-v="backup" class="adminonly">Central Data</button>
     <button data-v="sysmap" class="adminonly">System map</button>
     </div></div>
@@ -1613,6 +1633,7 @@ function render(){
   if(S.view==='backup') return rBackup();
   if(S.view==='sysmap') return rSysmap();
   if(S.view==='sop') return rSop();
+  if(S.view==='owner') return rOwner();
 }
 
 /* ================= dashboard ================= */
@@ -1865,7 +1886,7 @@ function runCounters(){
 }
 const SKINS=[['navy','Deep navy theme (Navy)'],['verde','Green theme (Verde)'],['bracket','Flat admin theme (Bracket)'],['apex','Dark theme (Apex)'],['classic','Original theme (Classic)']];
 function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElement.dataset.skin); const nx=SKINS[(i+1)%SKINS.length]; document.documentElement.dataset.skin=nx[0]; try{ localStorage.setItem('ee_skin',nx[0]); }catch(e){} toast(nx[1]); }
-const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4'};
+const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4',owner:'M3 3v18h18M7 14l4-4 4 3 5-6M17 3h4v4'};
 const NAV_SUB={dash:'Overview & KPIs',todo:'Follow-up tasks',mkt:'OPC tours · Friday pay',deals:'Close deal · contract no.',comm:'Sales commission',bible:'Contract registry',cases:'Welcome call · files',recv:'Accounts receivable',ar:'Maintenance fee due',payouts:'Fractional pay-back',clients:'Members · value tiers',weeks:'Stay usage',interval:"Interval Int'l",renew:'Expiring contracts',sop:'Who does what',backup:'Users · activity · export',sysmap:'Data flow (admin)'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.dataset.dec) return; b.dataset.dec='1';
   const v=b.dataset.v; const p=NAV_ICONS[v]; const badge=b.querySelector('.badge');
@@ -3686,6 +3707,175 @@ function exportBibleCSV(){
 
 /* ================= backup ================= */
 /* ================= SOP guide ================= */
+/* ================= Owner / CFO Dashboard (adapted from hotel CFO spec — only what our data supports) ================= */
+Object.assign(S,{otab:'exec'});
+function oLight(actual,ref){ if(ref==null||!ref) return 'na'; const r=actual/ref; return r>=1?'g':(r>=0.9?'y':'r'); }
+function oLightIco(l){ return l==='g'?'🟢':l==='y'?'🟡':l==='r'?'🔴':'⚪'; }
+function oPct(a,b){ return b?Math.round(a/b*100):0; }
+function oDays(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function ownerStats(){
+  const cur=BASE.cur_year||Number(TODAY.slice(0,4)), ly=cur-1, mon=TODAY.slice(0,7);
+  const yOf=d=>(d||'').slice(0,4);
+  const recUSD=REC.filter(r=>(r.currency||'USD')!=='THB' && recStatus(r)!=='cancel');
+  const salesY=y=>recUSD.filter(r=>yOf(r.contract_date)===String(y));
+  const sumP=a=>a.reduce((s,r)=>s+(r.price||0),0), sumN=a=>a.reduce((s,r)=>s+((r.deal_nett!=null?r.deal_nett:r.price)||0),0);
+  const sCur=salesY(cur), sLY=salesY(ly);
+  const dCur=DL.filter(d=>yOf(d.deal_date)===String(cur)&&!/cancel|cxl|canx/i.test(d.status||''));
+  let feeDue=0,feePaid=0,feeDueLY=0,feePaidLY=0,feeUnpaidAmt=0,feePaidAmt=0;
+  allContracts().forEach(c=>{ if(/cancel/i.test(c.status||'')) return; (c.fees||[]).forEach(f=>{ if(f.year===cur){ feeDue++; if(f.paid){ feePaid++; feePaidAmt+=(f.amount||0); } else feeUnpaidAmt+=(f.amount||0); } if(f.year===ly){ feeDueLY++; if(f.paid) feePaidLY++; } }); });
+  const owing=recUSD.filter(r=>recStatus(r)==='owing'); const arBal=owing.reduce((s,r)=>s+(r.balance||0),0);
+  const lastPay={}; RP.forEach(p=>{ const k=normCno(p.contract_no); if(p.paid_date && (!lastPay[k]||p.paid_date>lastPay[k])) lastPay[k]=p.paid_date; });
+  const aging={b0:0,b31:0,b61:0,b90:0,n0:0,n31:0,n61:0,n90:0,list90:[]};
+  owing.forEach(r=>{ const k=normCno(r.contract_no); const ref=lastPay[k]||r.contract_date; if(!ref) return; const d=oDays(String(ref).slice(0,10),TODAY); const b=r.balance||0; if(isNaN(d)) return;
+    if(d<=30){aging.b0+=b;aging.n0++;} else if(d<=60){aging.b31+=b;aging.n31++;} else if(d<=90){aging.b61+=b;aging.n61++;} else {aging.b90+=b;aging.n90++;aging.list90.push({r,d});} });
+  aging.list90.sort((a,b)=>b.r.balance-a.r.balance);
+  const fc={d7:0,d30:0,d90:0,n7:0,n30:0,n90:0};
+  DL.forEach(d=>{ if(!d.first_due||!d.instalments||!d.instalment_amount) return; for(let i=0;i<d.instalments;i++){ const due=addMonthsISO(d.first_due,i); const dd=oDays(TODAY,due); if(dd<0) continue; if(dd<=7){fc.d7+=d.instalment_amount;fc.n7++;} if(dd<=30){fc.d30+=d.instalment_amount;fc.n30++;} if(dd<=90){fc.d90+=d.instalment_amount;fc.n90++;} } });
+  const act=allContracts().filter(c=>!/cancel/i.test(c.status||'')&&(c.lyo==null||c.lyo>=cur)).length;
+  const exp5=allContracts().filter(c=>!/cancel/i.test(c.status||'')&&c.lyo>=cur&&c.lyo<=cur+4).length;
+  const tiers=tierCounts();
+  const toursMonth=MT.filter(t=>(t.tour_date||'').slice(0,7)===mon);
+  const opcMonth=toursMonth.reduce((s,t)=>s+(t.pay_total||0),0);
+  const toursShowed=toursMonth.filter(t=>t.showed).length, toursDeal=toursMonth.filter(t=>t.deal).length, toursQ=toursMonth.filter(t=>/^Q/.test(t.qualify||'')).length;
+  const curP=CP.slice().sort((a,b)=>a.period<b.period?1:-1)[0]; const commCur=curP?CL.filter(l=>l.period===curP.period).reduce((s,l)=>s+commToPay(l),0):0;
+  const dMon=dCur.filter(d=>(d.deal_date||'').slice(0,7)===mon);
+  const giftMonth=dMon.reduce((s,d)=>s+(d.deductions_usd||0),0), nettMonth=dMon.reduce((s,d)=>s+(d.deal_nett||0),0), grossMonth=dMon.reduce((s,d)=>s+(d.purchase_price||0),0);
+  const upg=allContracts().filter(isUpgraded).length;
+  const cashYTD=RP.filter(p=>yOf(p.paid_date)===String(cur)&&(p.kind||'payment')==='payment').reduce((s,p)=>s+(p.amount||0),0);
+  const cashLY=RP.filter(p=>yOf(p.paid_date)===String(ly)&&(p.kind||'payment')==='payment').reduce((s,p)=>s+(p.amount||0),0);
+  return {cur,ly,mon,sCur,sLY,salesCur:sumP(sCur),salesLY:sumP(sLY),nettCur:sumN(sCur),nettLY:sumN(sLY),dCur,dMon,feeDue,feePaid,feeDueLY,feePaidLY,feeUnpaidAmt,feePaidAmt,arBal,owingN:owing.length,aging,fc,act,exp5,tiers,opcMonth,toursMonth:toursMonth.length,toursShowed,toursDeal,toursQ,commCur,curP,giftMonth,nettMonth,grossMonth,upg,cashYTD,cashLY};
+}
+function ownerGroup(keyFn){ const cur=String(BASE.cur_year||TODAY.slice(0,4)); const rows={};
+  REC.filter(r=>(r.currency||'USD')!=='THB'&&recStatus(r)!=='cancel'&&(r.contract_date||'').slice(0,4)===cur).forEach(r=>{ const k=keyFn(r)||'Unknown'; const o=rows[k]=rows[k]||{n:0,price:0,nett:0,bal:0}; o.n++; o.price+=(r.price||0); o.nett+=((r.deal_nett!=null?r.deal_nett:r.price)||0); o.bal+=(recStatus(r)==='owing'?(r.balance||0):0); });
+  return Object.entries(rows).sort((a,b)=>b[1].nett-a[1].nett); }
+function ownerFlash(){ const y=addDaysISO(TODAY,-1); const t=MT.filter(x=>x.tour_date===y), d=DL.filter(x=>x.deal_date===y&&!/cancel/i.test(x.status||''));
+  const cash=RP.filter(p=>p.paid_date===y&&(p.kind||'payment')==='payment').reduce((s,p)=>s+(p.amount||0),0);
+  let fee=0; allContracts().forEach(c=>(c.fees||[]).forEach(f=>{ if(f.paid&&f.paid_date===y) fee++; }));
+  return {y,tours:t.length,q:t.filter(x=>/^Q/.test(x.qualify||'')).length,showed:t.filter(x=>x.showed).length,deals:d.length,gross:d.reduce((s,x)=>s+(x.purchase_price||0),0),nett:d.reduce((s,x)=>s+(x.deal_nett||0),0),cash,fee,opc:t.reduce((s,x)=>s+(x.pay_total||0),0)}; }
+function ownerAlerts(st){ const a=[];
+  if(st.aging.n90) a.push(['r',`${st.aging.n90.toLocaleString()} receivables with no payment for >90 days · ${usd(st.aging.b90)} outstanding`,'recv']);
+  const unpaid=st.feeDue-st.feePaid; if(unpaid) a.push([unpaid/Math.max(1,st.feeDue)>0.3?'r':'y',`${unpaid.toLocaleString()} maintenance fees for ${st.cur} not recorded as paid (${100-oPct(st.feePaid,st.feeDue)}% of due)`,'ar']);
+  const noRes=MT.filter(t=>!t.qualify&&t.tour_date&&t.tour_date<TODAY).length; if(noRes) a.push(['y',`${noRes} tours still without a qualification result`,'mkt']);
+  const noCno=DL.filter(d=>!d.contract_no).length; if(noCno) a.push(['r',`${noCno} deals without a contract number`,'deals']);
+  const wc=CF.filter(f=>/welcome/i.test(f.category||'')&&!/complete/i.test((f.status||'')+' '+(f.category||''))).length; if(wc) a.push(['y',`${wc.toLocaleString()} case files still at Welcome-call stage`,'cases']);
+  if(st.salesLY&&st.salesCur<st.salesLY*0.9) a.push(['r',`Sales ${st.cur} (${usd(st.salesCur)}) are ${100-oPct(st.salesCur,st.salesLY)}% below ${st.ly} (${usd(st.salesLY)})`,'owner']);
+  if(st.tiers.watch) a.push(['y',`${st.tiers.watch.toLocaleString()} active members pay irregularly — collect before pitching upgrades`,'clients']);
+  if(!a.length) a.push(['g','No alerts — all indicators within range','']);
+  return a; }
+function ownerClosing(st){ const mon=st.mon; const dM=DL.filter(d=>(d.deal_date||'').slice(0,7)===mon);
+  return [
+   ['All deals this month have a contract number', dM.length===0||dM.every(d=>d.contract_no), dM.length+' deals'],
+   ['Receipts recorded in the ledger this month', RP.some(p=>(p.paid_date||'').slice(0,7)===mon), RP.filter(p=>(p.paid_date||'').slice(0,7)===mon).length+' receipts'],
+   ['Commission cycle exists for the latest 15-day period', !!st.curP, st.curP?commPeriodLabel(st.curP):'none'],
+   [`Maintenance fee ${st.cur} recorded for most due contracts`, st.feeDue>0&&st.feePaid/st.feeDue>=0.5, oPct(st.feePaid,st.feeDue)+'% recorded'],
+   ['No receivable left unpaid >90 days without follow-up', st.aging.n90===0, st.aging.n90+' contracts'],
+   ['Welcome calls completed for all new case files', CF.filter(f=>/welcome/i.test(f.category||'')&&!/complete/i.test((f.status||'')+' '+(f.category||''))).length===0, 'see Case files'],
+   ['OPC Friday pay slips issued for tours this month', st.toursMonth===0||st.toursShowed>0, st.toursMonth+' tours']
+  ]; }
+function oKpi(label,val,sub,light,view){ return `<div class="okpi ${light||'na'}" ${view?`onclick="go('${view}')" style="cursor:pointer"`:''}><div class="ok-l">${label}</div><div class="ok-v">${val}</div><div class="ok-s">${oLightIco(light)} ${sub||''}</div></div>`; }
+function rOwner(){
+  const st=ownerStats(); const tabs=[['exec','Executive'],['sales','Sales & Members'],['ar','AR Aging & Cash'],['channel','Channels'],['contrib','Contribution & Alerts'],['flash','Daily Flash & Month-end']];
+  const T=S.otab;
+  let body='';
+  if(T==='exec'){
+    body=`<div class="okpis">
+      ${oKpi('Total sales '+st.cur,usd(st.salesCur),'LY '+usd(st.salesLY),oLight(st.salesCur,st.salesLY),'recv')}
+      ${oKpi('Deal Nett '+st.cur,usd(st.nettCur),'LY '+usd(st.nettLY),oLight(st.nettCur,st.nettLY),'deals')}
+      ${oKpi('Cash received '+st.cur,usd(st.cashYTD),'LY '+usd(st.cashLY),oLight(st.cashYTD,st.cashLY),'recv')}
+      ${oKpi('MFEE collection '+st.cur,oPct(st.feePaid,st.feeDue)+'%',st.feePaid.toLocaleString()+' / '+st.feeDue.toLocaleString()+' · LY '+oPct(st.feePaidLY,st.feeDueLY)+'%',oLight(oPct(st.feePaid,st.feeDue),oPct(st.feePaidLY,st.feeDueLY)),'ar')}
+      ${oKpi('AR outstanding',usd(st.arBal),st.owingN.toLocaleString()+' contracts owing',st.aging.n90?'r':'g','recv')}
+      ${oKpi('AR >90 days',usd(st.aging.b90),st.aging.n90.toLocaleString()+' contracts',st.aging.n90?'r':'g','owner')}
+      ${oKpi('Active members',st.act.toLocaleString(),'Prime '+st.tiers.prime.toLocaleString()+' · Watch '+st.tiers.watch.toLocaleString(),'na','clients')}
+      ${oKpi('Expiring '+st.cur+'–'+(st.cur+4),st.exp5.toLocaleString(),'renewal / upgrade pipeline','na','renew')}
+      ${oKpi('Tours → deals (month)',st.toursMonth?oPct(st.toursDeal,st.toursMonth)+'%':'—',st.toursDeal+' deals / '+st.toursMonth+' tours · Q '+st.toursQ,'na','mkt')}
+      ${oKpi('Sales & marketing cost (month)',usd(st.commCur+st.opcMonth+st.giftMonth),'comm '+usd(st.commCur)+' · OPC '+usd(st.opcMonth)+' · gifts '+usd(st.giftMonth),'na','comm')}
+      ${oKpi('Sales contribution (month)',usd(st.nettMonth-st.commCur-st.opcMonth-st.giftMonth),'Deal Nett '+usd(st.nettMonth)+' − costs',st.nettMonth?oLight(st.nettMonth-st.commCur-st.opcMonth-st.giftMonth,st.nettMonth*0.5):'na','deals')}
+      ${oKpi('Cash-in forecast 30d',usd(st.fc.d30+st.feeUnpaidAmt),'instalments '+usd(st.fc.d30)+' · MFEE due '+usd(st.feeUnpaidAmt),'na','owner')}
+    </div>
+    <div class="mini" style="margin-top:8px">🟢 at/above last year · 🟡 within 10% · 🔴 more than 10% below · ⚪ no comparison. Budget comparison needs a budget table — not set up yet, so last year is the reference.</div>`;
+  } else if(T==='sales'){
+    const byProd=ownerGroup(r=>r.product||'—'); const byMon={}; st.sCur.forEach(r=>{ const m=(r.contract_date||'').slice(0,7); const o=byMon[m]=byMon[m]||{n:0,p:0}; o.n++; o.p+=(r.price||0); }); const months=Object.keys(byMon).sort(); const mx=Math.max(1,...months.map(m=>byMon[m].p));
+    body=`<div class="row2"><div class="panel"><h3><span class="idx">01</span>Sales by month ${st.cur}</h3><div class="cs">Contract value from the receivables ledger (USD)</div>
+      ${months.length?months.map(m=>`<div class="stack"><span>${m}</span><span class="tr"><i style="width:${byMon[m].p/mx*100}%;background:var(--s1)"></i></span><span class="rt"><b>${usd(byMon[m].p)}</b> · ${byMon[m].n}</span></div>`).join(''):'<div class="mini">No sales dated '+st.cur+' yet</div>'}</div>
+      <div class="panel"><h3><span class="idx">02</span>Member KPIs</h3>
+      <table><tbody>
+      <tr><td>Active contracts</td><td class="n"><b>${st.act.toLocaleString()}</b></td></tr>
+      <tr><td>Average contract value ${st.cur}</td><td class="n"><b>${st.sCur.length?usd(st.salesCur/st.sCur.length):'—'}</b></td></tr>
+      <tr><td>Revenue per active member ${st.cur}</td><td class="n"><b>${st.act?usd((st.salesCur+st.feePaidAmt)/st.act):'—'}</b></td></tr>
+      <tr><td>Upgraded contracts (all time)</td><td class="n"><b>${st.upg.toLocaleString()}</b> · ${oPct(st.upg,allContracts().length)}%</td></tr>
+      <tr><td>Weeks used this year (stays)</td><td class="n"><b>${WU.filter(w=>String(w.use_year)===String(st.cur)).length.toLocaleString()}</b></td></tr>
+      <tr><td>Value groups</td><td class="n">Prime <b>${st.tiers.prime.toLocaleString()}</b> · Active <b>${st.tiers.watch.toLocaleString()}</b> · Expired <b>${st.tiers.expired.toLocaleString()}</b></td></tr>
+      </tbody></table></div></div>
+      <div class="panel" style="margin-top:14px"><h3><span class="idx">03</span>Sales by product ${st.cur}</h3><div class="scroll"><table><thead><tr><th>Product</th><th class="n">Contracts</th><th class="n">Sales</th><th class="n">Deal Nett</th><th class="n">Outstanding</th></tr></thead><tbody>
+      ${byProd.map(([k,o])=>`<tr><td><b>${esc(k)}</b></td><td class="n">${o.n}</td><td class="n">${usd(o.price)}</td><td class="n">${usd(o.nett)}</td><td class="n">${usd(o.bal)}</td></tr>`).join('')||'<tr><td colspan="5" class="mini">No data</td></tr>'}</tbody></table></div></div>`;
+  } else if(T==='ar'){
+    const A=st.aging; const tot=A.b0+A.b31+A.b61+A.b90||1;
+    const bar=(v,c)=>`<span class="tr" style="flex:1"><i style="width:${Math.round(v/tot*100)}%;background:${c}"></i></span>`;
+    body=`<div class="row2"><div class="panel"><h3><span class="idx">01</span>Receivables aging (days since last payment)</h3><div class="cs">USD contracts with an outstanding balance · total ${usd(st.arBal)} on ${st.owingN.toLocaleString()} contracts</div>
+      <div class="stack"><span>0–30</span>${bar(A.b0,'#10b981')}<span class="rt"><b>${usd(A.b0)}</b> · ${A.n0}</span></div>
+      <div class="stack"><span>31–60</span>${bar(A.b31,'#e0a23a')}<span class="rt"><b>${usd(A.b31)}</b> · ${A.n31}</span></div>
+      <div class="stack"><span>61–90</span>${bar(A.b61,'#ef8a4a')}<span class="rt"><b>${usd(A.b61)}</b> · ${A.n61}</span></div>
+      <div class="stack"><span>&gt;90</span>${bar(A.b90,'#e0533f')}<span class="rt"><b>${usd(A.b90)}</b> · ${A.n90}</span></div>
+      <div class="mini" style="margin-top:6px">Contracts with no receipt on file are aged from the contract date.</div></div>
+      <div class="panel"><h3><span class="idx">02</span>Cash-in forecast</h3><div class="cs">Deal instalments due + maintenance fees ${st.cur} still unpaid</div>
+      <table><tbody>
+      <tr><td>Next 7 days</td><td class="n"><b>${usd(st.fc.d7)}</b> <span class="mini">${st.fc.n7} instalments</span></td></tr>
+      <tr><td>Next 30 days</td><td class="n"><b>${usd(st.fc.d30)}</b> <span class="mini">${st.fc.n30} instalments</span></td></tr>
+      <tr><td>Next 90 days</td><td class="n"><b>${usd(st.fc.d90)}</b> <span class="mini">${st.fc.n90} instalments</span></td></tr>
+      <tr><td>Maintenance fees ${st.cur} unpaid</td><td class="n"><b>${usd(st.feeUnpaidAmt)}</b> <span class="mini">${(st.feeDue-st.feePaid).toLocaleString()} contracts</span></td></tr>
+      <tr><td>Cash received ${st.cur} to date</td><td class="n"><b>${usd(st.cashYTD)}</b></td></tr>
+      </tbody></table><div class="mini" style="margin-top:6px">Instalment schedules come from the Daily Sale Report (pay plan). Bank balance / payables are not in this system.</div></div></div>
+      <div class="panel" style="margin-top:14px"><h3><span class="idx">03</span>Top overdue &gt;90 days</h3><div class="scroll"><table><thead><tr><th>Contract</th><th>Customer</th><th>Product</th><th class="n">Days</th><th class="n">Outstanding</th></tr></thead><tbody>
+      ${A.list90.slice(0,25).map(x=>`<tr class="click" onclick="openRecvHistory('${esc(x.r.contract_no)}')"><td><b>${esc(x.r.contract_no)}</b></td><td>${esc(x.r.client_name||'')}</td><td>${esc(x.r.product||'')}</td><td class="n">${x.d.toLocaleString()}</td><td class="n"><b>${usd(x.r.balance)}</b></td></tr>`).join('')||'<tr><td colspan="5" class="mini">None</td></tr>'}</tbody></table></div></div>`;
+  } else if(T==='channel'){
+    const bySrc=ownerGroup(r=>r.generator||r.sale_type||'—'), byNat=ownerGroup(r=>r.nationality||'—'), byRep=ownerGroup(r=>(r.team&&r.team.sales_rep)||r.rep||'—');
+    const tbl=(title,rows,label)=>`<div class="panel"><h3>${title}</h3><div class="scroll"><table><thead><tr><th>${label}</th><th class="n">Deals</th><th class="n">Sales</th><th class="n">Deal Nett</th><th class="n">Nett %</th></tr></thead><tbody>${rows.slice(0,15).map(([k,o])=>`<tr><td><b>${esc(k)}</b></td><td class="n">${o.n}</td><td class="n">${usd(o.price)}</td><td class="n">${usd(o.nett)}</td><td class="n">${oPct(o.nett,o.price)}%</td></tr>`).join('')||'<tr><td colspan="5" class="mini">No data for '+st.cur+'</td></tr>'}</tbody></table></div></div>`;
+    const acq=st.toursDeal?Math.round((st.opcMonth+st.commCur)/st.toursDeal):0;
+    body=`<div class="okpis" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      ${oKpi('Tours this month',st.toursMonth.toLocaleString(),'showed '+st.toursShowed+' · Q '+st.toursQ,'na','mkt')}
+      ${oKpi('Deals from tours',st.toursDeal.toLocaleString(),st.toursMonth?oPct(st.toursDeal,st.toursMonth)+'% close rate':'—','na','deals')}
+      ${oKpi('Acquisition cost / deal',acq?usd(acq):'—','OPC pay + commission ÷ deals','na','comm')}
+      ${oKpi('Deal Nett this month',usd(st.nettMonth),'gross '+usd(st.grossMonth),'na','deals')}
+    </div>
+    <div class="mini" style="margin:6px 0 12px">Like OTA commission vs net revenue in a hotel — here the "channel cost" is OPC pay (Q ฿3,000 + split) plus sales commission, against Deal Nett.</div>
+    <div class="row2">${tbl('<span class="idx">01</span>By source / sale type '+st.cur,bySrc,'Source')}${tbl('<span class="idx">02</span>By nationality '+st.cur,byNat,'Nationality')}</div>
+    <div style="margin-top:14px">${tbl('<span class="idx">03</span>By sales rep '+st.cur,byRep,'Sales rep')}</div>`;
+  } else if(T==='contrib'){
+    const al=ownerAlerts(st); const costs=st.commCur+st.opcMonth+st.giftMonth; const contrib=st.nettMonth-costs;
+    body=`<div class="row2"><div class="panel"><h3><span class="idx">01</span>Sales contribution — ${st.mon}</h3><div class="cs">The part of a hotel P&amp;L we can compute: revenue from deals minus direct sales &amp; marketing cost</div>
+      <table><tbody>
+      <tr><td>Gross sales (deals this month)</td><td class="n"><b>${usd(st.grossMonth)}</b></td></tr>
+      <tr><td>− Deal items / gifts / admin</td><td class="n">${usd(st.grossMonth-st.nettMonth)}</td></tr>
+      <tr><td><b>Deal Nett</b></td><td class="n"><b>${usd(st.nettMonth)}</b></td></tr>
+      <tr><td>− Sales commission (latest cycle)</td><td class="n">${usd(st.commCur)}</td></tr>
+      <tr><td>− OPC Friday pay (this month)</td><td class="n">${usd(st.opcMonth)}</td></tr>
+      <tr><td>− Gifts / deductions</td><td class="n">${usd(st.giftMonth)}</td></tr>
+      <tr><td><b>Sales contribution</b></td><td class="n"><b style="color:${contrib>=0?'var(--s3)':'var(--s8)'}">${usd(contrib)}</b> <span class="mini">${st.nettMonth?oPct(contrib,st.nettMonth)+'% of Nett':''}</span></td></tr>
+      </tbody></table><div class="mini" style="margin-top:6px">Payroll, utilities and other operating costs are not in this system, so GOP / EBITDA / Net profit cannot be shown here.</div></div>
+      <div class="panel"><h3><span class="idx">02</span>Alerts</h3><div class="cs">Automatic checks on receivables, fees, tours, deals and case files</div>
+      ${al.map(a=>`<div class="oalert ${a[0]}" ${a[2]?`onclick="go('${a[2]}')" style="cursor:pointer"`:''}>${oLightIco(a[0])} ${esc(a[1])}</div>`).join('')}</div></div>`;
+  } else if(T==='flash'){
+    const f=ownerFlash(); const ck=ownerClosing(st); const done=ck.filter(c=>c[1]).length;
+    body=`<div class="panel"><h3><span class="idx">01</span>Daily flash — ${fmtD(f.y)}</h3><div class="cs">What happened yesterday</div>
+      <div class="okpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      ${oKpi('Tours',f.tours,'showed '+f.showed+' · Q '+f.q,'na','mkt')}
+      ${oKpi('Deals',f.deals,'gross '+usd(f.gross),'na','deals')}
+      ${oKpi('Deal Nett',usd(f.nett),'','na','deals')}
+      ${oKpi('Cash received',usd(f.cash),'receipts in AR','na','recv')}
+      ${oKpi('MFEE recorded paid',f.fee,'contracts','na','ar')}
+      ${oKpi('OPC pay accrued',usd(f.opc),'due Friday','na','mkt')}
+      </div></div>
+      <div class="panel" style="margin-top:14px"><h3><span class="idx">02</span>Month-end closing checklist — ${st.mon}</h3><div class="cs">${done} / ${ck.length} checks passing</div>
+      ${ck.map(c=>`<div class="ochk ${c[1]?'ok':'no'}"><span>${c[1]?'✅':'⬜'}</span><span>${esc(c[0])}</span><span class="mini">${esc(c[2])}</span></div>`).join('')}
+      <div class="mini" style="margin-top:8px">GL / bank reconciliation / tax are outside this system — this list covers the records that live here.</div></div>`;
+  }
+  $main.innerHTML=`<div class="pk">Management · Owner Dashboard</div><h1>Owner Dashboard</h1>
+  <p class="sub">Executive view adapted from a hotel CFO dashboard — showing only what this system's data supports (sales, members, receivables, channels, sales costs). Reference = last year; budget comparison can be added once a budget table exists.</p>
+  <div class="tabbtns otabs">${tabs.map(t=>`<button class="${T===t[0]?'on':''}" onclick="S.otab='${t[0]}';render()">${t[1]}</button>`).join('')}</div>
+  ${body}`;
+}
+
+
 const SOP_HTML=`
 <nav class="sp-toc">
   <div class="sp-kick">สารบัญ</div>
