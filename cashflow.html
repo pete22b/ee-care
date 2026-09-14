@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Cash Flow — Elite Escapes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f4f6f8;--surface:#fff;--ink:#1a2733;--ink2:#5a6b7a;--ink3:#93a1af;--line:#e4e9ee;--line2:#eef2f5;
+--brand:#0e9f8e;--brand2:#0b7e70;--brandsoft:#e6f6f4;--income:#12a56f;--incomesoft:#e5f6ee;--expense:#e2574b;--expensesoft:#fbe9e7;
+--gold:#c9a45c;--pulse:#2f7fd6;--shadow:0 1px 2px rgba(16,32,48,.05),0 6px 20px -8px rgba(16,32,48,.12);--radius:12px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Inter","IBM Plex Sans Thai",system-ui,sans-serif}
+a{color:var(--brand)}
+h1{font-size:22px;margin:0 0 2px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:16px;margin:0 0 10px;font-weight:600}
+.mini{font-size:12px;color:var(--ink3)}
+.muted{color:var(--ink2)}
+button{font:inherit}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:8px 14px;border-radius:9px;cursor:pointer;font-weight:500;box-shadow:var(--shadow);transition:.13s}
+.btn:hover{border-color:#cdd6de}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent;color:#fff}
+.btn.pri:hover{filter:brightness(1.06)}
+.btn.inc{background:linear-gradient(135deg,#18b579,#0f8f60);border-color:transparent;color:#fff}
+.btn.exp{background:linear-gradient(135deg,#ef6a5e,#d8483c);border-color:transparent;color:#fff}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+.btn.ghost{background:transparent;box-shadow:none;border-color:var(--line)}
+.btn.danger{color:var(--expense);border-color:#f0c9c4}
+.btn.link{border:none;background:none;box-shadow:none;color:var(--brand);padding:4px 2px}
+input,select{font:inherit;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);outline:none;width:100%}
+input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brandsoft)}
+label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bottom:4px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600}
+.pill.inc{background:var(--incomesoft);color:#0c7d52}
+.pill.exp{background:var(--expensesoft);color:#b83c31}
+.pill.fc{background:#e8f0fb;color:#2565aa}
+.pill.off{background:#eef2f5;color:#8a98a5}
+/* layout */
+.top{position:sticky;top:0;z-index:30;background:#0f2733;color:#fff;box-shadow:0 2px 14px -6px rgba(0,0,0,.4)}
+.top-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:0 20px;height:56px}
+.brand{font-weight:700;font-size:15px;letter-spacing:.01em;display:flex;align-items:center;gap:9px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px rgba(14,159,142,.25)}
+.tabs{display:flex;gap:2px;margin-left:6px}
+.tabs button{background:none;border:none;color:#a9bcc7;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13.5px}
+.tabs button:hover{color:#fff;background:rgba(255,255,255,.07)}
+.tabs button.on{color:#fff;background:rgba(255,255,255,.13);font-weight:600}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:12.5px;color:#cdd9e0}
+.top .right a{color:#8fd6cc}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 80px}
+.head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.head .sp{flex:1}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:9px;overflow:hidden;box-shadow:var(--shadow)}
+.seg button{border:none;background:none;padding:7px 15px;cursor:pointer;color:var(--ink2);font-weight:500;font-size:13px}
+.seg button.on{background:var(--brand);color:#fff}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.pad{padding:16px 18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .v{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{font-size:12px;color:var(--ink3);margin-top:2px}
+/* matrix */
+.scroll{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:9px 13px;white-space:nowrap;border-bottom:1px solid var(--line2);text-align:left}
+thead th{position:sticky;top:0;background:#f7f9fb;z-index:2;font-weight:600;color:var(--ink2);font-size:12px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.mx .lab{position:sticky;left:0;background:var(--surface);z-index:1;min-width:220px;font-weight:500}
+.mx thead th.lab{z-index:3}
+.mx tr.sec td{background:#f2f6f8;text-transform:uppercase;font-size:10.5px;letter-spacing:.08em;color:var(--ink3);font-weight:700}
+.mx tr.grp .lab{font-weight:700;cursor:pointer}
+.mx tr.item .lab{padding-left:30px;color:var(--ink2);font-weight:500}
+.mx tr.item td.n{color:var(--ink)}
+.mx tr.beg td,.mx tr.end td{background:var(--brandsoft);font-weight:700}
+.mx tr.end td{border-top:2px solid #cfe7e3}
+.mx tr.pulse td{background:#eef5fd;color:#1f5f9e;font-weight:600}
+.mx tr.tot td{font-weight:700;border-top:1px solid var(--line)}
+.mx tr.item:hover td{background:#f8fbfc}
+.click{cursor:pointer}
+/* modal */
+#mw{position:fixed;inset:0;z-index:80;background:rgba(15,30,40,.45);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow:auto}
+#mw.hide{display:none}
+.modal{background:#fff;border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);width:min(720px,100%);padding:22px 24px;animation:pop .2s ease}
+@keyframes pop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid2 .full{grid-column:1/3}
+.right{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.lines th,.lines td{padding:6px 8px}
+.lines input,.lines select{padding:6px 8px}
+.emptyc{text-align:center;color:var(--ink3);padding:48px 20px}
+.emptyc .big{font-size:40px;opacity:.4}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#12303c;color:#fff;padding:11px 20px;border-radius:10px;box-shadow:0 12px 40px -8px rgba(0,0,0,.5);z-index:120;opacity:0;transition:.25s;pointer-events:none;font-size:13.5px}
+#toast.show{opacity:1}
+/* gate */
+#gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#0c2230;overflow:hidden;transition:opacity .5s}
+#gate.bye{opacity:0;pointer-events:none}
+#gate .orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 15s ease-in-out infinite alternate}
+#gate .o1{width:520px;height:520px;background:#12564c;top:-150px;left:-120px}
+#gate .o2{width:420px;height:420px;background:#123252;bottom:-130px;right:-80px;animation-delay:-7s}
+@keyframes drift{from{transform:translate(0,0)}to{transform:translate(60px,40px)}}
+.gatecard{position:relative;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:22px;padding:40px 40px 30px;width:min(400px,92vw);text-align:center;color:#fff;backdrop-filter:blur(12px)}
+.gatecard .k{font-size:10px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:#6fd3bd}
+.gatecard .w{font-size:26px;font-weight:700;margin:8px 0 3px}
+.gatecard .s{font-size:13px;opacity:.7;margin-bottom:24px}
+.gbtn{width:100%;padding:12px;border-radius:11px;border:none;background:#fff;color:#3c4043;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+.gerr{min-height:18px;font-size:12.5px;color:#ff9b8a;margin-top:12px}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}.grid2 .full{grid-column:1}.tabs{overflow:auto}.top-in{gap:8px}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <div class="brand"><span class="dot"></span> Elite Escapes · Cash Flow</div>
+  <div class="tabs" id="tabs">
+    <button data-t="cashflow" class="on">Cash Flow</button>
+    <button data-t="reports">Reports</button>
+    <button data-t="companies">Companies</button>
+    <button data-t="accounts">Accounts</button>
+    <button data-t="import">Import / Export</button>
+  </div>
+  <div class="right" id="userbox"></div>
+</div></div>
+<div class="wrap" id="main"></div>
+<div id="mw" class="hide" onclick="if(event.target===this)closeModal()"></div>
+<div id="toast"></div>
+<script>
+/* ============ config ============ */
+const SB_URL='https://vpsrfukevrcaapwlkoop.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwc3JmdWtldnJjYWFwd2xrb29wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODA4ODgsImV4cCI6MjEwMjU1Njg4OH0.F9ClGxUU0WjG_d-H2Ic3f48Bvoc1IhBPFEP3W6F1h-w';
+const SBC = window.supabase ? window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}}) : null;
+let USER=null;
+const REPEATS=[['never','One-time'],['weekly','Weekly'],['biweekly','Biweekly'],['monthly','Monthly'],['bimonthly','Bimonthly'],['quarterly','Quarterly'],['biannually','Biannually'],['annually','Annually']];
+const REPSTEP={weekly:{d:7},biweekly:{d:14},monthly:{m:1},bimonthly:{m:2},quarterly:{m:3},biannually:{m:6},annually:{m:12}};
+const REPLBL=Object.fromEntries(REPEATS);
+const CURSYM={THB:'฿',USD:'US$',GBP:'£',EUR:'€',AUD:'A$'};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ============ state + data ============ */
+let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
+const today=new Date(); const TODAY=iso(today);
+const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
+  report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}};
+
+/* ============ helpers ============ */
+function iso(d){ const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function addDaysISO(s,n){ const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d+n); return iso(dt); }
+function addMonthsISO(s,n){ const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1+n,1); const last=new Date(dt.getFullYear(),dt.getMonth()+1,0).getDate(); dt.setDate(Math.min(d,last)); return iso(dt); }
+function lastDayOfMonth(key){ const [y,m]=key.split('-').map(Number); return key+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(p){ return (p||'x')+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function curSym(){ const a=primaryAccount(); return CURSYM[(a&&a.currency)||'THB']||'฿'; }
+function fmt(n){ n=Math.round((n||0)); return curSym()+n.toLocaleString('en-US'); }
+function fmtSigned(n){ return (n<0?'-':'')+curSym()+Math.abs(Math.round(n||0)).toLocaleString('en-US'); }
+function fmtDate(s){ if(!s) return '—'; const [y,m,d]=s.split('-').map(Number); return MON[m-1]+' '+d+', '+y; }
+function primaryAccount(){ return DB.accounts.find(a=>a.is_primary) || DB.accounts[0] || null; }
+function g(id){ return document.getElementById(id); }
+function toast(m){ const t=g('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+function openModal(html){ const w=g('mw'); w.innerHTML='<div class="modal">'+html+'</div>'; w.classList.remove('hide'); }
+function closeModal(){ g('mw').classList.add('hide'); g('mw').innerHTML=''; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+/* occurrences for a line within [from,to] */
+function occ(line, from, to){
+  const out=[], base=line.txn_date; if(!base) return out;
+  const amt=Number(line.amount)||0, mode=line.repeat||'never', step=REPSTEP[mode];
+  if(mode==='never'||!step){ if(base>=from&&base<=to) out.push({date:base,amount:amt,forecast:!!line.forecast}); return out; }
+  const until=line.repeat_until||to;
+  for(let i=0;i<800;i++){
+    const dt= step.d? addDaysISO(base,step.d*i) : addMonthsISO(base,step.m*i);
+    if(dt>to) break; if(dt>until) break;
+    if(dt>=from) out.push({date:dt,amount:amt,forecast:!!line.forecast});
+  }
+  return out;
+}
+/* flatten all lines with parent entry */
+function allLines(){ const em=Object.fromEntries(DB.entries.map(e=>[e.id,e])); return DB.lines.map(l=>({l,e:em[l.entry_id]})).filter(x=>x.e); }
+
+/* ============ Supabase REST ============ */
+async function token(){ try{ const {data}=await SBC.auth.getSession(); return (data&&data.session)?data.session.access_token:SB_KEY; }catch(e){ return SB_KEY; } }
+async function api(path, opts={}){
+  const tok=await token();
+  const r=await fetch(SB_URL+'/rest/v1/'+path, Object.assign({},opts,{headers:Object.assign({apikey:SB_KEY,Authorization:'Bearer '+tok,'Content-Type':'application/json',Prefer:opts.prefer||''},opts.headers||{})}));
+  if(!r.ok) throw new Error((await r.text()).slice(0,300));
+  if(r.status===204) return null; const t=await r.text(); return t?JSON.parse(t):null;
+}
+async function upsert(table, rows){ if(!rows.length) return; return api(table+'?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(rows.map(r=>Object.assign({updated_by:USER&&USER.email},r)))}); }
+async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); }
+
+/* ============ auth + boot ============ */
+function renderGate(msg){
+  document.body.insertAdjacentHTML('beforeend',`<div id="gate"><div class="orb o1"></div><div class="orb o2"></div>
+    <div class="gatecard"><div class="k">Cash Flow · Live</div><div class="w">ELITE ESCAPES</div><div class="s">Cash flow forecasting</div>
+    <button class="gbtn" onclick="doLogin()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.4 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.3-4.5 2.1-8.8 2.1-6.3 0-11.7-3.7-13.6-9l-7.9 6.1C6.4 42.6 14.6 48 24 48z"/></svg> Sign in with Google</button>
+    <div class="gerr" id="gerr">${msg?esc(msg):''}</div></div></div>`);
+}
+function doLogin(){ g('gerr').textContent='Taking you to Google…'; SBC.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}}); }
+function closeGate(){ const x=g('gate'); if(x){ x.classList.add('bye'); setTimeout(()=>x.remove(),520);} }
+async function boot(){
+  if(!SBC){ g('main').innerHTML='<div class="emptyc">Could not load Supabase.</div>'; return; }
+  let sess=null; try{ sess=(await SBC.auth.getSession()).data.session; }catch(e){}
+  if(!sess && /[?&]code=/.test(location.search)){ for(let i=0;i<12&&!sess;i++){ await new Promise(r=>setTimeout(r,300)); try{ sess=(await SBC.auth.getSession()).data.session; }catch(e){} } }
+  if(location.search.indexOf('code=')>-1) history.replaceState({},'',location.origin+location.pathname);
+  if(!sess){ renderGate(); return; }
+  const em=(sess.user.email||'').toLowerCase();
+  const nm=(sess.user.user_metadata&&sess.user.user_metadata.full_name)||em;
+  let rows=[]; try{ rows=await api('app_users?select=*&email=eq.'+encodeURIComponent(em)); }catch(e){}
+  if(rows&&rows.length) USER=Object.assign({},rows[0],{name:rows[0].name||nm});
+  else if(em.endsWith('@elite-escapes.club')) USER={email:em,name:nm,role:'editor'};
+  else { await SBC.auth.signOut(); renderGate('Access only via company Gmail @elite-escapes.club'); return; }
+  closeGate();
+  g('userbox').innerHTML=`👤 ${esc(USER.name||USER.email)} · <a href="#" onclick="logout();return false">Sign out</a>`;
+  await loadAll();
+}
+function logout(){ SBC.auth.signOut().then(()=>location.reload(),()=>location.reload()); }
+async function loadAll(){
+  g('main').innerHTML='<div class="emptyc"><div class="big">⏳</div>Loading cash flow…</div>';
+  try{
+    const [co,ac,ca,en,li]=await Promise.all([
+      api('cf_companies?select=*&order=name.asc'), api('cf_accounts?select=*&order=sort.asc'),
+      api('cf_categories?select=*&order=name.asc'), api('cf_entries?select=*&order=title.asc'),
+      api('cf_lines?select=*&order=txn_date.asc')
+    ]);
+    DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[]};
+    if(!DB.accounts.length){ /* seed a Primary account like Pulse */
+      const a={id:uid('ac'),name:'Pulse Cash Flow',opening_balance:0,opening_date:TODAY,currency:'THB',is_primary:true,sort:0};
+      await upsert('cf_accounts',[a]); DB.accounts=[a];
+    }
+    render();
+  }catch(e){ g('main').innerHTML='<div class="emptyc">Failed to load: '+esc(e.message)+'</div>'; }
+}
+
+/* ============ router ============ */
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab)); render(); });
+function render(){
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
+  if(S.tab==='cashflow') return rCashflow();
+  if(S.tab==='reports') return rReports();
+  if(S.tab==='companies') return rCompanies();
+  if(S.tab==='accounts') return rAccounts();
+  if(S.tab==='import') return rImport();
+}
+
+/* ============ matrix engine ============ */
+function periods(kind, start, n){
+  const arr=[];
+  if(kind==='week'){
+    let d=start; // start is a monday iso
+    for(let i=0;i<n;i++){ const s=d, e=addDaysISO(d,6); arr.push({key:s,label:fmtShort(s),s,e}); d=addDaysISO(d,7); }
+  } else {
+    for(let i=0;i<n;i++){ const iso2=addMonthsISO(start+'-01',i), key=iso2.slice(0,7); const [y,m]=key.split('-').map(Number); arr.push({key,label:MON[m-1]+' '+y,s:key+'-01',e:lastDayOfMonth(key)}); }
+  }
+  return arr;
+}
+function fmtShort(s){ const [y,m,d]=s.split('-').map(Number); return MON[m-1]+' '+d; }
+function mondayOf(s){ const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); const wd=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-wd); return iso(dt); }
+function bucketKey(kind, date, ps){
+  if(kind==='week'){ for(const p of ps){ if(date>=p.s&&date<=p.e) return p.key; } return null; }
+  return date.slice(0,7);
+}
+/* build matrix over given periods; includeForecast for pulse line */
+function buildMatrix(ps, opts){
+  opts=opts||{};
+  const winS=ps[0].s, winE=ps[ps.length-1].e;
+  const openBal=DB.accounts.reduce((s,a)=>s+(Number(a.opening_balance)||0),0);
+  const lines=allLines().filter(x=>x.e.active!==false);
+  // beginning before window
+  let begin=openBal, beginF=openBal;
+  lines.forEach(({l})=>{ occ(l,'0000-01-01',addDaysISO(winS,-1)).forEach(o=>{
+    const e=DB.entries.find(en=>en.id===l.entry_id); const sign=e.kind==='expense'?-1:1;
+    if(!o.forecast){ begin+=sign*o.amount; beginF+=sign*o.amount; } else beginF+=sign*o.amount;
+  }); });
+  const inc={}, exp={}, incTot={}, expTot={}, incF={}, expF={};
+  lines.forEach(({l,e})=>{
+    const g0=e.category||(e.kind==='expense'?'Uncategorized expense':'Uncategorized income');
+    occ(l,winS,winE).forEach(o=>{
+      const pk=bucketKey(S.view,o.date,ps); if(!pk) return;
+      const tgt=e.kind==='expense'?exp:inc, tot=e.kind==='expense'?expTot:incTot, totF=e.kind==='expense'?expF:incF;
+      (totF[pk]=totF[pk]||0); totF[pk]+=o.amount;
+      if(o.forecast && opts.forecastSeparate!==false){ /* forecast only counts to pulse */ }
+      const grp=(tgt[g0]=tgt[g0]||{entries:{},tot:{}});
+      const em=(grp.entries[e.id]=grp.entries[e.id]||{title:e.title||'(untitled)',kind:e.kind,m:{},fc:!!o.forecast});
+      em.m[pk]=(em.m[pk]||0)+o.amount;
+      grp.tot[pk]=(grp.tot[pk]||0)+o.amount;
+      if(!o.forecast){ tot[pk]=(tot[pk]||0)+o.amount; }
+    });
+  });
+  const beginByP={}, endByP={}, pulseByP={};
+  let run=begin, runF=beginF;
+  ps.forEach(p=>{ beginByP[p.key]=run; run=run+(incTot[p.key]||0)-(expTot[p.key]||0); endByP[p.key]=run;
+    runF=runF+(incF[p.key]||0)-(expF[p.key]||0); pulseByP[p.key]=runF; });
+  const hasFc=DB.lines.some(l=>l.forecast);
+  return {ps,inc,exp,incTot,expTot,beginByP,endByP,pulseByP,begin,hasFc};
+}
+
+/* ============ Cash Flow worksheet ============ */
+function rCashflow(){
+  const empty=DB.entries.length===0;
+  const bar=`<div class="toolbar">
+    <div class="seg">${[['month','Month'],['week','Week'],['list','List']].map(v=>`<button class="${S.view===v[0]?'on':''}" onclick="S.view='${v[0]}';render()">${v[1]}</button>`).join('')}</div>
+    <div class="sp" style="flex:1"></div>
+    <button class="btn inc" onclick="openEntry('income')">＋ Add Income</button>
+    <button class="btn exp" onclick="openEntry('expense')">＋ Add Expense</button>
+    <button class="btn ghost sm" onclick="S.tab='import';render()">Import</button>
+    <button class="btn ghost sm" onclick="exportCSV()">Export</button>
+  </div>`;
+  const head=`<div class="head"><div><h1>Cash Flow</h1><p class="mini">Forecast your cash on hand — money in, money out. ${DB.entries.length} entries · ${DB.accounts.length} account(s)</p></div></div>`;
+  let body;
+  if(empty) body=emptyState();
+  else if(S.view==='list') body=listView();
+  else body=matrixView();
+  g('main').innerHTML=head+bar+body;
+  if(S.view==='list'){ const inp=g('cfq'); if(inp) inp.oninput=()=>{ S.q=inp.value; const b=matrixOrList(); }; }
+}
+function matrixOrList(){ /* only list re-renders body for search focus */
+  const b=g('cflistbody'); if(!b) return; b.innerHTML=listRows();
+}
+function emptyState(){
+  return `<div class="card"><div class="emptyc"><div class="big">💵</div>
+    <h2 style="margin:10px 0 4px">No entries yet</h2>
+    <p class="mini" style="max-width:420px;margin:0 auto 18px">Add income and expenses by hand, or import a CSV to test the flow. Income and expenses can repeat on a schedule, just like Pulse.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn inc" onclick="openEntry('income')">＋ Add Income</button>
+      <button class="btn exp" onclick="openEntry('expense')">＋ Add Expense</button>
+      <button class="btn" onclick="S.tab='import';render()">⬆ Import CSV</button>
+    </div></div></div>`;
+}
+function shiftPeriod(dir){
+  if(S.view==='week') S.start=addDaysISO(mondayOf(S.start.length>7?S.start:S.start+'-01'), dir*7*S.span);
+  else S.start=addMonthsISO(S.start+'-01', dir*S.span).slice(0,7);
+  render();
+}
+function matrixView(){
+  let ps;
+  if(S.view==='week'){ const wkStart=mondayOf(TODAY); if(!S._wkInit){ S.start=wkStart; S._wkInit=1; } ps=periods('week', (S.start.length>7?S.start:wkStart), 13); }
+  else ps=periods('month', S.start, S.span);
+  const M=buildMatrix(ps);
+  const rangeLabel = S.view==='week' ? (ps[0].label+' – '+ps[ps.length-1].label) : (ps[0].label+' – '+ps[ps.length-1].label);
+  const nav=`<div class="toolbar" style="margin-bottom:10px">
+    <button class="btn sm ghost" onclick="shiftPeriod(-1)">‹ Prev</button>
+    <b style="min-width:180px;text-align:center">${rangeLabel}</b>
+    <button class="btn sm ghost" onclick="shiftPeriod(1)">Next ›</button>
+    <button class="btn sm ghost" onclick="S.start='${TODAY.slice(0,7)}';S._wkInit=0;render()">Today</button></div>`;
+  const th=`<th class="lab">Cash flow</th>`+ps.map(p=>`<th class="n">${p.label}</th>`).join('');
+  const cell=v=>`<td class="n">${v?fmt(v):'<span style="opacity:.28">–</span>'}</td>`;
+  const balRow=(obj,lbl,cls)=>`<tr class="${cls}"><td class="lab">${lbl}</td>${ps.map(p=>`<td class="n">${fmt(obj[p.key])}</td>`).join('')}</tr>`;
+  const secRow=lbl=>`<tr class="sec"><td class="lab">${lbl}</td>${ps.map(()=>'<td></td>').join('')}</tr>`;
+  const totRow=(obj,lbl,cls)=>`<tr class="${cls}"><td class="lab">${lbl}</td>${ps.map(p=>`<td class="n">${obj[p.key]?fmt(obj[p.key]):'–'}</td>`).join('')}</tr>`;
+  function groupRows(groups,kindcls){
+    const keys=Object.keys(groups).sort();
+    if(!keys.length) return `<tr class="item"><td class="lab" style="opacity:.5">— none —</td>${ps.map(()=>'<td></td>').join('')}</tr>`;
+    return keys.map(gk=>{
+      const grp=groups[gk]; const col=S.collapsed[kindcls+gk];
+      const gRow=`<tr class="grp" onclick="toggleGrp('${esc(kindcls+gk)}')"><td class="lab">${col?'▸':'▾'} ${esc(gk)}</td>${ps.map(p=>`<td class="n">${grp.tot[p.key]?fmt(grp.tot[p.key]):''}</td>`).join('')}</tr>`;
+      if(col) return gRow;
+      const items=Object.entries(grp.entries).map(([eid,em])=>`<tr class="item click" onclick="openEntry('${em.kind}','${esc(eid)}')"><td class="lab">${esc(em.title)}${em.fc?' <span class="pill fc">forecast</span>':''}</td>${ps.map(p=>cell(em.m[p.key])).join('')}</tr>`).join('');
+      return gRow+items;
+    }).join('');
+  }
+  const rows=`${balRow(M.beginByP,'Total Cash on Hand · beginning','beg')}
+    ${secRow('Income')}${groupRows(M.inc,'inc')}${totRow(M.incTot,'Total Income','tot')}
+    ${secRow('Expenses')}${groupRows(M.exp,'exp')}${totRow(M.expTot,'Total Expenses','tot')}
+    ${balRow(M.endByP,'Total Cash on Hand · end of period','end')}
+    ${M.hasFc?balRow(M.pulseByP,'Pulse Cash on Hand · incl. forecast','pulse'):''}`;
+  const openBal=DB.accounts.reduce((s,a)=>s+(Number(a.opening_balance)||0),0);
+  return `${nav}<div class="scroll"><table class="mx"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="mini" style="margin-top:8px">Opening balance ${fmt(openBal)} across ${DB.accounts.length} account(s). Forecast lines feed the blue Pulse line only, not actual Cash on Hand — just like Pulse.</p>`;
+}
+function toggleGrp(k){ S.collapsed[k]=!S.collapsed[k]; render(); }
+
+function listView(){
+  return `<div class="toolbar" style="margin-bottom:10px">
+    <input id="cfq" placeholder="🔍 Search title / category / company / description" value="${esc(S.q)}" style="max-width:360px">
+    <select onchange="S.repType=this.value;render()" style="width:auto"><option value="all">All types</option><option value="income" ${S.repType==='income'?'selected':''}>Income</option><option value="expense" ${S.repType==='expense'?'selected':''}>Expense</option></select>
+  </div>
+  <div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Title</th><th>Category</th><th>Company</th><th>Account</th><th class="n">Amount</th><th>Repeat</th><th></th></tr></thead><tbody id="cflistbody">${listRows()}</tbody></table></div>`;
+}
+function listRows(){
+  const q=(S.q||'').trim().toLowerCase();
+  let rows=allLines().map(({l,e})=>({l,e}));
+  if(S.repType!=='all') rows=rows.filter(x=>x.e.kind===S.repType);
+  if(q) rows=rows.filter(x=>((x.e.title||'')+' '+(x.e.category||'')+' '+(x.e.company||'')+' '+(x.e.description||'')).toLowerCase().includes(q));
+  rows.sort((a,b)=>a.l.txn_date<b.l.txn_date?1:(a.l.txn_date>b.l.txn_date?-1:0));
+  if(!rows.length) return '<tr><td colspan="9" style="opacity:.5;padding:20px">No entries match.</td></tr>';
+  return rows.map(({l,e})=>`<tr class="click" onclick="openEntry('${e.kind}','${esc(e.id)}')">
+    <td>${fmtDate(l.txn_date)}</td>
+    <td><span class="pill ${e.kind==='income'?'inc':'exp'}">${e.kind==='income'?'Income':'Expense'}</span></td>
+    <td><b>${esc(e.title||'(untitled)')}</b>${e.description?'<br><span class="mini">'+esc(e.description)+'</span>':''}</td>
+    <td>${esc(e.category||'—')}</td><td>${esc(e.company||'—')}</td><td>${esc(accName(e.account))}</td>
+    <td class="n">${e.kind==='expense'?'-':''}${fmt(l.amount)}</td>
+    <td class="mini">${REPLBL[l.repeat||'never']}${l.forecast?' · <span class="pill fc">fc</span>':''}${e.active===false?' · <span class="pill off">inactive</span>':''}</td>
+    <td><button class="btn link" onclick="event.stopPropagation();openEntry('${e.kind}','${esc(e.id)}')">Edit</button></td></tr>`).join('');
+}
+function accName(idOrName){ const a=DB.accounts.find(a=>a.id===idOrName||a.name===idOrName); return a?a.name:(idOrName||(primaryAccount()&&primaryAccount().name)||'—'); }
+
+/* ============ Entry modal (income/expense) ============ */
+function openEntry(kind, id){
+  const e = id ? DB.entries.find(x=>x.id===id) : null;
+  kind=(e&&e.kind)||kind||'income';
+  const lines = e ? DB.lines.filter(l=>l.entry_id===e.id) : [];
+  if(!lines.length) lines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never',forecast:false});
+  const catOpts = DB.categories.map(c=>`<option value="${esc(c.name)}">`).join('');
+  const coOpts = DB.companies.map(c=>`<option value="${esc(c.name)}">`).join('');
+  const accSel = DB.accounts.map(a=>`<option value="${esc(a.id)}" ${(e&&e.account===a.id)||(!e&&a.is_primary)?'selected':''}>${esc(a.name)}</option>`).join('');
+  window._elines=lines.map(l=>Object.assign({},l));
+  openModal(`<h2>${id?'Edit':'Add'} ${kind==='income'?'Income':'Expense'}</h2>
+  <input type="hidden" id="e_kind" value="${kind}"><input type="hidden" id="e_id" value="${id?esc(id):''}">
+  <div class="grid2">
+    <div class="full"><label>Title <span style="color:var(--expense)">*</span></label><input id="e_title" value="${esc(e?e.title:'')}" placeholder="${kind==='income'?'e.g. Sales Deck PBH':'e.g. Office Rent'}"></div>
+    <div><label>Category</label><input id="e_cat" list="catlist" value="${esc(e?e.category:'')}" placeholder="Contract no. / type"><datalist id="catlist">${catOpts}</datalist></div>
+    <div><label>Company</label><input id="e_co" list="colist" value="${esc(e?e.company:'')}" placeholder="Company"><datalist id="colist">${coOpts}</datalist></div>
+    <div><label>Account</label><select id="e_acc">${accSel}</select></div>
+    <div><label>Description</label><input id="e_desc" value="${esc(e?e.description:'')}" placeholder="Customer / note"></div>
+    <div class="full"><label><input type="checkbox" id="e_active" ${!e||e.active!==false?'checked':''} style="width:auto;margin-right:6px">Active (include in cash flow)</label></div>
+  </div>
+  <h2 style="margin:16px 0 6px;font-size:14px">Schedule</h2>
+  <div class="scroll" style="box-shadow:none"><table class="lines"><thead><tr><th>Amount</th><th>Date</th><th>Repeat</th><th>Until</th><th title="Forecast (Pulse line only)">FC</th><th></th></tr></thead><tbody id="e_lines"></tbody></table></div>
+  <button class="btn ghost sm" style="margin-top:8px" onclick="addLine()">＋ Add another line</button>
+  <div class="right">${id?`<button class="btn danger" onclick="deleteEntry('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveEntry()">Save</button></div>`);
+  renderLines();
+}
+function renderLines(){
+  const body=g('e_lines');
+  body.innerHTML=window._elines.map((l,i)=>`<tr>
+    <td><input type="number" step="any" value="${l.amount}" oninput="_elines[${i}].amount=this.value" style="width:120px"></td>
+    <td><input type="date" value="${l.txn_date||TODAY}" oninput="_elines[${i}].txn_date=this.value" style="width:150px"></td>
+    <td><select onchange="_elines[${i}].repeat=this.value;renderLines()" style="width:130px">${REPEATS.map(r=>`<option value="${r[0]}" ${((l.repeat||'never')===r[0])?'selected':''}>${r[1]}</option>`).join('')}</select></td>
+    <td><input type="date" value="${l.repeat_until||''}" oninput="_elines[${i}].repeat_until=this.value" style="width:150px" ${(l.repeat||'never')==='never'?'disabled':''}></td>
+    <td style="text-align:center"><input type="checkbox" ${l.forecast?'checked':''} onchange="_elines[${i}].forecast=this.checked" style="width:auto"></td>
+    <td>${window._elines.length>1?`<button class="btn link" onclick="_elines.splice(${i},1);renderLines()">✕</button>`:''}</td></tr>`).join('');
+}
+function addLine(){ window._elines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never',forecast:false}); renderLines(); }
+async function saveEntry(){
+  const title=g('e_title').value.trim(); if(!title){ toast('Title is required'); return; }
+  const kind=g('e_kind').value, id=g('e_id').value||uid('en');
+  const lines=window._elines.map(l=>({id:l.id||uid('ln'),entry_id:id,amount:parseFloat(l.amount)||0,txn_date:l.txn_date||TODAY,repeat:l.repeat||'never',repeat_until:((l.repeat&&l.repeat!=='never')&&l.repeat_until)||null,forecast:!!l.forecast,line_type:l.line_type||null})).filter(l=>l.amount>0);
+  if(!lines.length){ toast('Add at least one amount'); return; }
+  const cat=g('e_cat').value.trim()||null, co=g('e_co').value.trim()||null;
+  const entry={id,kind,title,category:cat,account:g('e_acc').value,company:co,description:g('e_desc').value.trim()||null,active:g('e_active').checked};
+  try{
+    await ensureCategory(cat); await ensureCompany(co);
+    await upsert('cf_entries',[entry]);
+    // replace lines
+    const keep=lines.map(l=>l.id);
+    await api('cf_lines?entry_id=eq.'+id+(keep.length?('&id=not.in.('+keep.join(',')+')'):''),{method:'DELETE',prefer:'return=minimal'});
+    await upsert('cf_lines',lines);
+    closeModal(); toast('Saved'); await loadAll();
+  }catch(e){ toast('Save failed: '+e.message); }
+}
+async function deleteEntry(id){ if(!confirm('Delete this entry and its schedule?')) return;
+  try{ await api('cf_lines?entry_id=eq.'+id,{method:'DELETE',prefer:'return=minimal'}); await del('cf_entries',id); closeModal(); toast('Deleted'); await loadAll(); }
+  catch(e){ toast('Delete failed: '+e.message); } }
+async function ensureCategory(name){ if(!name) return; if(DB.categories.some(c=>c.name===name)) return; const c={id:uid('ct'),name}; await upsert('cf_categories',[c]); DB.categories.push(c); }
+async function ensureCompany(name){ if(!name) return; if(DB.companies.some(c=>c.name===name)) return; const c={id:uid('co'),name}; await upsert('cf_companies',[c]); DB.companies.push(c); }
+
+/* ============ Reports ============ */
+function rReports(){
+  const ps=periods('month', S.rStart, S.rSpan);
+  const M=buildMatrix(ps);
+  const head=`<div class="head"><div><h1>Reports</h1><p class="mini">Income &amp; Expenses over time · the blue Pulse line looks down the road so you avoid running out of cash</p></div></div>`;
+  const sel=`<div class="toolbar">
+    <div class="seg">${[['ie','Income & Expenses'],['cat','By Category'],['co','By Company']].map(r=>`<button class="${S.report===r[0]?'on':''}" onclick="S.report='${r[0]}';render()">${r[1]}</button>`).join('')}</div>
+    <div class="sp" style="flex:1"></div>
+    <button class="btn sm ghost" onclick="S.rStart='${addMonthsISO(S.rStart+'-01',-12).slice(0,7)}';render()">‹ 12 mo</button>
+    <b style="align-self:center">${ps[0].label} – ${ps[ps.length-1].label}</b>
+    <button class="btn sm ghost" onclick="S.rStart='${addMonthsISO(S.rStart+'-01',12).slice(0,7)}';render()">12 mo ›</button>
+  </div>`;
+  let body;
+  if(S.report==='cat') body=reportBy('category',ps);
+  else if(S.report==='co') body=reportBy('company',ps);
+  else body=reportIE(M,ps);
+  g('main').innerHTML=head+sel+body;
+}
+function reportIE(M,ps){
+  const th=`<th class="lab">Month</th><th class="n">Beginning Cash</th><th class="n">Income</th><th class="n">Expenses</th><th class="n">Ending Cash</th>${M.hasFc?'<th class="n">Pulse (fc)</th>':''}`;
+  let sumI=0,sumE=0;
+  const rows=ps.map(p=>{ const i=M.incTot[p.key]||0,e=M.expTot[p.key]||0; sumI+=i;sumE+=e;
+    return `<tr><td class="lab">${p.label}</td><td class="n">${fmt(M.beginByP[p.key])}</td><td class="n" style="color:var(--income)">${i?fmt(i):'–'}</td><td class="n" style="color:var(--expense)">${e?fmt(e):'–'}</td><td class="n"><b>${fmt(M.endByP[p.key])}</b></td>${M.hasFc?`<td class="n pulse" style="color:var(--pulse)">${fmt(M.pulseByP[p.key])}</td>`:''}</tr>`;
+  }).join('');
+  const n=ps.length;
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="v">${fmt(M.beginByP[ps[0].key])}</div><div class="l">Beginning Cash on Hand</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(sumI)}</div><div class="l">Total Income · ${n} mo</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(sumE)}</div><div class="l">Total Expenses · ${n} mo</div></div>
+    <div class="kpi"><div class="v">${fmt(M.endByP[ps[ps.length-1].key])}</div><div class="l">Ending Cash on Hand</div></div>
+    <div class="kpi"><div class="v">${fmt(sumI/n)} / ${fmt(sumE/n)}</div><div class="l">Monthly avg in / out</div></div>
+  </div>`;
+  return kpis+`<div class="scroll"><table class="mx"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function reportBy(field,ps){
+  const winS=ps[0].s, winE=ps[ps.length-1].e;
+  const map={}; // key -> {inc:{},exp:{}}
+  allLines().filter(x=>x.e.active!==false).forEach(({l,e})=>{
+    const k=e[field]|| (field==='company'?'(no company)':'(uncategorized)');
+    occ(l,winS,winE).forEach(o=>{ const pk=o.date.slice(0,7); const m=(map[k]=map[k]||{inc:{},exp:{},ti:0,te:0});
+      if(e.kind==='expense'){ m.exp[pk]=(m.exp[pk]||0)+o.amount; m.te+=o.amount; } else { m.inc[pk]=(m.inc[pk]||0)+o.amount; m.ti+=o.amount; } });
+  });
+  const keys=Object.keys(map).sort((a,b)=>(map[b].ti+map[b].te)-(map[a].ti+map[a].te));
+  const th=`<th class="lab">${field==='company'?'Company':'Category'}</th><th class="n">Income</th><th class="n">Expenses</th><th class="n">Net</th>${ps.map(p=>`<th class="n">${p.label}</th>`).join('')}`;
+  if(!keys.length) return '<div class="card"><div class="emptyc">No data in this range.</div></div>';
+  const rows=keys.map(k=>{ const m=map[k]; const net=m.ti-m.te;
+    return `<tr><td class="lab"><b>${esc(k)}</b></td><td class="n" style="color:var(--income)">${m.ti?fmt(m.ti):'–'}</td><td class="n" style="color:var(--expense)">${m.te?fmt(m.te):'–'}</td><td class="n"><b>${fmtSigned(net)}</b></td>${ps.map(p=>{ const v=(m.inc[p.key]||0)-(m.exp[p.key]||0); return `<td class="n">${v?fmtSigned(v):'<span style=\"opacity:.28\">–</span>'}</td>`; }).join('')}</tr>`;
+  }).join('');
+  return `<div class="scroll"><table class="mx"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ============ Companies ============ */
+function rCompanies(){
+  const cnt={}; DB.entries.forEach(e=>{ if(e.company) cnt[e.company]=(cnt[e.company]||0)+1; });
+  const head=`<div class="head"><div><h1>Companies</h1><p class="mini">Group entries by company — like Pulse projects</p></div><div class="sp"></div><button class="btn pri" onclick="openCompany()">＋ Add company</button></div>`;
+  const rows=DB.companies.length?DB.companies.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.note?'<br><span class="mini">'+esc(c.note)+'</span>':''}</td><td class="n">${cnt[c.name]||0} entries</td><td><button class="btn link" onclick="openCompany('${esc(c.id)}')">Edit</button></td></tr>`).join('')
+    :'<tr><td colspan="3" style="opacity:.5;padding:20px">No companies yet.</td></tr>';
+  g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Company</th><th class="n">Entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openCompany(id){ const c=id?DB.companies.find(x=>x.id===id):null;
+  openModal(`<h2>${id?'Edit':'Add'} company</h2><div class="grid2"><div class="full"><label>Name</label><input id="c_name" value="${esc(c?c.name:'')}"></div><div class="full"><label>Note</label><input id="c_note" value="${esc(c?c.note:'')}"></div></div>
+  <div class="right">${id?`<button class="btn danger" onclick="delCompany('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveCompany('${id?esc(id):''}')">Save</button></div>`); }
+async function saveCompany(id){ const name=g('c_name').value.trim(); if(!name){ toast('Name required'); return; }
+  const c={id:id||uid('co'),name,note:g('c_note').value.trim()||null};
+  try{ await upsert('cf_companies',[c]); closeModal(); toast('Saved'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
+async function delCompany(id){ if(!confirm('Delete company?')) return; try{ await del('cf_companies',id); closeModal(); toast('Deleted'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
+
+/* ============ Accounts (Financial Accounts) ============ */
+function rAccounts(){
+  const head=`<div class="head"><div><h1>Financial Accounts</h1><p class="mini">Opening balance per account — the starting point for Cash on Hand</p></div><div class="sp"></div><button class="btn pri" onclick="openAccount()">＋ Add account</button></div>`;
+  const rows=DB.accounts.map(a=>`<tr><td><b>${esc(a.name)}</b> ${a.is_primary?'<span class="pill inc">Primary</span>':''}</td><td>${esc(a.currency||'THB')}</td><td class="n">${fmt(a.opening_balance)}</td><td>${a.opening_date?fmtDate(a.opening_date):'—'}</td><td><button class="btn link" onclick="openAccount('${esc(a.id)}')">Edit</button></td></tr>`).join('');
+  g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Account</th><th>Currency</th><th class="n">Opening balance</th><th>As of</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openAccount(id){ const a=id?DB.accounts.find(x=>x.id===id):null;
+  openModal(`<h2>${id?'Edit':'Add'} account</h2><div class="grid2">
+    <div class="full"><label>Name</label><input id="a_name" value="${esc(a?a.name:'')}"></div>
+    <div><label>Opening balance</label><input id="a_bal" type="number" step="any" value="${a?a.opening_balance:0}"></div>
+    <div><label>As of date</label><input id="a_date" type="date" value="${(a&&a.opening_date)||TODAY}"></div>
+    <div><label>Currency</label><select id="a_cur">${Object.keys(CURSYM).map(c=>`<option ${(a&&a.currency||'THB')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div><label><input type="checkbox" id="a_pri" ${a&&a.is_primary?'checked':''} style="width:auto;margin-right:6px">Primary account</label></div>
+  </div><div class="right">${id&&!a.is_primary?`<button class="btn danger" onclick="delAccount('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveAccount('${id?esc(id):''}')">Save</button></div>`); }
+async function saveAccount(id){ const name=g('a_name').value.trim(); if(!name){ toast('Name required'); return; }
+  const pri=g('a_pri').checked;
+  const a={id:id||uid('ac'),name,opening_balance:parseFloat(g('a_bal').value)||0,opening_date:g('a_date').value||TODAY,currency:g('a_cur').value,is_primary:pri,sort:(DB.accounts.find(x=>x.id===id)||{}).sort||DB.accounts.length};
+  try{ if(pri){ const others=DB.accounts.filter(x=>x.is_primary&&x.id!==a.id).map(x=>Object.assign({},x,{is_primary:false})); if(others.length) await upsert('cf_accounts',others); }
+    await upsert('cf_accounts',[a]); closeModal(); toast('Saved'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
+async function delAccount(id){ if(!confirm('Delete account?')) return; try{ await del('cf_accounts',id); closeModal(); toast('Deleted'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
+
+/* ============ Import / Export (Pulse CSV) ============ */
+const IMPORT_COLS=['Date','Title','Account','Company','Description','Category','Memo','Payment','Deposit'];
+function rImport(){
+  const head=`<div class="head"><div><h1>Import / Export</h1><p class="mini">Bring data in from a CSV, or export what you have — Pulse-compatible format</p></div></div>`;
+  const body=`<div class="card pad" style="margin-bottom:16px">
+    <h2>Import from CSV</h2>
+    <p class="mini" style="margin-bottom:12px">One (1) payment or deposit per row. Required: <b>Date</b> and either <b>Payment</b> (expense) or <b>Deposit</b> (income). Optional: Title, Account, Company, Description, Category, Memo.</p>
+    <input type="file" id="csvfile" accept=".csv,text/csv" style="max-width:340px;display:inline-block;width:auto">
+    <button class="btn ghost sm" onclick="downloadTemplate()">⬇ Download CSV template</button>
+    <div id="preview" style="margin-top:16px"></div>
+  </div>
+  <div class="card pad"><h2>Export</h2><p class="mini" style="margin-bottom:10px">Download every scheduled line as CSV (${DB.lines.length} rows) in the same column format.</p>
+  <button class="btn" onclick="exportCSV()">⬇ Export CSV</button></div>
+  <table style="margin-top:16px" class="mini"><thead><tr>${IMPORT_COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+  <tbody><tr><td>2026-10-01</td><td>Office Rent</td><td>Primary</td><td>Club Unique</td><td>HQ Patong</td><td>Rent</td><td>Monthly</td><td>50000</td><td></td></tr>
+  <tr><td>2026-10-05</td><td>Sales Deck PBH</td><td>Primary</td><td>Club Unique</td><td>John Smith</td><td>TCU-0001</td><td>Instalment</td><td></td><td>36500</td></tr></tbody></table>`;
+  g('main').innerHTML=head+body;
+  g('csvfile').onchange=onCSV;
+}
+function downloadTemplate(){
+  const rows=[IMPORT_COLS.join(','),'2026-10-01,Office Rent,Primary,Club Unique,HQ,Rent,Monthly,50000,','2026-10-05,Sales Deck PBH,Primary,Club Unique,John Smith,TCU-0001,Instalment,,36500'];
+  downloadFile('cashflow-template.csv', rows.join('\n'));
+}
+function downloadFile(name, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+function parseCSV(text){
+  const rows=[]; let i=0,f='',row=[],q=false; text=text.replace(/^﻿/,'');
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(f); f=''; } else if(c==='\r'){} else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; } else f+=c; }
+    i++; }
+  if(f.length||row.length){ row.push(f); rows.push(row); }
+  return rows.filter(r=>!(r.length===1&&r[0].trim()===''));
+}
+function normDate(s){ s=(s||'').trim(); if(!s) return null;
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/); if(m){ let [_,a,b,y]=m; if(y.length===2)y='20'+y; return y+'-'+a.padStart(2,'0')+'-'+b.padStart(2,'0'); } // M/D/Y
+  const d=new Date(s); if(!isNaN(d)) return iso(d); return null;
+}
+function num(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+let _importRows=null;
+function onCSV(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ buildPreview(parseCSV(rd.result)); }catch(e){ g('preview').innerHTML='<div class="pill exp">Parse error: '+esc(e.message)+'</div>'; } };
+  rd.readAsText(file);
+}
+function buildPreview(rows){
+  if(rows.length<2){ g('preview').innerHTML='<div class="mini">Empty file.</div>'; return; }
+  const hdr=rows[0].map(h=>h.trim().toLowerCase());
+  const idx=name=>hdr.indexOf(name.toLowerCase());
+  const col={date:idx('date'),title:idx('title'),account:idx('account'),company:idx('company'),description:idx('description'),category:idx('category'),memo:idx('memo'),payment:idx('payment'),deposit:idx('deposit')};
+  if(col.date<0){ g('preview').innerHTML='<div class="pill exp">Missing required "Date" column</div>'; return; }
+  const parsed=[], bad=[];
+  for(let r=1;r<rows.length;r++){ const row=rows[r]; if(!row.join('').trim()) continue;
+    const date=normDate(row[col.date]);
+    const pay=col.payment>=0?num(row[col.payment]):0, dep=col.deposit>=0?num(row[col.deposit]):0;
+    if(!date || (pay<=0&&dep<=0)){ bad.push(r+1); continue; }
+    const kind = dep>0?'income':'expense', amount= dep>0?dep:pay;
+    parsed.push({date,kind,amount,
+      title:(col.title>=0?row[col.title]:'')||'(imported)',
+      account:col.account>=0?(row[col.account]||''):'',
+      company:col.company>=0?(row[col.company]||''):'',
+      description:col.description>=0?(row[col.description]||''):'',
+      category:col.category>=0?(row[col.category]||''):'',
+      memo:col.memo>=0?(row[col.memo]||''):''});
+  }
+  _importRows=parsed;
+  const inc=parsed.filter(p=>p.kind==='income'), exp=parsed.filter(p=>p.kind==='expense');
+  const sum=a=>a.reduce((s,x)=>s+x.amount,0);
+  const prev=parsed.slice(0,12).map(p=>`<tr><td>${fmtDate(p.date)}</td><td><span class="pill ${p.kind==='income'?'inc':'exp'}">${p.kind}</span></td><td>${esc(p.title)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.company||'—')}</td><td class="n">${fmt(p.amount)}</td></tr>`).join('');
+  g('preview').innerHTML=`<div class="kpis" style="margin-bottom:12px">
+      <div class="kpi"><div class="v">${parsed.length}</div><div class="l">Rows ready</div></div>
+      <div class="kpi"><div class="v" style="color:var(--income)">${fmt(sum(inc))}</div><div class="l">${inc.length} income</div></div>
+      <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(sum(exp))}</div><div class="l">${exp.length} expense</div></div>
+      ${bad.length?`<div class="kpi"><div class="v" style="color:var(--ink3)">${bad.length}</div><div class="l">Skipped (no date/amount)</div></div>`:''}
+    </div>
+    <div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Title</th><th>Category</th><th>Company</th><th class="n">Amount</th></tr></thead><tbody>${prev}</tbody></table></div>
+    ${parsed.length>12?`<p class="mini" style="margin-top:6px">…and ${parsed.length-12} more rows</p>`:''}
+    <div class="right"><button class="btn pri" onclick="runImport()">Import ${parsed.length} rows</button></div>`;
+}
+async function runImport(){
+  if(!_importRows||!_importRows.length){ toast('Nothing to import'); return; }
+  const btn=event.target; btn.disabled=true; btn.textContent='Importing…';
+  try{
+    const primary=primaryAccount();
+    // ensure companies & categories
+    const cos=[...new Set(_importRows.map(r=>r.company).filter(Boolean))];
+    const cats=[...new Set(_importRows.map(r=>r.category).filter(Boolean))];
+    const newCos=cos.filter(n=>!DB.companies.some(c=>c.name===n)).map(n=>({id:uid('co'),name:n}));
+    const newCats=cats.filter(n=>!DB.categories.some(c=>c.name===n)).map(n=>({id:uid('ct'),name:n}));
+    if(newCos.length) await upsert('cf_companies',newCos);
+    if(newCats.length) await upsert('cf_categories',newCats);
+    const entries=[], lines=[];
+    _importRows.forEach(r=>{ const id=uid('en');
+      const acc=DB.accounts.find(a=>a.name.toLowerCase()===(r.account||'').toLowerCase());
+      entries.push({id,kind:r.kind,title:r.title,category:r.category||null,company:r.company||null,account:(acc&&acc.id)||(primary&&primary.id),description:r.description||null,active:true,note:r.memo||null});
+      lines.push({id:uid('ln'),entry_id:id,amount:r.amount,txn_date:r.date,repeat:'never',forecast:false});
+    });
+    // batch in chunks of 500
+    for(let i=0;i<entries.length;i+=500) await upsert('cf_entries',entries.slice(i,i+500));
+    for(let i=0;i<lines.length;i+=500) await upsert('cf_lines',lines.slice(i,i+500));
+    toast('Imported '+entries.length+' entries'); _importRows=null;
+    await loadAll(); S.tab='cashflow'; render();
+  }catch(e){ toast('Import failed: '+e.message); btn.disabled=false; btn.textContent='Retry import'; }
+}
+function exportCSV(){
+  const out=[IMPORT_COLS.join(',')];
+  allLines().forEach(({l,e})=>{ const cell=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+    out.push([l.txn_date,e.title,accName(e.account),e.company,e.description,e.category,(l.repeat&&l.repeat!=='never'?REPLBL[l.repeat]:(e.note||'')),
+      e.kind==='expense'?l.amount:'', e.kind==='income'?l.amount:''].map(cell).join(',')); });
+  downloadFile('elite-cashflow-'+TODAY+'.csv', out.join('\n'));
+  toast('Exported '+(out.length-1)+' rows');
+}
+
+/* ============ start ============ */
+boot();
+</script>
+</body>
+</html>
