@@ -1041,6 +1041,11 @@ body:not(.isadmin) .adminonly{display:none!important}
 .sopstrip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin:0 0 18px}
 .sopstrip button{display:flex;align-items:flex-start;gap:9px;text-align:left;font-family:inherit;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 11px;cursor:pointer;color:var(--ink);box-shadow:var(--shadow-sm);transition:transform .15s,border-color .15s,box-shadow .15s;min-width:0}
 .sopstrip button:hover{transform:translateY(-2px);border-color:var(--s1);box-shadow:0 12px 26px -16px rgba(0,0,0,.45)}
+.sopstrip button{position:relative}
+.sopstrip .sbadge{position:absolute;top:8px;right:9px;min-width:18px;height:18px;line-height:18px;padding:0 5px;border-radius:999px;font-size:10.5px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;color:#fff;background:var(--ink3)}
+.sopstrip .sbadge.r{background:#e0533f}
+.sopstrip .sbadge.y{background:#e0a23a;color:#3a2c05}
+.sopstrip .sbadge.n{background:color-mix(in srgb,var(--ink3) 55%,transparent)}
 .sopstrip .sn{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;background:color-mix(in srgb,var(--s1) 18%,transparent);color:var(--s1);font-weight:700;font-size:13px}
 .sopstrip .st{display:flex;flex-direction:column;min-width:0}
 .sopstrip .st b{font-size:12.5px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1722,7 +1727,21 @@ function dashDailySales(){
 }
 /* Cold Line workflow strip — one click to the right screen for each SOP step */
 const SOP_STEPS=[['①','Market survey','OPC brings guest','mkt'],['②','Qualify Q/Q+/CT','Reception checklist','mkt'],['③','Tour · 90 min','Sales presentation','mkt'],['④','Close deal','Daily Sale Report · contract no.','deals'],['⑤','Case file','Welcome call · scan PA','cases'],['⑥','Receive · pay','AR receipts · commission · OPC pay','recv'],['⑦','Member care','MFEE · Interval · renewals','ar'],['⑧','Stay / use week','Check MFEE paid first','weeks']];
-function sopStrip(){ return `<div class="sopstrip">${SOP_STEPS.map(x=>`<button type="button" onclick="go('${x[3]}')"><span class="sn">${x[0]}</span><span class="st"><b>${x[1]}</b><small>${x[2]}</small></span></button>`).join('')}</div>`; }
+function sopCounts(){
+  const cur=BASE.cur_year||Number(TODAY.slice(0,4));
+  const dow=(new Date(TODAY+'T00:00:00').getDay()+6)%7, wkStart=addDaysISO(TODAY,-dow), wkEnd=addDaysISO(wkStart,6);
+  const toursWk=MT.filter(t=>t.tour_date>=wkStart&&t.tour_date<=wkEnd);
+  const noQual=MT.filter(t=>!t.qualify && t.tour_date && t.tour_date<=TODAY).length;
+  const showedWk=toursWk.filter(t=>t.showed).length;
+  const noCno=DL.filter(d=>!d.contract_no && !/cancel|cxl|canx/i.test(d.status||'')).length;
+  const wc=CF.filter(f=>/welcome/i.test(f.category||'')&&!/complete/i.test((f.status||'')+' '+(f.category||''))).length;
+  const lastPay={}; RP.forEach(pp=>{const k=normCno(pp.contract_no); if(pp.paid_date&&(!lastPay[k]||pp.paid_date>lastPay[k]))lastPay[k]=pp.paid_date;});
+  let ar90=0; REC.filter(r=>(r.currency||'USD')!=='THB'&&recStatus(r)==='owing').forEach(r=>{const ref=lastPay[normCno(r.contract_no)]||r.contract_date; if(!ref)return; const d=(new Date(TODAY)-new Date(String(ref).slice(0,10)))/86400000; if(d>90)ar90++;});
+  let feeUnpaid=0; allContracts().forEach(c=>{ if(/cancel/i.test(c.status||''))return; (c.fees||[]).forEach(f=>{ if(f.year===cur&&!f.paid)feeUnpaid++; });});
+  const weeksUsed=WU.filter(w=>String(w.use_year)===String(cur)).length;
+  return [ {n:toursWk.length,tone:''}, {n:noQual,tone:noQual?'y':''}, {n:showedWk,tone:''}, {n:noCno,tone:noCno?'r':''}, {n:wc,tone:wc?'y':''}, {n:ar90,tone:ar90?'r':''}, {n:feeUnpaid,tone:feeUnpaid?'y':''}, {n:weeksUsed,tone:''} ];
+}
+function sopStrip(){ const c=sopCounts(); return `<div class="sopstrip">${SOP_STEPS.map((x,i)=>{const b=c[i]||{n:0,tone:''}; const badge=b.n?`<span class="sbadge ${b.tone||'n'}">${b.n>999?'999+':b.n}</span>`:''; return `<button type="button" onclick="go('${x[3]}')" title="${esc(x[1])} · ${esc(x[2])}"><span class="sn">${x[0]}</span><span class="st"><b>${x[1]}</b><small>${x[2]}</small></span>${badge}</button>`;}).join('')}</div>`; }
 function rDash(){
   const st = bibleStats();
   const fc = st.fee[st.cur]||{due:0,paid:0,billed:0,none:0};
