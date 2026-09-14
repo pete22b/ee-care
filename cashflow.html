@@ -165,13 +165,16 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 /* occurrences for a line within [from,to] */
 function occ(line, from, to){
   const out=[], base=line.txn_date; if(!base) return out;
-  const amt=Number(line.amount)||0, mode=line.repeat||'never', step=REPSTEP[mode];
-  if(mode==='never'||!step){ if(base>=from&&base<=to) out.push({date:base,amount:amt,forecast:!!line.forecast}); return out; }
+  const amt=Number(line.amount)||0;
+  const fa=(line.forecast_amount!=null&&line.forecast_amount!=='')?Number(line.forecast_amount):amt;
+  const mode=line.repeat||'never', step=REPSTEP[mode];
+  const push=dt=>out.push({date:dt,amount:amt,famount:fa});
+  if(mode==='never'||!step){ if(base>=from&&base<=to) push(base); return out; }
   const until=line.repeat_until||to;
   for(let i=0;i<800;i++){
     const dt= step.d? addDaysISO(base,step.d*i) : addMonthsISO(base,step.m*i);
     if(dt>to) break; if(dt>until) break;
-    if(dt>=from) out.push({date:dt,amount:amt,forecast:!!line.forecast});
+    if(dt>=from) push(dt);
   }
   return out;
 }
@@ -268,30 +271,25 @@ function buildMatrix(ps, opts){
   const lines=allLines().filter(x=>x.e.active!==false);
   // beginning before window
   let begin=openBal, beginF=openBal;
-  lines.forEach(({l})=>{ occ(l,'0000-01-01',addDaysISO(winS,-1)).forEach(o=>{
-    const e=DB.entries.find(en=>en.id===l.entry_id); const sign=e.kind==='expense'?-1:1;
-    if(!o.forecast){ begin+=sign*o.amount; beginF+=sign*o.amount; } else beginF+=sign*o.amount;
-  }); });
+  lines.forEach(({l,e})=>{ const sign=e.kind==='expense'?-1:1; occ(l,'0000-01-01',addDaysISO(winS,-1)).forEach(o=>{ begin+=sign*o.amount; beginF+=sign*o.famount; }); });
   const inc={}, exp={}, incTot={}, expTot={}, incF={}, expF={};
   lines.forEach(({l,e})=>{
     const g0=e.category||(e.kind==='expense'?'Uncategorized expense':'Uncategorized income');
     occ(l,winS,winE).forEach(o=>{
       const pk=bucketKey(S.view,o.date,ps); if(!pk) return;
-      const tgt=e.kind==='expense'?exp:inc, tot=e.kind==='expense'?expTot:incTot, totF=e.kind==='expense'?expF:incF;
-      (totF[pk]=totF[pk]||0); totF[pk]+=o.amount;
-      if(o.forecast && opts.forecastSeparate!==false){ /* forecast only counts to pulse */ }
+      const tot=e.kind==='expense'?expTot:incTot, totF=e.kind==='expense'?expF:incF, tgt=e.kind==='expense'?exp:inc;
+      tot[pk]=(tot[pk]||0)+o.amount; totF[pk]=(totF[pk]||0)+o.famount;
       const grp=(tgt[g0]=tgt[g0]||{entries:{},tot:{}});
-      const em=(grp.entries[e.id]=grp.entries[e.id]||{title:e.title||'(untitled)',kind:e.kind,m:{},fc:!!o.forecast});
+      const em=(grp.entries[e.id]=grp.entries[e.id]||{title:e.title||'(untitled)',kind:e.kind,m:{}});
       em.m[pk]=(em.m[pk]||0)+o.amount;
       grp.tot[pk]=(grp.tot[pk]||0)+o.amount;
-      if(!o.forecast){ tot[pk]=(tot[pk]||0)+o.amount; }
     });
   });
   const beginByP={}, endByP={}, pulseByP={};
   let run=begin, runF=beginF;
   ps.forEach(p=>{ beginByP[p.key]=run; run=run+(incTot[p.key]||0)-(expTot[p.key]||0); endByP[p.key]=run;
     runF=runF+(incF[p.key]||0)-(expF[p.key]||0); pulseByP[p.key]=runF; });
-  const hasFc=DB.lines.some(l=>l.forecast);
+  const hasFc=DB.lines.some(l=>l.forecast_amount!=null&&l.forecast_amount!==''&&Number(l.forecast_amount)!==Number(l.amount));
   return {ps,inc,exp,incTot,expTot,beginByP,endByP,pulseByP,begin,hasFc};
 }
 
@@ -355,7 +353,7 @@ function matrixView(){
       const grp=groups[gk]; const col=S.collapsed[kindcls+gk];
       const gRow=`<tr class="grp" onclick="toggleGrp('${esc(kindcls+gk)}')"><td class="lab">${col?'▸':'▾'} ${esc(gk)}</td>${ps.map(p=>`<td class="n">${grp.tot[p.key]?fmt(grp.tot[p.key]):''}</td>`).join('')}</tr>`;
       if(col) return gRow;
-      const items=Object.entries(grp.entries).map(([eid,em])=>`<tr class="item click" onclick="openEntry('${em.kind}','${esc(eid)}')"><td class="lab">${esc(em.title)}${em.fc?' <span class="pill fc">forecast</span>':''}</td>${ps.map(p=>cell(em.m[p.key])).join('')}</tr>`).join('');
+      const items=Object.entries(grp.entries).map(([eid,em])=>`<tr class="item click" onclick="openEntry('${em.kind}','${esc(eid)}')"><td class="lab">${esc(em.title)}</td>${ps.map(p=>cell(em.m[p.key])).join('')}</tr>`).join('');
       return gRow+items;
     }).join('');
   }
@@ -390,17 +388,22 @@ function listRows(){
     <td><b>${esc(e.title||'(untitled)')}</b>${e.description?'<br><span class="mini">'+esc(e.description)+'</span>':''}</td>
     <td>${esc(e.category||'—')}</td><td>${esc(e.company||'—')}</td><td>${esc(accName(e.account))}</td>
     <td class="n">${e.kind==='expense'?'-':''}${fmt(l.amount)}</td>
-    <td class="mini">${REPLBL[l.repeat||'never']}${l.forecast?' · <span class="pill fc">fc</span>':''}${e.active===false?' · <span class="pill off">inactive</span>':''}</td>
+    <td class="mini">${REPLBL[l.repeat||'never']}${(l.forecast_amount!=null&&l.forecast_amount!==''&&Number(l.forecast_amount)!==Number(l.amount))?' · <span class="pill fc">fc '+fmt(l.forecast_amount)+'</span>':''}${e.active===false?' · <span class="pill off">inactive</span>':''}</td>
     <td><button class="btn link" onclick="event.stopPropagation();openEntry('${e.kind}','${esc(e.id)}')">Edit</button></td></tr>`).join('');
 }
 function accName(idOrName){ const a=DB.accounts.find(a=>a.id===idOrName||a.name===idOrName); return a?a.name:(idOrName||(primaryAccount()&&primaryAccount().name)||'—'); }
 
 /* ============ Entry modal (income/expense) ============ */
+const MONTHS_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function _dmy(s){ const p=(s||TODAY).split('-').map(Number); return {y:p[0],m:p[1],d:p[2]}; }
+function setLDate(i){ const y=g('ld_y'+i).value,m=g('ld_m'+i).value,d=g('ld_d'+i).value; window._elines[i].txn_date=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function onEndMode(i,v){ if(v==='never'){ window._elines[i].repeat_until=null; } const el=g('lu_'+i); if(el) el.style.display=v==='on'?'':'none'; }
 function openEntry(kind, id){
   const e = id ? DB.entries.find(x=>x.id===id) : null;
   kind=(e&&e.kind)||kind||'income';
-  const lines = e ? DB.lines.filter(l=>l.entry_id===e.id) : [];
-  if(!lines.length) lines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never',forecast:false});
+  const lines = e ? DB.lines.filter(l=>l.entry_id===e.id).slice().sort((a,b)=>a.txn_date<b.txn_date?-1:1) : [];
+  if(!lines.length) lines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never'});
+  const titleOpts=[...new Set(DB.entries.map(x=>x.title).filter(Boolean))].map(t=>`<option value="${esc(t)}">`).join('');
   const catOpts = DB.categories.map(c=>`<option value="${esc(c.name)}">`).join('');
   const coOpts = DB.companies.map(c=>`<option value="${esc(c.name)}">`).join('');
   const accSel = DB.accounts.map(a=>`<option value="${esc(a.id)}" ${(e&&e.account===a.id)||(!e&&a.is_primary)?'selected':''}>${esc(a.name)}</option>`).join('');
@@ -408,41 +411,52 @@ function openEntry(kind, id){
   openModal(`<h2>${id?'Edit':'Add'} ${kind==='income'?'Income':'Expense'}</h2>
   <input type="hidden" id="e_kind" value="${kind}"><input type="hidden" id="e_id" value="${id?esc(id):''}">
   <div class="grid2">
-    <div class="full"><label>Title <span style="color:var(--expense)">*</span></label><input id="e_title" value="${esc(e?e.title:'')}" placeholder="${kind==='income'?'e.g. Sales Deck PBH':'e.g. Office Rent'}"></div>
+    <div><label>Project <span class="muted" style="font-weight:400">(or enter title)</span> <span style="color:var(--expense)">*</span></label><input id="e_title" list="titlelist" value="${esc(e?e.title:'')}" placeholder="${kind==='income'?'e.g. Sales Deck PBH':'e.g. Office Rent'}"><datalist id="titlelist">${titleOpts}</datalist></div>
+    <div style="grid-row:span 3"><label>Description</label><textarea id="e_desc" rows="4" style="width:100%;font:inherit;padding:8px 11px;border:1px solid var(--line);border-radius:8px;resize:vertical" placeholder="Customer name / notes">${esc(e?e.description:'')}</textarea>
+      <label style="margin-top:12px"><input type="checkbox" id="e_active" ${!e||e.active!==false?'checked':''} style="width:auto;margin-right:6px">Active entry</label>
+      <div class="mini">Inactive entries do not figure into your cash flow</div></div>
     <div><label>Category</label><input id="e_cat" list="catlist" value="${esc(e?e.category:'')}" placeholder="Contract no. / type"><datalist id="catlist">${catOpts}</datalist></div>
-    <div><label>Company</label><input id="e_co" list="colist" value="${esc(e?e.company:'')}" placeholder="Company"><datalist id="colist">${coOpts}</datalist></div>
     <div><label>Account</label><select id="e_acc">${accSel}</select></div>
-    <div><label>Description</label><input id="e_desc" value="${esc(e?e.description:'')}" placeholder="Customer / note"></div>
-    <div class="full"><label><input type="checkbox" id="e_active" ${!e||e.active!==false?'checked':''} style="width:auto;margin-right:6px">Active (include in cash flow)</label></div>
+    <div><label>Company</label><input id="e_co" list="colist" value="${esc(e?e.company:'')}" placeholder="Company"><datalist id="colist">${coOpts}</datalist></div>
   </div>
-  <h2 style="margin:16px 0 6px;font-size:14px">Schedule</h2>
-  <div class="scroll" style="box-shadow:none"><table class="lines"><thead><tr><th>Amount</th><th>Date</th><th>Repeat</th><th>Until</th><th title="Forecast (Pulse line only)">FC</th><th></th></tr></thead><tbody id="e_lines"></tbody></table></div>
+  <div class="scroll" style="box-shadow:none;margin-top:14px"><table class="lines"><thead><tr><th>Amount</th><th>Date</th><th>Repeat</th><th>End</th><th title="Projected amount — feeds the blue Pulse line">Forecast</th><th></th></tr></thead><tbody id="e_lines"></tbody></table></div>
   <button class="btn ghost sm" style="margin-top:8px" onclick="addLine()">＋ Add another line</button>
-  <div class="right">${id?`<button class="btn danger" onclick="deleteEntry('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveEntry()">Save</button></div>`);
+  <div class="right">${id?`<button class="btn danger" onclick="deleteEntry('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveEntry()">${id?'Save':'Add '+(kind==='income'?'Income':'Expense')}</button></div>`);
   renderLines();
 }
 function renderLines(){
+  const yNow=Number(TODAY.slice(0,4)); const years=[]; for(let y=yNow-2;y<=yNow+6;y++) years.push(y);
   const body=g('e_lines');
-  body.innerHTML=window._elines.map((l,i)=>`<tr>
-    <td><input type="number" step="any" value="${l.amount}" oninput="_elines[${i}].amount=this.value" style="width:120px"></td>
-    <td><input type="date" value="${l.txn_date||TODAY}" oninput="_elines[${i}].txn_date=this.value" style="width:150px"></td>
-    <td><select onchange="_elines[${i}].repeat=this.value;renderLines()" style="width:130px">${REPEATS.map(r=>`<option value="${r[0]}" ${((l.repeat||'never')===r[0])?'selected':''}>${r[1]}</option>`).join('')}</select></td>
-    <td><input type="date" value="${l.repeat_until||''}" oninput="_elines[${i}].repeat_until=this.value" style="width:150px" ${(l.repeat||'never')==='never'?'disabled':''}></td>
-    <td style="text-align:center"><input type="checkbox" ${l.forecast?'checked':''} onchange="_elines[${i}].forecast=this.checked" style="width:auto"></td>
-    <td>${window._elines.length>1?`<button class="btn link" onclick="_elines.splice(${i},1);renderLines()">✕</button>`:''}</td></tr>`).join('');
+  body.innerHTML=window._elines.map((l,i)=>{
+    const dt=_dmy(l.txn_date); const rep=l.repeat||'never'; const recurring=rep!=='never';
+    const dateCell=`<span style="white-space:nowrap">
+      <select id="ld_m${i}" onchange="setLDate(${i})" style="width:auto">${MONTHS_FULL.map((nm,mi)=>`<option value="${mi+1}" ${dt.m===mi+1?'selected':''}>${nm}</option>`).join('')}</select>
+      <select id="ld_d${i}" onchange="setLDate(${i})" style="width:auto">${Array.from({length:31},(_,k)=>k+1).map(dd=>`<option ${dt.d===dd?'selected':''}>${dd}</option>`).join('')}</select>
+      <select id="ld_y${i}" onchange="setLDate(${i})" style="width:auto">${years.map(y=>`<option ${dt.y===y?'selected':''}>${y}</option>`).join('')}</select></span>`;
+    const endCell= recurring
+      ? `<select id="le_${i}" onchange="onEndMode(${i},this.value)" style="width:auto"><option value="never" ${!l.repeat_until?'selected':''}>Never end</option><option value="on" ${l.repeat_until?'selected':''}>End on…</option></select> <input type="date" id="lu_${i}" value="${l.repeat_until||''}" oninput="window._elines[${i}].repeat_until=this.value||null" style="width:150px;${l.repeat_until?'':'display:none'}">`
+      : '<span class="mini">—</span>';
+    return `<tr>
+      <td><input type="number" step="any" value="${l.amount}" oninput="window._elines[${i}].amount=this.value" placeholder="0" style="width:110px"></td>
+      <td>${dateCell}</td>
+      <td><select onchange="window._elines[${i}].repeat=this.value;renderLines()" style="width:auto">${REPEATS.map(r=>`<option value="${r[0]}" ${rep===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></td>
+      <td>${endCell}</td>
+      <td><input type="number" step="any" value="${l.forecast_amount!=null?l.forecast_amount:''}" oninput="window._elines[${i}].forecast_amount=this.value" placeholder="—" style="width:100px" title="Projected amount (Pulse line)"></td>
+      <td>${window._elines.length>1?`<button class="btn link" onclick="window._elines.splice(${i},1);renderLines()">✕</button>`:''}</td></tr>
+      <tr><td></td><td colspan="5"><input placeholder="Add memo" value="${esc(l.memo||'')}" oninput="window._elines[${i}].memo=this.value" style="max-width:340px"></td></tr>`;
+  }).join('');
 }
-function addLine(){ window._elines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never',forecast:false}); renderLines(); }
+function addLine(){ window._elines.push({id:uid('ln'),amount:'',txn_date:TODAY,repeat:'never'}); renderLines(); }
 async function saveEntry(){
-  const title=g('e_title').value.trim(); if(!title){ toast('Title is required'); return; }
+  const title=g('e_title').value.trim(); if(!title){ toast('Project / title is required'); return; }
   const kind=g('e_kind').value, id=g('e_id').value||uid('en');
-  const lines=window._elines.map(l=>({id:l.id||uid('ln'),entry_id:id,amount:parseFloat(l.amount)||0,txn_date:l.txn_date||TODAY,repeat:l.repeat||'never',repeat_until:((l.repeat&&l.repeat!=='never')&&l.repeat_until)||null,forecast:!!l.forecast,line_type:l.line_type||null})).filter(l=>l.amount>0);
+  const lines=window._elines.map(l=>({id:l.id||uid('ln'),entry_id:id,amount:parseFloat(l.amount)||0,txn_date:l.txn_date||TODAY,repeat:l.repeat||'never',repeat_until:((l.repeat&&l.repeat!=='never')&&l.repeat_until)||null,forecast_amount:(l.forecast_amount!=null&&l.forecast_amount!=='')?(parseFloat(l.forecast_amount)||null):null,memo:(l.memo||'').trim()||null,line_type:l.line_type||null})).filter(l=>l.amount>0);
   if(!lines.length){ toast('Add at least one amount'); return; }
   const cat=g('e_cat').value.trim()||null, co=g('e_co').value.trim()||null;
   const entry={id,kind,title,category:cat,account:g('e_acc').value,company:co,description:g('e_desc').value.trim()||null,active:g('e_active').checked};
   try{
     await ensureCategory(cat); await ensureCompany(co);
     await upsert('cf_entries',[entry]);
-    // replace lines
     const keep=lines.map(l=>l.id);
     await api('cf_lines?entry_id=eq.'+id+(keep.length?('&id=not.in.('+keep.join(',')+')'):''),{method:'DELETE',prefer:'return=minimal'});
     await upsert('cf_lines',lines);
@@ -651,7 +665,7 @@ async function runImport(){
 function exportCSV(){
   const out=[IMPORT_COLS.join(',')];
   allLines().forEach(({l,e})=>{ const cell=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-    out.push([l.txn_date,e.title,accName(e.account),e.company,e.description,e.category,(l.repeat&&l.repeat!=='never'?REPLBL[l.repeat]:(e.note||'')),
+    out.push([l.txn_date,e.title,accName(e.account),e.company,e.description,e.category,(l.memo||(l.repeat&&l.repeat!=='never'?REPLBL[l.repeat]:'')||e.note||''),
       e.kind==='expense'?l.amount:'', e.kind==='income'?l.amount:''].map(cell).join(',')); });
   downloadFile('elite-cashflow-'+TODAY+'.csv', out.join('\n'));
   toast('Exported '+(out.length-1)+' rows');
