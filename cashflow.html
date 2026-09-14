@@ -7,6 +7,7 @@
 <title>Cash Flow — Elite Escapes</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f4f6f8;--surface:#fff;--ink:#1a2733;--ink2:#5a6b7a;--ink3:#93a1af;--line:#e4e9ee;--line2:#eef2f5;
 --brand:#0e9f8e;--brand2:#0b7e70;--brandsoft:#e6f6f4;--income:#12a56f;--incomesoft:#e5f6ee;--expense:#e2574b;--expensesoft:#fbe9e7;
@@ -644,6 +645,7 @@ function rBankCash(){
      <label class="mini" style="align-self:center">Snapshot date</label>
      <input type="date" value="${date}" onchange="S.bankDate=this.value;render()" style="width:auto">
      <button class="btn pri" onclick="openBankAcct()">＋ Add account</button>
+     <button class="btn ghost" onclick="openBankImport()">⬆ Import from Excel</button>
      <button class="btn inc" onclick="useBankAsOpening()" title="Set the Cash Flow opening balance to this total">Use as Cash on Hand</button>
      <div class="sp" style="flex:1"></div>
      <button class="btn ghost sm" onclick="window.print()">🖨 Print</button></div>
@@ -721,7 +723,7 @@ function openBankBal(accId){ const a=DB.bankAccounts.find(x=>x.id===accId); if(!
    <div class="grid2">
     <div><label>Balance (฿)</label><input type="number" step="any" id="bb_amt" value="${s?s.balance:''}"></div>
     <div><label>Status</label><select id="bb_status"><option value="confirmed" ${(!s||s.status==='confirmed')?'selected':''}>Confirmed</option><option value="pending" ${s&&s.status==='pending'?'selected':''}>Pending confirm</option></select></div>
-    <div class="full"><label>${isCash?'Attach count sheet / photo (optional)':'Attach statement / bankbook image'}</label><input type="file" id="bb_file" accept="image/*,application/pdf">${s&&s.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(s.proof_name||'file')} · <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false">view</a></div>`:''}</div>
+    <div class="full"><label>${isCash?'Attach count sheet / photo (optional)':'Attach statement — PDF / CSV / bankbook image'}</label><input type="file" id="bb_file" accept="image/*,application/pdf,.csv,text/csv">${s&&s.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(s.proof_name||'file')} · <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false">view</a></div>`:''}</div>
     <div class="full"><label>Note</label><input id="bb_note" value="${esc(s?s.note:'')}"></div>
    </div>
    <div class="right">${s?`<button class="btn danger" onclick="delBankBal('${esc(accId)}')">Remove</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="bb_save" onclick="saveBankBal('${esc(accId)}')">Save</button></div>`);
@@ -751,6 +753,76 @@ async function useBankAsOpening(){ const date=S.bankDate; const accs=(DB.bankAcc
   const msg = cur==='THB' ? fmtB(grandTHB) : (fmtB(grandTHB)+' ≈ '+fmt(opening)+' at ฿'+cfRate(cur)+'/'+cur);
   if(!confirm('Set the Cash Flow opening balance ('+esc(pri.name)+') to '+msg+' as of '+fmtDate(date)+' ?')) return;
   try{ await patchRow('cf_accounts',pri.id,{opening_balance:Math.round(opening),opening_date:date}); toast('Opening balance updated'); await loadAll(); S.tab='bank'; render(); }catch(e){ toast('Failed: '+e.message); } }
+
+/* ---- Cash & Bank: import accounts from Excel / CSV ---- */
+function normType(v){ v=(v||'').toString().trim().toLowerCase(); if(/cash|เงินสด/.test(v)) return 'cash'; if(/sav|ออม/.test(v)) return 'savings'; return 'current'; }
+function bankNum(v){ if(v==null||v==='') return null; const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; }
+function readWorkbook(file){ return new Promise((res,rej)=>{ const rd=new FileReader(); const isCsv=/\.csv$/i.test(file.name)||file.type==='text/csv';
+  rd.onload=()=>{ try{ if(isCsv){ res(parseCSV(String(rd.result))); } else { const wb=XLSX.read(rd.result,{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]]; res(XLSX.utils.sheet_to_json(ws,{header:1,defval:''})); } }catch(e){ rej(e); } };
+  rd.onerror=()=>rej(rd.error);
+  if(isCsv) rd.readAsText(file,'utf-8'); else rd.readAsArrayBuffer(file); }); }
+const BANK_IMPORT_COLS=['Company','Bank','Account no','Type','OD limit','OD note','Note','Balance','As of'];
+function openBankImport(){
+  openModal(`<h2>Import accounts from Excel / CSV</h2>
+   <p class="mini" style="margin-bottom:10px">One account per row. Columns (header row required): <b>Company, Bank, Account no, Type</b> (current/savings/cash · Thai ok), OD limit, OD note, Note, and optionally <b>Balance</b> + <b>As of</b> (date) to also record a balance snapshot.</p>
+   <input type="file" id="bi_file" accept=".xlsx,.xls,.csv" style="width:auto;display:inline-block"> <button class="btn ghost sm" onclick="downloadBankTemplate()">⬇ Template</button>
+   <div id="bi_prev" style="margin-top:14px"></div>
+   <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button></div>`);
+  g('bi_file').onchange=async(ev)=>{ const f=ev.target.files[0]; if(!f) return;
+    try{ const rows=await readWorkbook(f); bankImportPreview(rows); }catch(e){ g('bi_prev').innerHTML='<div class="pill exp">Read error: '+esc(e.message)+'</div>'; } };
+}
+function downloadBankTemplate(){
+  const ex=[BANK_IMPORT_COLS.join(','),
+    'Elite Escapes Co.,BBL,123-4-56789-0,current,,,Operating,1250000,'+TODAY,
+    'Elite Escapes Co.,SCB,987-6-54321-0,savings,3000000,OD 3M,,,',
+    'Elite Escapes Co.,Cash,PETTY-01,cash,,,Front desk,80000,'+TODAY];
+  downloadFile('cash-bank-accounts-template.csv', ex.join('\n'));
+}
+let _biRows=null;
+function bankImportPreview(rows){
+  if(!rows || rows.length<2){ g('bi_prev').innerHTML='<div class="mini">Empty file.</div>'; return; }
+  const hdr=rows[0].map(h=>String(h).trim().toLowerCase());
+  const ix=(...names)=>{ for(const n of names){ const i=hdr.indexOf(n.toLowerCase()); if(i>=0) return i; } return -1; };
+  const col={co:ix('company','บริษัท','เจ้าของ'),bank:ix('bank','ธนาคาร'),no:ix('account no','account','เลขบัญชี','acct','account number'),
+    type:ix('type','ประเภท'),od:ix('od limit','od','วงเงิน od'),odn:ix('od note','od_note'),note:ix('note','หมายเหตุ'),
+    bal:ix('balance','ยอดคงเหลือ','ยอด'),asof:ix('as of','asof','วันที่','date')};
+  if(col.no<0 && col.co<0){ g('bi_prev').innerHTML='<div class="pill exp">Need at least a "Company" or "Account no" column</div>'; return; }
+  const out=[];
+  for(let r=1;r<rows.length;r++){ const row=rows[r]; if(!row.join('').trim()) continue;
+    const cell=i=>i>=0?String(row[i]).trim():'';
+    const co=cell(col.co), no=cell(col.no); if(!co && !no) continue;
+    let asof=cell(col.asof); asof = asof? normDate(asof) : null;
+    out.push({company:co||null,bank:cell(col.bank)||null,acct_no:no||null,acct_type:normType(cell(col.type)),
+      od_limit:col.od>=0?bankNum(row[col.od]):null,od_note:cell(col.odn)||null,note:cell(col.note)||null,
+      balance:col.bal>=0?bankNum(row[col.bal]):null, as_of:asof});
+  }
+  _biRows=out;
+  const withBal=out.filter(x=>x.balance!=null).length;
+  const prev=out.slice(0,10).map(x=>`<tr><td>${esc(x.company||'')}</td><td>${esc(x.bank||'')}</td><td class="mini">${esc(x.acct_no||'')}</td><td>${esc(ACCT_TYPE_LBL[x.acct_type])}</td><td class="n">${x.balance!=null?fmtB(x.balance):''}</td></tr>`).join('');
+  g('bi_prev').innerHTML=`<div class="kpis" style="margin-bottom:10px">
+      <div class="kpi"><div class="v">${out.length}</div><div class="l">Accounts ready</div></div>
+      <div class="kpi"><div class="v">${withBal}</div><div class="l">With balance snapshot</div></div></div>
+    <div class="scroll"><table><thead><tr><th>Company</th><th>Bank</th><th>Account</th><th>Type</th><th class="n">Balance</th></tr></thead><tbody>${prev}</tbody></table></div>
+    ${out.length>10?`<p class="mini" style="margin-top:6px">…and ${out.length-10} more</p>`:''}
+    <div class="right" style="margin-top:10px"><button class="btn pri" onclick="runBankImport()">Import ${out.length} accounts</button></div>`;
+}
+async function runBankImport(){
+  if(!_biRows||!_biRows.length){ toast('Nothing to import'); return; }
+  const btn=event.target; btn.disabled=true; btn.textContent='Importing…';
+  try{
+    const existing={}; (DB.bankAccounts||[]).forEach(a=>{ if(a.acct_no) existing[a.acct_no.replace(/\s/g,'')]=a.id; });
+    const accs=[], snaps=[], audits=[]; let sort=(DB.bankAccounts||[]).length;
+    _biRows.forEach(r=>{ const key=(r.acct_no||'').replace(/\s/g,''); const id= (key&&existing[key]) || uid('ba'); if(key) existing[key]=id;
+      accs.push({id,company:r.company,bank:r.bank,acct_no:r.acct_no,acct_type:r.acct_type,od_limit:r.od_limit,od_note:r.od_note,note:r.note,active:true,sort:sort++});
+      if(r.balance!=null){ const date=r.as_of||S.bankDate; snaps.push({id:uid('bs'),account_id:id,as_of:date,balance:r.balance,status:'confirmed',note:'imported'});
+        audits.push({actor:USER&&USER.email,action:'add',as_of:date,account_id:id,company:r.company,bank:r.bank,acct_no:r.acct_no,old_balance:null,new_balance:r.balance,note:'imported from Excel'}); }
+    });
+    for(let i=0;i<accs.length;i+=200) await upsert('cf_bank_accounts',accs.slice(i,i+200));
+    for(let i=0;i<snaps.length;i+=200) await api('cf_bank_snapshots?on_conflict=account_id,as_of',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(snaps.slice(i,i+200).map(s=>Object.assign({updated_by:USER&&USER.email},s)))});
+    if(audits.length) for(let i=0;i<audits.length;i+=200) await api('cf_bank_audit',{method:'POST',prefer:'return=minimal',body:JSON.stringify(audits.slice(i,i+200))});
+    _biRows=null; closeModal(); toast('Imported '+accs.length+' accounts'); await loadAll(); S.tab='bank'; render();
+  }catch(e){ toast('Import failed: '+e.message); btn.disabled=false; btn.textContent='Retry import'; }
+}
 
 /* ============ Companies ============ */
 function rCompanies(){
