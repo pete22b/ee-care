@@ -688,24 +688,36 @@ function termOf(cno){ const t=parseInt(String(cno||'').split('/')[2]); return is
 function mfeeLinesFor(cno){ return allLines().filter(x=>x.e.category===cno && x.l.line_type==='mfee').map(x=>x.l).sort((a,b)=>a.txn_date<b.txn_date?-1:1); }
 function stayOf(cno,year){ return (DB.stays||[]).find(s=>s.contract===cno && Number(s.year)===Number(year))||null; }
 function eligibility(cno){ const out=mfeeLinesFor(cno).filter(l=>l.txn_date<=TODAY && !l.paid); return {blocked:out.length>0, out}; }
+const CUR_YEAR=Number(TODAY.slice(0,4));
+function iiOf(meta){ meta=meta||{}; if(!meta.ii_tier && !meta.ii_membership) return null; return {tier:meta.ii_tier||'', from:Number(meta.ii_from)||null, until:Number(meta.ii_until)||null, label:meta.ii_membership||('Interval '+(meta.ii_tier||''))}; }
+/* upsell when Interval membership (or the contract itself) expires this year or next */
+function upsellInfo(g){ const ii=iiOf(g.meta); const term=termOf(g.cno); const fyo=Number(g.meta&&g.meta.fyo)||null; const lyo=(fyo&&term)?fyo+term-1:null;
+  const ends=[]; if(ii&&ii.until) ends.push({what:'Interval '+(ii.tier||'')+' expires',year:ii.until}); if(lyo) ends.push({what:'Membership ends',year:lyo});
+  if(!ends.length) return null; ends.sort((a,b)=>a.year-b.year); const soonest=ends[0];
+  const due = soonest.year - CUR_YEAR; // <=1 = this year/next, <0 expired
+  return {soonest, due, upsell: due<=1, ends}; }
 function membershipContracts(){
   const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); } });
   return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
 }
 function rStays(){
   const groups=membershipContracts();
-  let blocked=0, eligible=0, stayed=0;
-  groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; });
-  const head=`<div class="head"><div><h1>Stays &amp; Eligibility</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Mark each year's stay once MFEE is paid.</p></div></div>`;
+  let blocked=0, eligible=0, upsell=0;
+  groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; const u=upsellInfo(g); if(u&&u.upsell) upsell++; });
+  const head=`<div class="head"><div><h1>Stays &amp; Eligibility</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div></div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
     <div class="kpi"><div class="v" style="color:var(--income)">${eligible}</div><div class="l">Eligible to stay</div></div>
-    <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owes MFEE</div></div></div>`;
+    <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owes MFEE</div></div>
+    <div class="kpi"><div class="v" style="color:var(--gold)">${upsell}</div><div class="l">Renew / upsell soon</div></div></div>`;
   const blocks=groups.map(g=>{
     const el=eligibility(g.cno); const fyo=Number(g.meta.fyo)||null; const term=termOf(g.cno); const lyo=(fyo&&term)?fyo+term-1:null;
     const badge= el.blocked
       ? `<span class="pill exp">🔴 Blocked — owes MFEE ${fmt(el.out.reduce((s,l)=>s+Number(l.amount||0),0))}</span>`
       : `<span class="pill inc">🟢 Can stay</span>`;
+    const ii=iiOf(g.meta); const u=upsellInfo(g);
+    const iiBadge= ii? `<span class="pill fc" title="Interval International membership">🌐 Interval ${esc(ii.tier)}${ii.until?' · until '+ii.until:''}</span>` : '';
+    const upBadge= (u&&u.upsell)? `<span class="pill" style="background:#fbf1d8;color:#8a6d1f" title="${esc(u.soonest.what)} ${u.soonest.year}">⭐ Upsell — ${esc(u.soonest.what)} ${u.soonest.year}${u.due<0?' (expired)':''}</span>` : '';
     let rows='';
     if(fyo&&lyo){
       for(let y=fyo;y<=lyo;y++){
@@ -724,7 +736,7 @@ function rStays(){
     const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
     return `<div class="card" style="margin-bottom:12px"><div class="pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)">
       <div><b>${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
-      <div>${badge}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${badge}${iiBadge}${upBadge}</div></div>
       <div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('');
   g('main').innerHTML=head+kpis+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
