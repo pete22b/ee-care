@@ -152,6 +152,19 @@ select.flt,input.flt{flex:0 0 auto;padding:10px 14px;font:inherit;font-size:14px
 .tabbtns button{font:inherit;font-size:13.5px;font-weight:500;padding:7px 17px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;color:var(--ink2);box-shadow:var(--shadow-sm);transition:all .13s}
 .tabbtns button:hover{border-color:#dcc7a8}
 .tabbtns button.on{background:linear-gradient(135deg,#1c486b,#102e4c);border-color:#102e4c;color:#fff;font-weight:700}
+/* ===== Cash Flow matrix ===== */
+.cf-wrap{border:1px solid var(--line);border-radius:12px;max-height:72vh;overflow:auto}
+.cf-table{border-collapse:separate;border-spacing:0;font-size:13px;min-width:640px;width:100%}
+.cf-table th,.cf-table td{padding:7px 12px;white-space:nowrap;border-bottom:1px solid var(--line)}
+.cf-table thead th{position:sticky;top:0;background:var(--surface2);z-index:2;font-weight:600}
+.cf-table .cf-lab{position:sticky;left:0;background:var(--surface);z-index:1;text-align:left;min-width:180px}
+.cf-table thead th.cf-lab{z-index:4}
+.cf-table td.n,.cf-table th.n{text-align:right;font-variant-numeric:tabular-nums}
+.cf-table tr.cf-sec td{background:var(--surface2);font-weight:700;font-size:10.5px;letter-spacing:.09em;color:var(--ink3);text-transform:uppercase}
+.cf-table tr.cf-beg td,.cf-table tr.cf-end td{background:rgba(28,72,107,.07);font-weight:600}
+.cf-table tr.cf-end td{border-top:2px solid var(--line)}
+.cf-table tr.cf-tinc td,.cf-table tr.cf-texp td{border-top:1px solid var(--line);font-weight:600}
+.cf-table tr.cf-inc .cf-lab,.cf-table tr.cf-exp .cf-lab{padding-left:24px;color:var(--ink2);font-weight:500}
 .contract-card{border:1px solid var(--line);border-radius:15px;padding:18px 20px;margin-bottom:16px;background:var(--surface);box-shadow:var(--shadow-sm)}
 .contract-card h4{margin:0 0 2px;font-size:17.5px;font-weight:600}
 .payout-sec{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
@@ -1187,6 +1200,7 @@ main.anim .panel{animation:fadeUp .5s ease both}
     <button data-v="recv">Receivables (AR)</button>
     <button data-v="ar">Overdue</button>
     <button data-v="payouts">Payouts</button>
+    <button data-v="cashflow">Cash Flow</button>
     </div></div>
     <div class="ng open" data-g="mem" style="--gc:#b07fd8"><button type="button" class="navlab" onclick="toggleGroup('mem')">Member Service & Bookings</button><div class="ngi">
     <button data-v="clients">Customer</button>
@@ -1352,7 +1366,7 @@ async function fetchAllRows(table, order){
 }
 /* ===== browser cache (IndexedDB) + fetch only rows changed since last time (updated_at) =====
    First load pulls everything (~13 MB); later loads pull only the delta; it checks the total row count against the server, and if it differs (a delete) or the cache is older than 24 h → full reload */
-const TBL_PK={clients:['code'],contracts:['id'],mfee:['contract_id','year'],payout_plans:['contract_id'],payout_installments:['id'],receivables:['contract_no'],week_usage:['id'],ar_payments:['id'],case_files:['contract_no'],case_customers:['id'],commission_periods:['period'],commission_lines:['id'],mkt_weekly:['id'],contract_scans:['sha1'],mkt_tours:['id'],sales_deals:['id']};
+const TBL_PK={clients:['code'],contracts:['id'],mfee:['contract_id','year'],payout_plans:['contract_id'],payout_installments:['id'],receivables:['contract_no'],week_usage:['id'],ar_payments:['id'],case_files:['contract_no'],case_customers:['id'],commission_periods:['period'],commission_lines:['id'],mkt_weekly:['id'],contract_scans:['sha1'],mkt_tours:['id'],sales_deals:['id'],cash_entries:['id'],app_settings:['key']};
 function idb(){ return new Promise((res,rej)=>{ if(!window.indexedDB) return rej(new Error('no idb')); const r=indexedDB.open('ee_cache',1); r.onupgradeneeded=()=>r.result.createObjectStore('t'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 async function idbGet(k){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const q=db.transaction('t').objectStore('t').get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); }catch(e){ return null; } }
 async function idbSet(k,v){ try{ const db=await idb(); await new Promise((res,rej)=>{ const tx=db.transaction('t','readwrite'); tx.objectStore('t').put(v,k); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }catch(e){} }
@@ -1473,16 +1487,19 @@ async function boot(){
   $main.innerHTML='<div class="panel" style="margin-top:40px;text-align:center"><h3>⏳ Loading data from the central database…</h3><div class="mini" id="boot-prog">Starting to fetch data…</div><div class="mini">Supabase · Elite-Escapes</div></div>';
   try{
     const N=v=>v!=null?Number(v):null;
-    BOOT_DONE=0; BOOT_TOTAL=16; bootProgress();
+    BOOT_DONE=0; BOOT_TOTAL=18; bootProgress();
     /* Phase 1: core tables the first screen needs → render immediately; Phase 2 (payment history/case files/scans/commission ~8 MB) loads afterward */
     const t0=performance.now();
-    const [cls, cons, fees, plans, insts, recs, wus, cps, mws, mts, dls] = await Promise.all([
+    const [cls, cons, fees, plans, insts, recs, wus, cps, mws, mts, dls, ces, aps] = await Promise.all([
       loadTable('clients','code'), loadTable('contracts','id'), loadTable('mfee','contract_id'),
       loadTable('payout_plans','contract_id'), loadTable('payout_installments','id'),
       loadTable('receivables','contract_no'), loadTable('week_usage','id'),
       loadTable('commission_periods','period'), loadTable('mkt_weekly','id'),
-      loadTable('mkt_tours','id'), loadTable('sales_deals','id')
+      loadTable('mkt_tours','id'), loadTable('sales_deals','id'),
+      loadTable('cash_entries','id'), loadTable('app_settings','key')
     ]);
+    CE = ces.map(e=>({id:e.id,entry_date:e.entry_date,kind:e.kind,category:e.category,name:e.name,amount:N(e.amount),currency:e.currency||'THB',account:e.account||'Primary',recurring:e.recurring||'never',repeat_months:e.repeat_months,repeat_count:e.repeat_count,repeat_until:e.repeat_until,active:e.active!==false,company:e.company,note:e.note,source:e.source,source_ref:e.source_ref,updated_by:e.updated_by}));
+    APPSET={}; (aps||[]).forEach(r=>{ APPSET[r.key]=r.value; });
     const mapCS=css=>css.map(s=>({sha1:s.sha1,contract_no:s.contract_no,contract_key:s.contract_key,file_name:s.file_name,size:s.size,copies:s.copies,drive_folder:s.drive_folder}));
     const mapCL=cls2=>cls2.map(l=>({id:l.id,period:l.period,contract_no:l.contract_no,customer:l.customer,sale_type:l.sale_type,status:l.status,purchase_price:N(l.purchase_price),paid_to_date:N(l.paid_to_date),new_payment:N(l.new_payment),total_instalments:N(l.total_instalments),balance:N(l.balance),cash_in_pct:N(l.cash_in_pct),roles:l.roles||{},blocks:l.blocks||{},remark:l.remark}));
     const mapCF=cfs=>cfs.map(f=>({contract_no:f.contract_no,status:f.status,category:f.category,priority:f.priority,opened_date:f.opened_date,due_date:f.due_date,resolved_date:f.resolved_date,description:f.description,comments:f.comments,attachments:f.attachments||[],assigned_to:f.assigned_to,opened_by:f.opened_by,customer_id:f.customer_id,source_db:f.source_db,source_ids:f.source_ids||{},updated_by:f.updated_by}));
@@ -1602,7 +1619,10 @@ let CL=[];   /* commission lines per contract (commission_lines) */
 let MW=[];   /* marketing team weekly results/pay (mkt_weekly) */
 let MT=[];   /* OPC tour log (mkt_tours) */
 let DL=[];   /* Daily Sale Report — signed deals (sales_deals) */
+let CE=[];   /* Cash Flow entries (cash_entries) */
+let APPSET={}; /* app_settings key -> value (opening balance, fx, toggles) */
 Object.assign(S,{mkTab:'tours', tq:'', tweek:'', topc:'all', dq:'', dper:'month', dprod:'all'});
+Object.assign(S,{cfView:'month', cfStart:'', cfN:12, cfType:'all', cfQ:''});
 Object.assign(S,{cq:'', ccat:'all', coff:'all', cyr:'all', cmp:'', cms:'all', cmq:'', mw:'', ryr:'all', cUp:false, tier:''});
 let REC = (typeof BASE!=='undefined' && BASE.receivables) ? BASE.receivables : [];
 function natOptions(sel){
@@ -1635,6 +1655,7 @@ function render(){
   if(S.view==='clients') return rClients();
   if(S.view==='client') return rClient();
   if(S.view==='payouts') return rPayouts();
+  if(S.view==='cashflow') return rCashflow();
   if(S.view==='ar') return rAR();
   if(S.view==='recv') return rRecv();
   if(S.view==='weeks') return rWeeks();
@@ -1650,6 +1671,193 @@ function render(){
   if(S.view==='sop') return rSop();
   if(S.view==='owner') return rOwner();
 }
+
+/* ================= Cash Flow (Pulse-style) ================= */
+async function pushCashEntry(e){
+  try{
+    await sbApi('cash_entries?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{id:e.id,entry_date:e.entry_date,kind:e.kind,category:e.category||null,name:e.name||null,amount:e.amount,currency:e.currency||'THB',account:e.account||'Primary',recurring:e.recurring||'never',repeat_months:e.repeat_months||null,repeat_count:e.repeat_count||null,repeat_until:e.repeat_until||null,active:e.active!==false,company:e.company||null,note:e.note||null,source:e.source||null,source_ref:e.source_ref||null,updated_by:USER&&USER.email}])});
+    toast('☁️ Saved to the central database');
+  }catch(err){ toast('⚠️ Failed to save to the central database: '+err.message); }
+}
+async function deleteCashPush(id){
+  try{ await sbApi('cash_entries?id=eq.'+encodeURIComponent(id),{method:'DELETE'}); }
+  catch(e){ toast('⚠️ Failed to delete from the central database: '+e.message); }
+}
+async function pushSetting(k,v){
+  try{
+    await sbApi('app_settings?on_conflict=key',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify([{key:k,value:v,updated_by:USER&&USER.email}])});
+  }catch(e){ toast('⚠️ Failed to save setting: '+e.message); }
+}
+const CF_REPEAT=[['never','One-time'],['weekly','Weekly'],['biweekly','Biweekly'],['monthly','Monthly'],['bimonthly','Bimonthly'],['quarterly','Quarterly'],['biannually','Biannually'],['annually','Annually']];
+const CF_STEP={weekly:{d:7},biweekly:{d:14},monthly:{m:1},bimonthly:{m:2},quarterly:{m:3},biannually:{m:6},annually:{m:12}};
+const CF_REPLBL=Object.fromEntries(CF_REPEAT);
+function cfFmt(n){ return '฿'+Math.round(n||0).toLocaleString('en-US'); }
+function cfRate(cur){ const s=APPSET.cf_fx||{}; const usdthb=Number(s.USD)||36.5; const m={THB:1,USD:usdthb,GBP:usdthb*GBP_USD_DEFAULT,EUR:usdthb*1.08,AUD:usdthb*0.66}; return m[cur]||1; }
+function cfTHB(amt,cur){ return (Number(amt)||0)*cfRate(cur||'THB'); }
+function cfOpening(){ const o=APPSET.cf_opening||{}; return {amount:Number(o.amount)||0, date:o.date||((BASE.cur_year||Number(TODAY.slice(0,4)))+'-01-01')}; }
+function cfOccur(e, fromISO, toISO){
+  const out=[], base=e.entry_date; if(!base) return out;
+  const amt=cfTHB(e.amount, e.currency||'THB');
+  const mode=e.recurring||'never', step=CF_STEP[mode];
+  if(mode==='never'||!step){ if(base>=fromISO&&base<=toISO) out.push({date:base,amount:amt}); return out; }
+  const until=e.repeat_until||toISO;
+  for(let i=0;i<600;i++){
+    const d= step.d? addDaysISO(base, step.d*i) : addMonthsISO(base, step.m*i);
+    if(d>toISO) break;
+    if(e.repeat_count && i>=e.repeat_count) break;
+    if(d>until) break;
+    if(d>=fromISO) out.push({date:d,amount:amt});
+  }
+  return out;
+}
+function cfDealEntries(){
+  if(APPSET.cf_auto===false) return [];
+  const out=[];
+  (typeof DL!=='undefined'?DL:[]).forEach(d=>{
+    if(!d.deal_date || /cancel|cxl|canx/i.test(d.status||'')) return;
+    const dep=Number(d.deposit)||0;
+    if(dep>0) out.push({id:'auto-dep-'+d.id,entry_date:d.deal_date,kind:'income',category:d.contract_no||'—',name:'Deposit',amount:dep,currency:'USD',recurring:'never',company:'Club Unique',account:'Primary',note:d.client_name||'',active:true,auto:true,source:'deal',source_ref:d.id});
+    let bal=0; try{ bal=dealCalc(d).balance; }catch(err){ bal=(Number(d.purchase_price)||0)-dep; }
+    const n=d.instalments||0;
+    if(n>0 && d.first_due && bal>0){
+      out.push({id:'auto-inst-'+d.id,entry_date:d.first_due,kind:'income',category:d.contract_no||'—',name:'Instalment',amount:Math.round(bal/n),currency:'USD',recurring:'monthly',repeat_count:n,company:'Club Unique',account:'Primary',note:d.client_name||'',active:true,auto:true,source:'deal',source_ref:d.id});
+    }
+  });
+  return out;
+}
+function cfEntries(){ return (CE||[]).map(e=>Object.assign({},e)).concat(cfDealEntries()); }
+function cfMonthList(){
+  const start=(S.cfStart||((BASE.cur_year||Number(TODAY.slice(0,4)))+'-01'))+'-01';
+  const n=S.cfN||12, arr=[];
+  for(let i=0;i<n;i++){ const iso=addMonthsISO(start,i), key=iso.slice(0,7), [y,m]=key.split('-').map(Number); arr.push({key,label:TH_M[m-1]+' '+y}); }
+  return arr;
+}
+function cfLastDay(key){ const [y,m]=key.split('-').map(Number); return key+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); }
+function cfMatrix(){
+  const months=cfMonthList(), winStart=months[0].key+'-01', winEnd=cfLastDay(months[months.length-1].key);
+  const ents=cfEntries().filter(e=>e.active!==false), op=cfOpening();
+  let begin=op.amount;
+  ents.forEach(e=>{ cfOccur(e,'0000-01-01',addDaysISO(winStart,-1)).forEach(o=>{ if(o.date>=op.date) begin += (e.kind==='expense'?-o.amount:o.amount); }); });
+  const inc={},exp={},incTot={},expTot={};
+  const grp=e=> e.auto ? ('Sales — '+e.name) : (e.category || (e.kind==='expense'?'Other expense':'Other income'));
+  ents.forEach(e=>{
+    cfOccur(e,winStart,winEnd).forEach(o=>{
+      if(o.date<op.date) return;
+      const mk=o.date.slice(0,7), g=grp(e), tgt=e.kind==='expense'?exp:inc, tot=e.kind==='expense'?expTot:incTot;
+      (tgt[g]=tgt[g]||{})[mk]=(tgt[g][mk]||0)+o.amount; tot[mk]=(tot[mk]||0)+o.amount;
+    });
+  });
+  const beginByM={},endByM={}; let run=begin;
+  months.forEach(m=>{ beginByM[m.key]=run; run=run+(incTot[m.key]||0)-(expTot[m.key]||0); endByM[m.key]=run; });
+  return {months,inc,exp,incTot,expTot,beginByM,endByM,op};
+}
+function cfShift(n){ const cur=(S.cfStart||((BASE.cur_year||Number(TODAY.slice(0,4)))+'-01'))+'-01'; S.cfStart=addMonthsISO(cur,n).slice(0,7); render(); }
+function rCashflow(){
+  const tab=S.cfView||'month';
+  const head=`<div class="pk">Accounting · Cash Flow</div><h1>Cash Flow</h1><p class="sub">Forecast cash on hand — sales instalments come in, expenses go out. Income is generated automatically from the Daily Sale Report; add expenses and other income by hand.</p>`;
+  const tabs=`<div class="tabbtns">${[['month','Month'],['list','List'],['settings','Settings']].map(t=>`<button class="${tab===t[0]?'on':''}" onclick="S.cfView='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
+  const bar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px"><button class="btn" onclick="openCfEntry('income')">＋ Add income</button><button class="btn sec" onclick="openCfEntry('expense')">＋ Add expense</button></div>`;
+  const body= tab==='list'?cfListView() : tab==='settings'?cfSettingsView() : cfMonthView();
+  $main.innerHTML=head+tabs+(tab==='settings'?'':bar)+body;
+  if(tab==='list'){ const inp=document.getElementById('cfq'); if(inp) inp.oninput=()=>{ S.cfQ=inp.value; render(); const el=document.getElementById('cfq'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } }; }
+}
+function cfMonthView(){
+  const M=cfMatrix(), months=M.months;
+  const nav=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <button class="btn sm ghost" onclick="cfShift(-12)">‹ Prev year</button>
+    <b>${months[0].label} – ${months[months.length-1].label}</b>
+    <button class="btn sm ghost" onclick="cfShift(12)">Next year ›</button>
+    <button class="btn sm ghost" onclick="S.cfStart='';render()">This year</button></div>`;
+  const th=`<th class="cf-lab">Line</th>`+months.map(m=>`<th class="n">${m.label}</th>`).join('');
+  const cell=v=>`<td class="n">${v?cfFmt(v):'<span style="opacity:.3">–</span>'}</td>`;
+  const rowGroup=(obj,cls)=>Object.keys(obj).sort().map(g=>`<tr class="${cls}"><td class="cf-lab">${esc(g)}</td>${months.map(m=>cell(obj[g][m.key])).join('')}</tr>`).join('');
+  const totRow=(obj,lbl,cls)=>`<tr class="${cls}"><td class="cf-lab"><b>${lbl}</b></td>${months.map(m=>`<td class="n"><b>${obj[m.key]?cfFmt(obj[m.key]):'–'}</b></td>`).join('')}</tr>`;
+  const balRow=(obj,lbl,cls)=>`<tr class="${cls}"><td class="cf-lab">${lbl}</td>${months.map(m=>`<td class="n">${cfFmt(obj[m.key])}</td>`).join('')}</tr>`;
+  const secRow=lbl=>`<tr class="cf-sec"><td class="cf-lab">${lbl}</td>${months.map(()=>'<td></td>').join('')}</tr>`;
+  const noInc=!Object.keys(M.inc).length, noExp=!Object.keys(M.exp).length;
+  return `${nav}<div class="cf-wrap"><table class="cf-table"><thead><tr>${th}</tr></thead><tbody>
+    ${balRow(M.beginByM,'Beginning cash on hand','cf-beg')}
+    ${secRow('Income')}${noInc?'':rowGroup(M.inc,'cf-inc')}${totRow(M.incTot,'Total income','cf-tinc')}
+    ${secRow('Expenses')}${noExp?'':rowGroup(M.exp,'cf-exp')}${totRow(M.expTot,'Total expenses','cf-texp')}
+    ${balRow(M.endByM,'<b>Ending cash on hand</b>','cf-end')}
+  </tbody></table></div>
+  <div class="mini" style="margin-top:6px">Opening balance ${cfFmt(M.op.amount)} as of ${fmtD(M.op.date)} · USD figures converted at ฿${cfRate('USD')}/US$${APPSET.cf_auto===false?' · auto sales income OFF':''}</div>`;
+}
+function cfListView(){
+  let list=cfEntries();
+  const q=(S.cfQ||'').trim().toLowerCase();
+  if(S.cfType&&S.cfType!=='all') list=list.filter(e=>e.kind===S.cfType);
+  if(q) list=list.filter(e=>((e.category||'')+' '+(e.name||'')+' '+(e.note||'')).toLowerCase().includes(q));
+  list.sort((a,b)=>a.entry_date<b.entry_date?1:(a.entry_date>b.entry_date?-1:0));
+  const rows=list.map(e=>{
+    const amtTHB=cfTHB(e.amount,e.currency||'THB'), rep=CF_REPLBL[e.recurring||'never']||'One-time';
+    const onc=e.auto?'':`class="click" onclick="openCfEntry('${e.kind}','${esc(e.id)}')"`;
+    return `<tr ${onc}><td>${fmtD(e.entry_date)}</td>
+      <td><span class="pill ${e.kind==='income'?'p-paid':'p-none'}">${e.kind==='income'?'Income':'Expense'}</span></td>
+      <td><b>${esc(e.category||'—')}</b></td>
+      <td>${esc(e.name||'')}${e.note?'<br><span class="mini">'+esc(e.note)+'</span>':''}</td>
+      <td class="n">${e.kind==='expense'?'-':''}${cfFmt(amtTHB)}${(e.currency&&e.currency!=='THB')?'<br><span class="mini">'+fmtM(e.amount,e.currency)+'</span>':''}</td>
+      <td class="mini">${rep}${e.repeat_count?' ×'+e.repeat_count:''}</td>
+      <td class="mini">${e.auto?'Auto · deal':'Manual'}</td></tr>`;
+  }).join('');
+  const filt=`<div class="search" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <input id="cfq" type="text" placeholder="🔍 Search category / name / customer…" value="${esc(S.cfQ||'')}" style="flex:1;min-width:220px">
+    <select class="flt" onchange="S.cfType=this.value;render()"><option value="all">All types</option><option value="income" ${S.cfType==='income'?'selected':''}>Income</option><option value="expense" ${S.cfType==='expense'?'selected':''}>Expense</option></select></div>`;
+  return `${filt}<div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Name</th><th class="n">Amount (฿)</th><th>Repeat</th><th>Source</th></tr></thead><tbody>${rows||'<tr><td colspan="7" style="opacity:.5;padding:14px">No entries yet — press "Add income/expense", or record deals in the Daily Sale Report</td></tr>'}</tbody></table></div>`;
+}
+function cfSettingsView(){
+  const op=cfOpening(), fx=APPSET.cf_fx||{}, auto=APPSET.cf_auto!==false;
+  return `<div class="panel"><h3><span class="idx">01</span>Opening cash on hand</h3>
+    <div class="cs">Starting balance and the date the forecast counts from</div>
+    <div class="form"><div><label>Amount (฿)</label><input id="cf_op_amt" type="number" step="any" value="${op.amount}"></div>
+    <div><label>As of date</label><input id="cf_op_date" type="date" value="${op.date}"></div></div>
+    <div class="right"><button class="btn" onclick="saveCfSettings()">💾 Save</button></div></div>
+  <div class="panel"><h3><span class="idx">02</span>Auto income from sales</h3>
+    <div class="cs">Generate income automatically from the Daily Sale Report — each deal's deposit plus its monthly instalments</div>
+    <label style="display:flex;gap:9px;align-items:center;cursor:pointer"><input type="checkbox" id="cf_auto" ${auto?'checked':''} onchange="APPSET.cf_auto=this.checked;pushSetting('cf_auto',this.checked);render()"> Include sales deposits &amp; instalments as income</label></div>
+  <div class="panel"><h3><span class="idx">03</span>Exchange rate</h3>
+    <div class="cs">Deals are recorded in USD — set USD→THB so every figure shows in Baht</div>
+    <div class="form"><div><label>1 USD = ฿</label><input id="cf_fx_usd" type="number" step="any" value="${Number(fx.USD)||36.5}"></div></div>
+    <div class="right"><button class="btn" onclick="saveCfFx()">💾 Save rate</button></div></div>`;
+}
+function saveCfSettings(){ APPSET.cf_opening={amount:parseFloat(document.getElementById('cf_op_amt').value)||0,date:document.getElementById('cf_op_date').value||TODAY}; pushSetting('cf_opening',APPSET.cf_opening); render(); toast('Saved'); }
+function saveCfFx(){ APPSET.cf_fx=Object.assign({},APPSET.cf_fx,{USD:parseFloat(document.getElementById('cf_fx_usd').value)||36.5}); pushSetting('cf_fx',APPSET.cf_fx); render(); toast('Saved'); }
+function openCfEntry(kind, id){
+  const e = id ? (CE.find(x=>x.id===id)||{}) : {}; kind = e.kind || kind || 'income';
+  const v=(k,d)=> e[k]!=null?e[k]:d;
+  openModal(`<h3>${id?'Edit':'Add'} ${kind==='income'?'income':'expense'}</h3>
+  <div class="form">
+    <div><label>Name / title</label><input id="cf_name" value="${esc(v('name',''))}" placeholder="${kind==='income'?'e.g. Instalment, Rent income':'e.g. Rent, Payroll, Utilities'}"></div>
+    <div><label>Category</label><input id="cf_cat" value="${esc(v('category',''))}" placeholder="${kind==='income'?'Contract no. / income type':'Expense type'}"></div>
+    <div><label>Amount</label><input id="cf_amt" type="number" step="any" value="${v('amount','')}"></div>
+    <div><label>Currency</label><select id="cf_cur">${['THB','USD','GBP','EUR','AUD'].map(c=>`<option ${v('currency','THB')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div><label>Start date</label><input id="cf_date" type="date" value="${v('entry_date',TODAY)}"></div>
+    <div><label>Repeat</label><select id="cf_rep" onchange="var x=this.value==='never';document.getElementById('cf_rw1').style.display=x?'none':'';document.getElementById('cf_rw2').style.display=x?'none':''">${CF_REPEAT.map(r=>`<option value="${r[0]}" ${v('recurring','never')===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></div>
+    <div id="cf_rw1" style="display:${v('recurring','never')==='never'?'none':''}"><label>No. of times (blank = use end date)</label><input id="cf_cnt" type="number" min="1" value="${v('repeat_count','')||''}"></div>
+    <div id="cf_rw2" style="display:${v('recurring','never')==='never'?'none':''}"><label>Repeat until (optional)</label><input id="cf_until" type="date" value="${v('repeat_until','')||''}"></div>
+    <div><label>Description / customer</label><input id="cf_note" value="${esc(v('note',''))}"></div>
+    <div><label>Company</label><input id="cf_co" value="${esc(v('company','Club Unique'))}"></div>
+    <div class="full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="cf_active" ${v('active',true)!==false?'checked':''}> Active (include in the cash flow)</label></div>
+  </div>
+  <input type="hidden" id="cf_kind" value="${kind}">
+  <div class="right">${id?`<button class="btn ghost danger" onclick="deleteCfEntry('${esc(id)}')">🗑 Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button>
+  <button class="btn" onclick="saveCfEntry('${id?esc(id):''}')">💾 Save</button></div>`);
+}
+function saveCfEntry(id){
+  const g=k=>document.getElementById(k), amt=parseFloat(g('cf_amt').value);
+  if(!(amt>0)){ toast('Enter an amount'); return; }
+  const e={ id: id||('ce'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    kind:g('cf_kind').value, name:g('cf_name').value.trim(), category:g('cf_cat').value.trim()||null,
+    amount:amt, currency:g('cf_cur').value, entry_date:g('cf_date').value||TODAY,
+    recurring:g('cf_rep').value, repeat_count:g('cf_cnt').value?parseInt(g('cf_cnt').value):null,
+    repeat_until:g('cf_until').value||null, note:g('cf_note').value.trim()||null,
+    company:g('cf_co').value.trim()||null, account:'Primary', active:g('cf_active').checked };
+  const i=CE.findIndex(x=>x.id===e.id); if(i>=0) CE[i]=e; else CE.push(e);
+  pushCashEntry(e); closeModal(); render(); toast(id?'Updated':'Added');
+}
+function deleteCfEntry(id){ if(!confirm('Delete this entry?')) return; CE=CE.filter(x=>x.id!==id); deleteCashPush(id); closeModal(); render(); toast('Deleted'); }
 
 /* ================= dashboard ================= */
 function bibleStats(){
@@ -1922,8 +2130,8 @@ function runCounters(){
 }
 const SKINS=[['navy','Deep navy theme (Navy)'],['verde','Green theme (Verde)'],['bracket','Flat admin theme (Bracket)'],['apex','Dark theme (Apex)'],['classic','Original theme (Classic)']];
 function toggleSkin(){ const i=SKINS.findIndex(s=>s[0]===document.documentElement.dataset.skin); const nx=SKINS[(i+1)%SKINS.length]; document.documentElement.dataset.skin=nx[0]; try{ localStorage.setItem('ee_skin',nx[0]); }catch(e){} toast(nx[1]); }
-const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4',owner:'M3 3v18h18M7 14l4-4 4 3 5-6M17 3h4v4'};
-const NAV_SUB={dash:'Overview & KPIs',todo:'Follow-up tasks',mkt:'OPC tours · Friday pay',deals:'Close deal · contract no.',comm:'Sales commission',bible:'Contract registry',cases:'Welcome call · files',recv:'Accounts receivable',ar:'Maintenance fee due',payouts:'Fractional pay-back',clients:'Members · value tiers',weeks:'Stay usage',interval:"Interval Int'l",renew:'Expiring contracts',sop:'Who does what',backup:'Users · activity · export',sysmap:'Data flow (admin)'};
+const NAV_ICONS={dash:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',todo:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',clients:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',payouts:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',cashflow:'M3 3v18h18M7 15l3-4 3 3 5-7M18 10h2v2',ar:'M4 4h16v16H4zM4 10h16M10 4v16',recv:'M3 7h18v12H3zM3 11h18M7 15h4',weeks:'M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2',cases:'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z',comm:'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4L4.2 7.7l5.4-.8z',mkt:'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6',deals:'M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5',interval:'M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.5 3.5-5.5 3.5-9S14.5 5.5 12 3m0 18c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3',renew:'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',bible:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',backup:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',sysmap:'M3 5h5v4H3zM16 3h5v4h-5zM16 10h5v4h-5zM16 17h5v4h-5zM8 7c4 0 4 -2 8 -2M8 7c4 0 4 5 8 5M8 7c4 0 4 12 8 12',sop:'M4 4h12l4 4v12H4zM8 12h8M8 16h8M8 8h4',owner:'M3 3v18h18M7 14l4-4 4 3 5-6M17 3h4v4'};
+const NAV_SUB={dash:'Overview & KPIs',todo:'Follow-up tasks',mkt:'OPC tours · Friday pay',deals:'Close deal · contract no.',comm:'Sales commission',bible:'Contract registry',cases:'Welcome call · files',recv:'Accounts receivable',ar:'Maintenance fee due',payouts:'Fractional pay-back',cashflow:'Forecast · in vs out',clients:'Members · value tiers',weeks:'Stay usage',interval:"Interval Int'l",renew:'Expiring contracts',sop:'Who does what',backup:'Users · activity · export',sysmap:'Data flow (admin)'};
 function decorateNav(){ document.querySelectorAll('nav button[data-v]').forEach(b=>{ if(b.dataset.dec) return; b.dataset.dec='1';
   const v=b.dataset.v; const p=NAV_ICONS[v]; const badge=b.querySelector('.badge');
   let label=''; b.childNodes.forEach(n=>{ if(n.nodeType===3) label+=n.textContent; }); label=(label.trim()||b.textContent.trim());
@@ -4385,7 +4593,7 @@ function resetOV(){
 
 /* ===== LIVE: viewer role guards ===== */
 function canEdit(){ return USER && USER.role!=='viewer'; }
-['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt','openTourModal','saveTour','deleteTour','openDealModal','saveDeal','deleteDeal'].forEach(fn=>{
+['savePlan','delPlan','delInst','unpay','confirmPay','saveInst','saveNewClient','openPayModal','openInstModal','openNewClientModal','openFeeModal','promptFeeYear','saveFee','openRecvPay','confirmRecvPay','openRecvEdit','saveRecvEdit','deletePayment','openWeekModal','saveWeek','deleteWeek','saveCase','openMktModal','saveMkt','deleteMkt','openTourModal','saveTour','deleteTour','openDealModal','saveDeal','deleteDeal','openCfEntry','saveCfEntry','deleteCfEntry','saveCfSettings','saveCfFx'].forEach(fn=>{
   const orig=window[fn];
   if(typeof orig==='function') window[fn]=function(){ if(!canEdit()){ toast('Your account has view-only access'); return; } return orig.apply(this,arguments); };
 });
