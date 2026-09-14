@@ -449,7 +449,7 @@ function accName(idOrName){ const a=DB.accounts.find(a=>a.id===idOrName||a.name=
 /* ---- sales-report metadata (structured, jsonb meta on the entry) ---- */
 function em(e){ return (e&&e.meta&&typeof e.meta==='object')?e.meta:{}; }
 function metaLine(e){ const m=em(e); const p=[];
-  if(m.nationality) p.push('🌏 '+m.nationality);
+  if(m.nationality||m.city) p.push('🌏 '+[m.nationality,m.city].filter(Boolean).join(' · '));
   if(m.unit) p.push('🏠 '+m.unit+(m.contract_type?(' · '+m.contract_type):'')+(m.season?(' '+m.season):''));
   if(m.channel) p.push('📣 '+m.channel);
   const team=[]; if(m.rep)team.push('Rep '+m.rep); if(m.fu)team.push('FU '+m.fu); if(team.length) p.push(team.join(' · '));
