@@ -146,7 +146,7 @@ let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
 const today=new Date(); const TODAY=iso(today);
 const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
   report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{},
-  bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0};
+  bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0, weekRef:TODAY};
 
 /* ============ helpers ============ */
 function iso(d){ const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
@@ -322,6 +322,7 @@ function rCashflow(){
   let body;
   if(empty) body=emptyState();
   else if(S.view==='list') body=listView();
+  else if(S.view==='week') body=weekView();
   else body=matrixView();
   g('main').innerHTML=head+bar+body;
   if(S.view==='list'){ const inp=g('cfq'); if(inp) inp.oninput=()=>{ S.q=inp.value; const b=matrixOrList(); }; }
@@ -382,6 +383,36 @@ function matrixView(){
 }
 function toggleGrp(k){ S.collapsed[k]=!S.collapsed[k]; render(); }
 
+function sundayOf(s){ const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()-dt.getDay()); return iso(dt); }
+function wkLabel(ws,we){ const a=ws.split('-').map(Number),b=we.split('-').map(Number); const sameM=a[1]===b[1]&&a[0]===b[0]; return MON[a[1]-1]+' '+a[2]+(sameM?('-'+b[2]):(' – '+MON[b[1]-1]+' '+b[2]))+', '+b[0]; }
+function weekView(){
+  const ref=S.weekRef||TODAY, ws=sundayOf(ref), we=addDaysISO(ws,6);
+  const openBal=DB.accounts.reduce((s,a)=>s+(Number(a.opening_balance)||0),0);
+  let begin=openBal;
+  allLines().filter(x=>x.e.active!==false).forEach(({l,e})=>{ const sign=e.kind==='expense'?-1:1; occ(l,'0000-01-01',addDaysISO(ws,-1)).forEach(o=>{ begin+=sign*o.famount; }); });
+  const days=[]; for(let i=0;i<7;i++) days.push({date:addDaysISO(ws,i),items:[]});
+  let net=0;
+  allLines().forEach(({l,e})=>{ occ(l,ws,we).forEach(o=>{ const di=days.find(x=>x.date===o.date); if(!di) return;
+    di.items.push({title:e.title||'(untitled)',desc:(e.description||'').replace(/\n/g,' '),kind:e.kind,amount:o.amount,active:e.active!==false,id:e.id});
+    if(e.active!==false) net += (e.kind==='expense'?-1:1)*o.famount; }); });
+  const end=begin+net;
+  const nav=`<div style="display:flex;align-items:stretch;margin-bottom:14px;box-shadow:var(--shadow);border-radius:8px;overflow:hidden">
+     <button class="btn ghost" style="border-radius:0;border:none" onclick="S.weekRef='${addDaysISO(ws,-7)}';render()">‹</button>
+     <div style="flex:1;background:#0f2733;color:#fff;text-align:center;font-weight:700;padding:11px;font-size:15px">${wkLabel(ws,we)}</div>
+     <button class="btn ghost" style="border-radius:0;border:none" onclick="S.weekRef='${addDaysISO(ws,7)}';render()">›</button></div>`;
+  const band=`<div style="background:#dbeafe;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+     <div><div class="mini" style="color:#1e40af">Pulse — beginning of the week</div><b style="font-size:18px">${fmt(begin)}</b></div>
+     <div style="text-align:right"><div class="mini" style="color:#1e40af">Pulse — end of the week</div><b style="font-size:18px">${fmt(end)}</b></div></div>`;
+  const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const blocks=days.map((dd,di)=>{ const [y,m,day]=dd.date.split('-').map(Number);
+    const rows=dd.items.length? dd.items.map((it,ri)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 14px;${ri%2?'background:var(--surface2);':''}${it.active?'':'opacity:.5;'}">
+        <div><span style="color:${it.active?'var(--brand)':'var(--ink3)'};font-weight:500">● ${esc(it.title)}</span>${it.active?'':' <span class="mini">— Inactive</span>'}${it.desc?'<br><span class="mini">'+esc(it.desc)+'</span>':''}</div>
+        <div class="n" style="white-space:nowrap;color:${it.kind==='expense'?'var(--expense)':'var(--income)'};font-weight:600">${it.kind==='expense'?'-':''}${fmt(it.amount)}</div></div>`).join('')
+      : '<div class="mini" style="padding:9px 14px;opacity:.45">—</div>';
+    return `<div style="margin-top:12px"><div style="font-weight:700;border-bottom:2px solid var(--ink);padding-bottom:5px">${DN[di]}, ${MON[m-1]} ${day}</div>${rows}</div>`;
+  }).join('');
+  return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><button class="btn sm ghost" onclick="S.weekRef='${TODAY}';render()">This week</button></div>${nav}${band}<div class="card"><div class="pad" style="padding-top:2px">${blocks}</div></div>`;
+}
 function listView(){
   return `<div class="toolbar" style="margin-bottom:10px">
     <input id="cfq" placeholder="🔍 Search title / category / company / description" value="${esc(S.q)}" style="max-width:360px">
@@ -727,28 +758,47 @@ function openBankBal(accId){ const a=DB.bankAccounts.find(x=>x.id===accId); if(!
     <div class="full"><label>Note</label><input id="bb_note" value="${esc(s?s.note:'')}"></div>
    </div>
    <div class="right">${s?`<button class="btn danger" onclick="delBankBal('${esc(accId)}')">Remove</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="bb_save" onclick="saveBankBal('${esc(accId)}')">Save</button></div>`);
-  const fi=g('bb_file'); if(fi) fi.onchange=onStatementPick;
+  const fi=g('bb_file'); if(fi) fi.onchange=()=>onStatementPick(accId);
 }
 /* auto-read the current balance out of an attached bank statement (Excel/CSV) */
 function numVal(v){ if(v==null||v==='') return null; if(typeof v==='number') return v; const n=parseFloat(String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; }
+function last3(s){ const d=String(s||'').replace(/\D/g,''); return d.length>=3?d.slice(-3):d; }
+function parseThaiDate(s){ const m=String(s||'').match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(!m) return null; let d=m[1],mo=m[2],y=m[3]; if(y.length===2)y='20'+y; let yy=+y; if(yy>2400) yy-=543; if(+mo>12||+d>31) return null; return yy+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
 function findStatementBalance(rows){
+  let acctNo=null, stmtDate=null;
+  const acctLabels=['account number','account no','a/c no.','a/c no','เลขที่บัญชี','บัญชีเลขที่','เลขบัญชี'];
+  const dateLabels=['printed on','as of','statement date','ณ วันที่','วันที่พิมพ์','วันที่'];
+  for(let r=0;r<rows.length && (!acctNo||!stmtDate);r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ const t=String(row[c]==null?'':row[c]).trim().toLowerCase().replace(/\s+/g,' '); if(!t) continue;
+    if(!acctNo && acctLabels.some(l=>t===l||t.indexOf(l)>=0)){ for(let cc=c+1;cc<row.length;cc++){ const v=String(row[cc]||'').trim(); if(/\d{3,}/.test(v) && !/balance|บาท/i.test(v)){ acctNo=v; break; } } }
+    if(!stmtDate && dateLabels.some(l=>t===l||t.indexOf(l)>=0)){ for(let cc=c+1;cc<row.length;cc++){ const d=parseThaiDate(row[cc]); if(d){ stmtDate=d; break; } } }
+  } }
   const labels=[['ledger balance',5],['available balance',4],['closing balance',5],['cash balance',3],['ยอดคงเหลือยกไป',5],['ยอดคงเหลือ',3],['ยอดยกไป',4]];
   let best=null,bp=-1,bl='';
   for(let r=0;r<rows.length;r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ const raw=String(row[c]==null?'':row[c]).trim(); if(!raw) continue; const t=raw.toLowerCase().replace(/\s+/g,' ');
     for(const [lab,p] of labels){ const exact=t===lab, inc=t.indexOf(lab)>=0; if(exact||inc){ const score=p+(exact?0.5:0);
       for(let cc=c+1;cc<row.length;cc++){ const v=numVal(row[cc]); if(v!=null){ if(score>bp){best=v;bp=score;bl=raw;} break; } } } } } }
-  if(best!=null) return {balance:best,label:bl};
+  if(best!=null) return {balance:best,label:bl,acctNo,stmtDate};
   /* fallback: a column headed "balance" → last numeric value in it */
   for(let r=0;r<Math.min(rows.length,6);r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ if(/balance|คงเหลือ/i.test(String(row[c]||''))){
-    for(let rr=rows.length-1;rr>r;rr--){ const v=numVal((rows[rr]||[])[c]); if(v!=null) return {balance:v,label:'last '+String(row[c]).trim()}; } } } }
-  return null;
+    for(let rr=rows.length-1;rr>r;rr--){ const v=numVal((rows[rr]||[])[c]); if(v!=null) return {balance:v,label:'last '+String(row[c]).trim(),acctNo,stmtDate}; } } } }
+  return (acctNo||stmtDate)?{balance:null,label:'',acctNo,stmtDate}:null;
 }
-async function onStatementPick(){ const f=g('bb_file').files[0]; const msg=g('bb_readmsg'); if(!f||!msg) return;
+async function onStatementPick(accId){ const f=g('bb_file').files[0]; const msg=g('bb_readmsg'); if(!f||!msg) return;
   if(!/\.(xls|xlsx|csv)$/i.test(f.name)){ msg.innerHTML='<span class="mini">PDF / image attached — enter the balance by hand</span>'; return; }
-  msg.innerHTML='<span class="mini">Reading balance from statement…</span>';
+  msg.innerHTML='<span class="mini">Reading statement…</span>';
   try{ const rows=await readWorkbook(f); const res=findStatementBalance(rows);
-    if(res){ g('bb_amt').value=res.balance; msg.innerHTML='<span class="pill inc">✓ read '+fmtB(res.balance)+'</span> <span class="mini">from “'+esc(res.label)+'” — please check, then Save</span>'; }
-    else msg.innerHTML='<span class="mini">Could not find a balance in the file — enter it by hand</span>';
+    if(!res){ msg.innerHTML='<span class="mini">Could not read a balance — enter it by hand</span>'; return; }
+    let html='';
+    if(res.balance!=null){ g('bb_amt').value=res.balance; html+='<span class="pill inc">✓ read '+fmtB(res.balance)+'</span>'; }
+    else html+='<span class="mini">No balance found — enter by hand.</span>';
+    const info=[]; if(res.acctNo) info.push('a/c '+esc(res.acctNo)); if(res.stmtDate) info.push('dated '+fmtDate(res.stmtDate));
+    if(info.length) html+=' <span class="mini">'+info.join(' · ')+'</span>';
+    const acc=DB.bankAccounts.find(x=>x.id===accId); const warns=[];
+    if(res.acctNo && acc && acc.acct_no && last3(res.acctNo)!==last3(acc.acct_no)) warns.push('⚠ statement account may not match this one ('+esc(maskAcct(acc.acct_no))+')');
+    if(res.stmtDate && res.stmtDate!==S.bankDate) warns.push('⚠ statement dated '+fmtDate(res.stmtDate)+' — snapshot date is '+fmtDate(S.bankDate));
+    if(warns.length) html+='<div style="margin-top:5px">'+warns.map(w=>'<span class="pill exp">'+w+'</span>').join(' ')+'</div>';
+    else if(res.balance!=null) html+=' <span class="mini">— check &amp; Save</span>';
+    msg.innerHTML=html;
   }catch(e){ msg.innerHTML='<span class="mini">Could not read the file — enter the balance by hand</span>'; }
 }
 async function saveBankBal(accId){ const btn=g('bb_save'); if(btn){btn.disabled=true;btn.textContent='Saving…';}
