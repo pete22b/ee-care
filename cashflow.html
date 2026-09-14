@@ -146,7 +146,8 @@ let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
 const today=new Date(); const TODAY=iso(today);
 const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
   report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{},
-  bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0, weekRef:TODAY};
+  bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0, weekRef:TODAY,
+  fRep:'all', fChan:'all', fNat:'all'};
 
 /* ============ helpers ============ */
 function iso(d){ const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
@@ -414,29 +415,47 @@ function weekView(){
   return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><button class="btn sm ghost" onclick="S.weekRef='${TODAY}';render()">This week</button></div>${nav}${band}<div class="card"><div class="pad" style="padding-top:2px">${blocks}</div></div>`;
 }
 function listView(){
+  const reps=metaOpts('rep'), chans=metaOpts('channel'), nats=metaOpts('nationality');
+  const opt=(v,cur)=>`<option ${cur===v?'selected':''}>${esc(v)}</option>`;
   return `<div class="toolbar" style="margin-bottom:10px">
-    <input id="cfq" placeholder="🔍 Search title / category / company / description" value="${esc(S.q)}" style="max-width:360px">
+    <input id="cfq" placeholder="🔍 Search — title / customer / rep / nationality…" value="${esc(S.q)}" style="max-width:300px">
     <select onchange="S.repType=this.value;render()" style="width:auto"><option value="all">All types</option><option value="income" ${S.repType==='income'?'selected':''}>Income</option><option value="expense" ${S.repType==='expense'?'selected':''}>Expense</option></select>
+    ${reps.length?`<select onchange="S.fRep=this.value;render()" style="width:auto"><option value="all">All reps</option>${reps.map(v=>opt(v,S.fRep)).join('')}</select>`:''}
+    ${chans.length?`<select onchange="S.fChan=this.value;render()" style="width:auto"><option value="all">All channels</option>${chans.map(v=>opt(v,S.fChan)).join('')}</select>`:''}
+    ${nats.length?`<select onchange="S.fNat=this.value;render()" style="width:auto"><option value="all">All nationalities</option>${nats.map(v=>opt(v,S.fNat)).join('')}</select>`:''}
   </div>
-  <div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Title</th><th>Category</th><th>Company</th><th>Account</th><th class="n">Amount</th><th>Repeat</th><th></th></tr></thead><tbody id="cflistbody">${listRows()}</tbody></table></div>`;
+  <div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Title / customer</th><th>Category</th><th>Company</th><th>Account</th><th class="n">Amount</th><th>Repeat</th><th></th></tr></thead><tbody id="cflistbody">${listRows()}</tbody></table></div>`;
 }
 function listRows(){
   const q=(S.q||'').trim().toLowerCase();
   let rows=allLines().map(({l,e})=>({l,e}));
   if(S.repType!=='all') rows=rows.filter(x=>x.e.kind===S.repType);
-  if(q) rows=rows.filter(x=>((x.e.title||'')+' '+(x.e.category||'')+' '+(x.e.company||'')+' '+(x.e.description||'')).toLowerCase().includes(q));
+  if(S.fRep!=='all') rows=rows.filter(x=>em(x.e).rep===S.fRep);
+  if(S.fChan!=='all') rows=rows.filter(x=>em(x.e).channel===S.fChan);
+  if(S.fNat!=='all') rows=rows.filter(x=>em(x.e).nationality===S.fNat);
+  if(q) rows=rows.filter(x=>((x.e.title||'')+' '+(x.e.category||'')+' '+(x.e.company||'')+' '+(x.e.description||'')+' '+metaText(x.e)).toLowerCase().includes(q));
   rows.sort((a,b)=>a.l.txn_date<b.l.txn_date?1:(a.l.txn_date>b.l.txn_date?-1:0));
   if(!rows.length) return '<tr><td colspan="9" style="opacity:.5;padding:20px">No entries match.</td></tr>';
-  return rows.map(({l,e})=>`<tr class="click" onclick="openEntry('${e.kind}','${esc(e.id)}')">
+  return rows.map(({l,e})=>{ const ml=metaLine(e); return `<tr class="click" onclick="openEntry('${e.kind}','${esc(e.id)}')">
     <td>${fmtDate(l.txn_date)}</td>
     <td><span class="pill ${e.kind==='income'?'inc':'exp'}">${e.kind==='income'?'Income':'Expense'}</span></td>
-    <td><b>${esc(e.title||'(untitled)')}</b>${e.description?'<br><span class="mini">'+esc(e.description)+'</span>':''}</td>
+    <td><b>${esc(e.title||'(untitled)')}</b>${e.description?'<br><span class="mini">'+esc(e.description)+'</span>':''}${ml?'<br><span class="mini" style="opacity:.85">'+esc(ml)+'</span>':''}</td>
     <td>${esc(e.category||'—')}</td><td>${esc(e.company||'—')}</td><td>${esc(accName(e.account))}</td>
     <td class="n">${e.kind==='expense'?'-':''}${fmt(l.amount)}</td>
     <td class="mini">${REPLBL[l.repeat||'never']}${(l.forecast_amount!=null&&l.forecast_amount!==''&&Number(l.forecast_amount)!==Number(l.amount))?' · <span class="pill fc">fc '+fmt(l.forecast_amount)+'</span>':''}${e.active===false?' · <span class="pill off">inactive</span>':''}</td>
-    <td><button class="btn link" onclick="event.stopPropagation();openEntry('${e.kind}','${esc(e.id)}')">Edit</button></td></tr>`).join('');
+    <td><button class="btn link" onclick="event.stopPropagation();openEntry('${e.kind}','${esc(e.id)}')">Edit</button></td></tr>`; }).join('');
 }
 function accName(idOrName){ const a=DB.accounts.find(a=>a.id===idOrName||a.name===idOrName); return a?a.name:(idOrName||(primaryAccount()&&primaryAccount().name)||'—'); }
+/* ---- sales-report metadata (structured, jsonb meta on the entry) ---- */
+function em(e){ return (e&&e.meta&&typeof e.meta==='object')?e.meta:{}; }
+function metaLine(e){ const m=em(e); const p=[];
+  if(m.nationality) p.push('🌏 '+m.nationality);
+  if(m.unit) p.push('🏠 '+m.unit+(m.contract_type?(' · '+m.contract_type):'')+(m.season?(' '+m.season):''));
+  if(m.channel) p.push('📣 '+m.channel);
+  const team=[]; if(m.rep)team.push('Rep '+m.rep); if(m.fu)team.push('FU '+m.fu); if(team.length) p.push(team.join(' · '));
+  return p.join(' · '); }
+function metaText(e){ const m=em(e); return [m.nationality,m.unit,m.contract_type,m.season,m.channel,m.generator,m.rep,m.manager,m.fu].filter(Boolean).join(' '); }
+function metaOpts(field){ return [...new Set(DB.entries.map(e=>em(e)[field]).filter(Boolean))].sort(); }
 
 /* ============ Entry modal (income/expense) ============ */
 const MONTHS_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -464,6 +483,18 @@ function openEntry(kind, id){
     <div><label>Account</label><select id="e_acc">${accSel}</select></div>
     <div><label>Company</label><input id="e_co" list="colist" value="${esc(e?e.company:'')}" placeholder="Company"><datalist id="colist">${coOpts}</datalist></div>
   </div>
+  <details style="margin-top:12px" ${em(e).rep||em(e).nationality?'open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--ink2)">Sales report details (optional)</summary>
+   <div class="grid2" style="margin-top:10px">
+    <div><label>Nationality</label><input id="m_nat" list="natlist" value="${esc(em(e).nationality||'')}"><datalist id="natlist">${metaOpts('nationality').map(v=>`<option value="${esc(v)}">`).join('')}</datalist></div>
+    <div><label>Unit / room</label><input id="m_unit" value="${esc(em(e).unit||'')}" placeholder="e.g. T1 Standard"></div>
+    <div><label>Contract type</label><input id="m_ctype" value="${esc(em(e).contract_type||'')}" placeholder="Annual / UDP"></div>
+    <div><label>Season</label><input id="m_season" value="${esc(em(e).season||'')}" placeholder="High / Low"></div>
+    <div><label>Sales channel</label><input id="m_chan" list="chanlist" value="${esc(em(e).channel||'')}" placeholder="OPC / …"><datalist id="chanlist">${metaOpts('channel').map(v=>`<option value="${esc(v)}">`).join('')}</datalist></div>
+    <div><label>Generator</label><input id="m_gen" value="${esc(em(e).generator||'')}"></div>
+    <div><label>Sales rep</label><input id="m_rep" list="replist" value="${esc(em(e).rep||'')}"><datalist id="replist">${metaOpts('rep').map(v=>`<option value="${esc(v)}">`).join('')}</datalist></div>
+    <div><label>Manager</label><input id="m_man" value="${esc(em(e).manager||'')}"></div>
+    <div><label>Follow-up (FU)</label><input id="m_fu" value="${esc(em(e).fu||'')}"></div>
+   </div></details>
   <div class="scroll" style="box-shadow:none;margin-top:14px"><table class="lines"><thead><tr><th>Amount</th><th>Date</th><th>Repeat</th><th>End</th><th title="Projected amount — feeds the blue Pulse line">Forecast</th><th></th></tr></thead><tbody id="e_lines"></tbody></table></div>
   <button class="btn ghost sm" style="margin-top:8px" onclick="addLine()">＋ Add another line</button>
   <div class="right">${id?`<button class="btn danger" onclick="deleteEntry('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveEntry()">${id?'Save':'Add '+(kind==='income'?'Income':'Expense')}</button></div>`);
@@ -498,7 +529,9 @@ async function saveEntry(){
   const lines=window._elines.map(l=>({id:l.id||uid('ln'),entry_id:id,amount:parseFloat(l.amount)||0,txn_date:l.txn_date||TODAY,repeat:l.repeat||'never',repeat_until:((l.repeat&&l.repeat!=='never')&&l.repeat_until)||null,forecast_amount:(l.forecast_amount!=null&&l.forecast_amount!=='')?(parseFloat(l.forecast_amount)||null):null,memo:(l.memo||'').trim()||null,line_type:l.line_type||null})).filter(l=>l.amount>0);
   if(!lines.length){ toast('Add at least one amount'); return; }
   const cat=g('e_cat').value.trim()||null, co=g('e_co').value.trim()||null;
-  const entry={id,kind,title,category:cat,account:g('e_acc').value,company:co,description:g('e_desc').value.trim()||null,active:g('e_active').checked};
+  const meta={}; const mv=(k,id2)=>{ const el=g(id2); if(el&&el.value.trim()) meta[k]=el.value.trim(); };
+  mv('nationality','m_nat'); mv('unit','m_unit'); mv('contract_type','m_ctype'); mv('season','m_season'); mv('channel','m_chan'); mv('generator','m_gen'); mv('rep','m_rep'); mv('manager','m_man'); mv('fu','m_fu');
+  const entry={id,kind,title,category:cat,account:g('e_acc').value,company:co,description:g('e_desc').value.trim()||null,active:g('e_active').checked,meta:Object.keys(meta).length?meta:null};
   try{
     await ensureCategory(cat); await ensureCompany(co);
     await upsert('cf_entries',[entry]);
@@ -520,15 +553,18 @@ function rReports(){
   const M=buildMatrix(ps);
   const head=`<div class="head"><div><h1>Reports</h1><p class="mini">Income &amp; Expenses over time · the blue Pulse line looks down the road so you avoid running out of cash</p></div></div>`;
   const sel=`<div class="toolbar">
-    <div class="seg">${[['ie','Income & Expenses'],['cat','By Category'],['co','By Company']].map(r=>`<button class="${S.report===r[0]?'on':''}" onclick="S.report='${r[0]}';render()">${r[1]}</button>`).join('')}</div>
+    <div class="seg">${[['ie','Income & Expenses'],['cat','By Category'],['co','By Company'],['rep','By Sales Rep'],['chan','By Channel'],['nat','By Nationality']].map(r=>`<button class="${S.report===r[0]?'on':''}" onclick="S.report='${r[0]}';render()">${r[1]}</button>`).join('')}</div>
     <div class="sp" style="flex:1"></div>
     <button class="btn sm ghost" onclick="S.rStart='${addMonthsISO(S.rStart+'-01',-12).slice(0,7)}';render()">‹ 12 mo</button>
     <b style="align-self:center">${ps[0].label} – ${ps[ps.length-1].label}</b>
     <button class="btn sm ghost" onclick="S.rStart='${addMonthsISO(S.rStart+'-01',12).slice(0,7)}';render()">12 mo ›</button>
   </div>`;
   let body;
-  if(S.report==='cat') body=reportBy('category',ps);
-  else if(S.report==='co') body=reportBy('company',ps);
+  if(S.report==='cat') body=reportBy(e=>e.category||'(uncategorized)','Category',ps);
+  else if(S.report==='co') body=reportBy(e=>e.company||'(no company)','Company',ps);
+  else if(S.report==='rep') body=reportBy(e=>em(e).rep||'(no rep)','Sales Rep',ps);
+  else if(S.report==='chan') body=reportBy(e=>em(e).channel||'(no channel)','Channel',ps);
+  else if(S.report==='nat') body=reportBy(e=>em(e).nationality||'(no nationality)','Nationality',ps);
   else body=reportIE(M,ps);
   g('main').innerHTML=head+sel+body;
 }
@@ -548,16 +584,16 @@ function reportIE(M,ps){
   </div>`;
   return kpis+`<div class="scroll"><table class="mx"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-function reportBy(field,ps){
+function reportBy(keyFn,label,ps){
   const winS=ps[0].s, winE=ps[ps.length-1].e;
   const map={}; // key -> {inc:{},exp:{}}
   allLines().filter(x=>x.e.active!==false).forEach(({l,e})=>{
-    const k=e[field]|| (field==='company'?'(no company)':'(uncategorized)');
+    const k=keyFn(e);
     occ(l,winS,winE).forEach(o=>{ const pk=o.date.slice(0,7); const m=(map[k]=map[k]||{inc:{},exp:{},ti:0,te:0});
       if(e.kind==='expense'){ m.exp[pk]=(m.exp[pk]||0)+o.amount; m.te+=o.amount; } else { m.inc[pk]=(m.inc[pk]||0)+o.amount; m.ti+=o.amount; } });
   });
   const keys=Object.keys(map).sort((a,b)=>(map[b].ti+map[b].te)-(map[a].ti+map[a].te));
-  const th=`<th class="lab">${field==='company'?'Company':'Category'}</th><th class="n">Income</th><th class="n">Expenses</th><th class="n">Net</th>${ps.map(p=>`<th class="n">${p.label}</th>`).join('')}`;
+  const th=`<th class="lab">${esc(label)}</th><th class="n">Income</th><th class="n">Expenses</th><th class="n">Net</th>${ps.map(p=>`<th class="n">${p.label}</th>`).join('')}`;
   if(!keys.length) return '<div class="card"><div class="emptyc">No data in this range.</div></div>';
   const rows=keys.map(k=>{ const m=map[k]; const net=m.ti-m.te;
     return `<tr><td class="lab"><b>${esc(k)}</b></td><td class="n" style="color:var(--income)">${m.ti?fmt(m.ti):'–'}</td><td class="n" style="color:var(--expense)">${m.te?fmt(m.te):'–'}</td><td class="n"><b>${fmtSigned(net)}</b></td>${ps.map(p=>{ const v=(m.inc[p.key]||0)-(m.exp[p.key]||0); return `<td class="n">${v?fmtSigned(v):'<span style=\"opacity:.28\">–</span>'}</td>`; }).join('')}</tr>`;
@@ -598,7 +634,7 @@ function rReceipts(){
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`;
     const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===ls.length?' <span class="pill inc">complete</span>':'');
     return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(e.id)}')">
-      <div><b>${open?'▾':'▸'} ${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span>${badge}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
+      <div><b>${open?'▾':'▸'} ${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(e)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(e))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
       ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
