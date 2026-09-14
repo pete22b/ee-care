@@ -143,7 +143,7 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
 const today=new Date(); const TODAY=iso(today);
 const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
-  report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}};
+  report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{}};
 
 /* ============ helpers ============ */
 function iso(d){ const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
@@ -529,6 +529,8 @@ function reportBy(field,ps){
 
 /* ============ Receipts (payment tracking + evidence) ============ */
 function lineStatus(l){ return l.paid?'paid':((l.txn_date<TODAY)?'overdue':'due'); }
+function toggleRc(id){ S.rcOpen[id]=!S.rcOpen[id]; render(); }
+function rcAll(open){ S.rcOpen={}; if(open) DB.entries.forEach(e=>S.rcOpen[e.id]=true); render(); }
 function rReceipts(){
   const groups={}; allLines().forEach(({l,e})=>{ (groups[e.id]=groups[e.id]||{e,ls:[]}).ls.push(l); });
   const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0;
@@ -539,10 +541,14 @@ function rReceipts(){
     <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (scheduled)</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
     <div class="kpi"><div class="v">${fmt(dueSoon)}</div><div class="l">Due in next 30 days</div></div></div>`;
-  const blocks=Object.values(groups).sort((a,b)=>(a.e.category||'')<(b.e.category||'')?-1:1).map(({e,ls})=>{
+  const entries=Object.values(groups).sort((a,b)=>(a.e.category||'')<(b.e.category||'')?-1:1);
+  const bar=`<div class="toolbar" style="margin-bottom:10px"><button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button></div>`;
+  const blocks=entries.map(({e,ls})=>{
     ls.sort((a,b)=>a.txn_date<b.txn_date?-1:1);
+    const open=!!S.rcOpen[e.id];
     const paidN=ls.filter(l=>l.paid).length; const paidSum=ls.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
     const totSum=ls.reduce((s,l)=>s+Number(l.amount||0),0);
+    const odN=ls.filter(l=>!l.paid && l.txn_date<TODAY).length;
     const rows=ls.map(l=>{ const st=lineStatus(l);
       const pill= st==='paid'?'<span class="pill inc">✓ Received</span>':(st==='overdue'?'<span class="pill exp">● Overdue</span>':'<span class="pill off">Due</span>');
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
@@ -552,12 +558,13 @@ function rReceipts(){
     const scan= e.contract_path
       ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(e.contract_path)}');return false">${esc(e.contract_name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(e.id)}')">replace</button>`
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`;
-    return `<div class="card" style="margin-bottom:14px"><div class="pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)">
-      <div><b>${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span><br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
-      <div class="mini">${scan}</div></div>
-      <div style="overflow:auto"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===ls.length?' <span class="pill inc">complete</span>':'');
+    return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(e.id)}')">
+      <div><b>${open?'▾':'▸'} ${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span>${badge}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
+      <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
+      ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
-  g('main').innerHTML=head+kpis+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
+  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
 }
 function markReceived(lineId){
   const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
