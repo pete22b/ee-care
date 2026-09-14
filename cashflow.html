@@ -723,10 +723,33 @@ function openBankBal(accId){ const a=DB.bankAccounts.find(x=>x.id===accId); if(!
    <div class="grid2">
     <div><label>Balance (฿)</label><input type="number" step="any" id="bb_amt" value="${s?s.balance:''}"></div>
     <div><label>Status</label><select id="bb_status"><option value="confirmed" ${(!s||s.status==='confirmed')?'selected':''}>Confirmed</option><option value="pending" ${s&&s.status==='pending'?'selected':''}>Pending confirm</option></select></div>
-    <div class="full"><label>${isCash?'Attach count sheet / photo (optional)':'Attach statement — PDF / CSV / bankbook image'}</label><input type="file" id="bb_file" accept="image/*,application/pdf,.csv,text/csv">${s&&s.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(s.proof_name||'file')} · <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false">view</a></div>`:''}</div>
+    <div class="full"><label>${isCash?'Attach count sheet / photo (optional)':'Attach statement — Excel/CSV auto-reads the balance · or PDF / bankbook image'}</label><input type="file" id="bb_file" accept="image/*,application/pdf,.csv,.xls,.xlsx,text/csv"><div id="bb_readmsg" style="margin-top:5px"></div>${s&&s.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(s.proof_name||'file')} · <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false">view</a></div>`:''}</div>
     <div class="full"><label>Note</label><input id="bb_note" value="${esc(s?s.note:'')}"></div>
    </div>
    <div class="right">${s?`<button class="btn danger" onclick="delBankBal('${esc(accId)}')">Remove</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="bb_save" onclick="saveBankBal('${esc(accId)}')">Save</button></div>`);
+  const fi=g('bb_file'); if(fi) fi.onchange=onStatementPick;
+}
+/* auto-read the current balance out of an attached bank statement (Excel/CSV) */
+function numVal(v){ if(v==null||v==='') return null; if(typeof v==='number') return v; const n=parseFloat(String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; }
+function findStatementBalance(rows){
+  const labels=[['ledger balance',5],['available balance',4],['closing balance',5],['cash balance',3],['ยอดคงเหลือยกไป',5],['ยอดคงเหลือ',3],['ยอดยกไป',4]];
+  let best=null,bp=-1,bl='';
+  for(let r=0;r<rows.length;r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ const raw=String(row[c]==null?'':row[c]).trim(); if(!raw) continue; const t=raw.toLowerCase().replace(/\s+/g,' ');
+    for(const [lab,p] of labels){ const exact=t===lab, inc=t.indexOf(lab)>=0; if(exact||inc){ const score=p+(exact?0.5:0);
+      for(let cc=c+1;cc<row.length;cc++){ const v=numVal(row[cc]); if(v!=null){ if(score>bp){best=v;bp=score;bl=raw;} break; } } } } } }
+  if(best!=null) return {balance:best,label:bl};
+  /* fallback: a column headed "balance" → last numeric value in it */
+  for(let r=0;r<Math.min(rows.length,6);r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ if(/balance|คงเหลือ/i.test(String(row[c]||''))){
+    for(let rr=rows.length-1;rr>r;rr--){ const v=numVal((rows[rr]||[])[c]); if(v!=null) return {balance:v,label:'last '+String(row[c]).trim()}; } } } }
+  return null;
+}
+async function onStatementPick(){ const f=g('bb_file').files[0]; const msg=g('bb_readmsg'); if(!f||!msg) return;
+  if(!/\.(xls|xlsx|csv)$/i.test(f.name)){ msg.innerHTML='<span class="mini">PDF / image attached — enter the balance by hand</span>'; return; }
+  msg.innerHTML='<span class="mini">Reading balance from statement…</span>';
+  try{ const rows=await readWorkbook(f); const res=findStatementBalance(rows);
+    if(res){ g('bb_amt').value=res.balance; msg.innerHTML='<span class="pill inc">✓ read '+fmtB(res.balance)+'</span> <span class="mini">from “'+esc(res.label)+'” — please check, then Save</span>'; }
+    else msg.innerHTML='<span class="mini">Could not find a balance in the file — enter it by hand</span>';
+  }catch(e){ msg.innerHTML='<span class="mini">Could not read the file — enter the balance by hand</span>'; }
 }
 async function saveBankBal(accId){ const btn=g('bb_save'); if(btn){btn.disabled=true;btn.textContent='Saving…';}
   try{ const a=DB.bankAccounts.find(x=>x.id===accId); const date=S.bankDate; const prev=bankSnap(accId,date);
