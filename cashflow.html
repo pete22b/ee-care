@@ -117,6 +117,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   <div class="tabs" id="tabs">
     <button data-t="cashflow" class="on">Cash Flow</button>
     <button data-t="reports">Reports</button>
+    <button data-t="receipts">Receipts</button>
     <button data-t="companies">Companies</button>
     <button data-t="accounts">Accounts</button>
     <button data-t="import">Import / Export</button>
@@ -191,6 +192,11 @@ async function api(path, opts={}){
 }
 async function upsert(table, rows){ if(!rows.length) return; return api(table+'?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(rows.map(r=>Object.assign({updated_by:USER&&USER.email},r)))}); }
 async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); }
+async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(obj)}); }
+/* ---- storage (payment slips + contract scans) ---- */
+async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
+async function openFile(bucket, path){ try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
+function methodLabel(m){ return {transfer:'Transfer · credit advice',card:'Card slip',cash:'Cash',other:'Other'}[m]||m||''; }
 
 /* ============ auth + boot ============ */
 function renderGate(msg){
@@ -241,6 +247,7 @@ function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
+  if(S.tab==='receipts') return rReceipts();
   if(S.tab==='companies') return rCompanies();
   if(S.tab==='accounts') return rAccounts();
   if(S.tab==='import') return rImport();
@@ -518,6 +525,79 @@ function reportBy(field,ps){
     return `<tr><td class="lab"><b>${esc(k)}</b></td><td class="n" style="color:var(--income)">${m.ti?fmt(m.ti):'–'}</td><td class="n" style="color:var(--expense)">${m.te?fmt(m.te):'–'}</td><td class="n"><b>${fmtSigned(net)}</b></td>${ps.map(p=>{ const v=(m.inc[p.key]||0)-(m.exp[p.key]||0); return `<td class="n">${v?fmtSigned(v):'<span style=\"opacity:.28\">–</span>'}</td>`; }).join('')}</tr>`;
   }).join('');
   return `<div class="scroll"><table class="mx"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ============ Receipts (payment tracking + evidence) ============ */
+function lineStatus(l){ return l.paid?'paid':((l.txn_date<TODAY)?'overdue':'due'); }
+function rReceipts(){
+  const groups={}; allLines().forEach(({l,e})=>{ (groups[e.id]=groups[e.id]||{e,ls:[]}).ls.push(l); });
+  const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0;
+  allLines().forEach(({l})=>{ const a=Number(l.amount)||0; if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
+  const head=`<div class="head"><div><h1>Receipts &amp; Evidence</h1><p class="mini">Mark each instalment received and attach the slip / credit advice · store the signed contract scan per contract</p></div></div>`;
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recv)}</div><div class="l">Received to date</div></div>
+    <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (scheduled)</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
+    <div class="kpi"><div class="v">${fmt(dueSoon)}</div><div class="l">Due in next 30 days</div></div></div>`;
+  const blocks=Object.values(groups).sort((a,b)=>(a.e.category||'')<(b.e.category||'')?-1:1).map(({e,ls})=>{
+    ls.sort((a,b)=>a.txn_date<b.txn_date?-1:1);
+    const paidN=ls.filter(l=>l.paid).length; const paidSum=ls.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
+    const totSum=ls.reduce((s,l)=>s+Number(l.amount||0),0);
+    const rows=ls.map(l=>{ const st=lineStatus(l);
+      const pill= st==='paid'?'<span class="pill inc">✓ Received</span>':(st==='overdue'?'<span class="pill exp">● Overdue</span>':'<span class="pill off">Due</span>');
+      const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
+      const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm pri" onclick="markReceived('${esc(l.id)}')">Mark received</button>`;
+      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n">${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`;
+    }).join('');
+    const scan= e.contract_path
+      ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(e.contract_path)}');return false">${esc(e.contract_name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(e.id)}')">replace</button>`
+      : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`;
+    return `<div class="card" style="margin-bottom:14px"><div class="pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)">
+      <div><b>${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span><br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
+      <div class="mini">${scan}</div></div>
+      <div style="overflow:auto"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+  g('main').innerHTML=head+kpis+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
+}
+function markReceived(lineId){
+  const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
+  openModal(`<h2>${l.paid?'Edit payment':'Record payment received'}</h2>
+   <div class="mini" style="margin-bottom:4px">${esc(e.category||'')} · ${esc(l.memo||'')} · due ${fmtDate(l.txn_date)} · scheduled ${fmt(l.amount)}</div>
+   <div class="grid2" style="margin-top:12px">
+    <div><label>Received date</label><input type="date" id="r_date" value="${l.paid_date||TODAY}"></div>
+    <div><label>Amount received</label><input type="number" step="any" id="r_amt" value="${l.paid_amount!=null?l.paid_amount:l.amount}"></div>
+    <div><label>Method</label><select id="r_method">
+      <option value="transfer" ${l.method==='transfer'?'selected':''}>Bank transfer (credit advice)</option>
+      <option value="card" ${l.method==='card'?'selected':''}>Card (slip)</option>
+      <option value="cash" ${l.method==='cash'?'selected':''}>Cash</option>
+      <option value="other" ${l.method==='other'?'selected':''}>Other</option></select></div>
+    <div><label>Reference / note</label><input id="r_note" value="${esc(l.paid_note||'')}"></div>
+    <div class="full"><label>Attach evidence — card slip / credit advice (image or PDF)</label><input type="file" id="r_file" accept="image/*,application/pdf">
+      ${l.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(l.proof_name||'file')} · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">view</a></div>`:''}</div>
+   </div>
+   <div class="right">${l.paid?`<button class="btn danger" onclick="undoReceipt('${esc(l.id)}')">Undo received</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="r_save" onclick="saveReceipt('${esc(l.id)}')">Save</button></div>`);
+}
+async function saveReceipt(id){
+  const btn=g('r_save'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    const l=DB.lines.find(x=>x.id===id); const file=g('r_file').files[0]; let path=l.proof_path||null, name=l.proof_name||null;
+    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); path='receipts/'+id+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',path,file); name=file.name; }
+    const patch={paid:true,paid_date:g('r_date').value||TODAY,paid_amount:parseFloat(g('r_amt').value)||Number(l.amount),method:g('r_method').value,paid_note:g('r_note').value.trim()||null,paid_by:USER&&USER.email,proof_path:path,proof_name:name};
+    await patchRow('cf_lines',id,patch);
+    closeModal(); toast('Payment recorded'); await loadAll(); S.tab='receipts'; render();
+  }catch(e){ toast('Save failed: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Save'; } }
+}
+async function undoReceipt(id){ if(!confirm('Undo this payment record? (keeps the attached file)')) return;
+  try{ await patchRow('cf_lines',id,{paid:false,paid_date:null,paid_amount:null,method:null,paid_note:null}); closeModal(); toast('Undone'); await loadAll(); S.tab='receipts'; render(); }
+  catch(e){ toast('Failed: '+e.message); } }
+function uploadContract(entryId){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*,application/pdf';
+  inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; toast('Uploading contract scan…');
+    try{ const ext=(f.name.split('.').pop()||'pdf').toLowerCase(); const path='contracts/'+entryId+'-'+Date.now()+'.'+ext;
+      await uploadTo('cf-contracts',path,f); await patchRow('cf_entries',entryId,{contract_path:path,contract_name:f.name});
+      toast('Contract scan saved'); await loadAll(); S.tab='receipts'; render();
+    }catch(e){ toast('Upload failed: '+e.message); } };
+  inp.click();
 }
 
 /* ============ Companies ============ */
