@@ -772,15 +772,26 @@ function findStatementBalance(rows){
     if(!acctNo && acctLabels.some(l=>t===l||t.indexOf(l)>=0)){ for(let cc=c+1;cc<row.length;cc++){ const v=String(row[cc]||'').trim(); if(/\d{3,}/.test(v) && !/balance|บาท/i.test(v)){ acctNo=v; break; } } }
     if(!stmtDate && dateLabels.some(l=>t===l||t.indexOf(l)>=0)){ for(let cc=c+1;cc<row.length;cc++){ const d=parseThaiDate(row[cc]); if(d){ stmtDate=d; break; } } }
   } }
-  const labels=[['ledger balance',5],['available balance',4],['closing balance',5],['cash balance',3],['ยอดคงเหลือยกไป',5],['ยอดคงเหลือ',3],['ยอดยกไป',4]];
+  /* summary balance field (BBL/KTB/SCB/KBank all expose one) — highest priority wins */
+  const labels=[['ledger balance',6],['available balance',5],['current balance',6],['closing balance',6],['ending balance',6],
+    ['balance carried forward',5],['cash balance',3],['ยอดคงเหลือยกไป',6],['ยอดเงินคงเหลือ',4],['ยอดคงเหลือ',4],['ยอดยกไป',5],['ยอดเงินฝากคงเหลือ',4]];
   let best=null,bp=-1,bl='';
   for(let r=0;r<rows.length;r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ const raw=String(row[c]==null?'':row[c]).trim(); if(!raw) continue; const t=raw.toLowerCase().replace(/\s+/g,' ');
     for(const [lab,p] of labels){ const exact=t===lab, inc=t.indexOf(lab)>=0; if(exact||inc){ const score=p+(exact?0.5:0);
       for(let cc=c+1;cc<row.length;cc++){ const v=numVal(row[cc]); if(v!=null){ if(score>bp){best=v;bp=score;bl=raw;} break; } } } } } }
   if(best!=null) return {balance:best,label:bl,acctNo,stmtDate};
-  /* fallback: a column headed "balance" → last numeric value in it */
-  for(let r=0;r<Math.min(rows.length,6);r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ if(/balance|คงเหลือ/i.test(String(row[c]||''))){
-    for(let rr=rows.length-1;rr>r;rr--){ const v=numVal((rows[rr]||[])[c]); if(v!=null) return {balance:v,label:'last '+String(row[c]).trim(),acctNo,stmtDate}; } } } }
+  /* fallback: transaction table with a "balance" column → take the balance of the LATEST-dated row (handles newest-first or oldest-first) */
+  let balCol=-1,dateCol=-1,hdrRow=-1;
+  for(let r=0;r<Math.min(rows.length,10);r++){ const row=rows[r]||[]; for(let c=0;c<row.length;c++){ const h=String(row[c]||'').toLowerCase().trim();
+    if(balCol<0 && (/\bbalance\b/.test(h)||/คงเหลือ/.test(h))) { balCol=c; hdrRow=r; }
+    if(dateCol<0 && (/\bdate\b/.test(h)||/วันที่/.test(h))) dateCol=c; }
+    if(balCol>=0) break; }
+  if(balCol>=0){ let bestD='',bestV=null,lastV=null;
+    for(let r=hdrRow+1;r<rows.length;r++){ const v=numVal((rows[r]||[])[balCol]); if(v==null) continue; lastV=v;
+      if(dateCol>=0){ const d=parseThaiDate((rows[r]||[])[dateCol]); if(d && d>=bestD){ bestD=d; bestV=v; } } }
+    const val=(bestV!=null)?bestV:lastV;
+    if(val!=null) return {balance:val,label:'balance column'+(bestD?(' · '+fmtDate(bestD)):''),acctNo,stmtDate};
+  }
   return (acctNo||stmtDate)?{balance:null,label:'',acctNo,stmtDate}:null;
 }
 async function onStatementPick(accId){ const f=g('bb_file').files[0]; const msg=g('bb_readmsg'); if(!f||!msg) return;
