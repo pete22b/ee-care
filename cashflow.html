@@ -118,6 +118,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <button data-t="cashflow" class="on">Cash Flow</button>
     <button data-t="reports">Reports</button>
     <button data-t="receipts">Receipts</button>
+    <button data-t="bank">Cash &amp; Bank</button>
     <button data-t="companies">Companies</button>
     <button data-t="accounts">Accounts</button>
     <button data-t="import">Import / Export</button>
@@ -143,7 +144,8 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
 const today=new Date(); const TODAY=iso(today);
 const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
-  report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{}};
+  report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{},
+  bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0};
 
 /* ============ helpers ============ */
 function iso(d){ const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
@@ -227,12 +229,15 @@ function logout(){ SBC.auth.signOut().then(()=>location.reload(),()=>location.re
 async function loadAll(){
   g('main').innerHTML='<div class="emptyc"><div class="big">⏳</div>Loading cash flow…</div>';
   try{
-    const [co,ac,ca,en,li]=await Promise.all([
+    const [co,ac,ca,en,li,ba,bs,bl]=await Promise.all([
       api('cf_companies?select=*&order=name.asc'), api('cf_accounts?select=*&order=sort.asc'),
       api('cf_categories?select=*&order=name.asc'), api('cf_entries?select=*&order=title.asc'),
-      api('cf_lines?select=*&order=txn_date.asc')
+      api('cf_lines?select=*&order=txn_date.asc'),
+      api('cf_bank_accounts?select=*&order=sort.asc'), api('cf_bank_snapshots?select=*'),
+      api('cf_bank_audit?select=*&order=ts.desc&limit=300')
     ]);
-    DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[]};
+    DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[],
+        bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[]};
     if(!DB.accounts.length){ /* seed a Primary account like Pulse */
       const a={id:uid('ac'),name:'Pulse Cash Flow',opening_balance:0,opening_date:TODAY,currency:'THB',is_primary:true,sort:0};
       await upsert('cf_accounts',[a]); DB.accounts=[a];
@@ -248,6 +253,7 @@ function render(){
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
   if(S.tab==='receipts') return rReceipts();
+  if(S.tab==='bank') return rBankCash();
   if(S.tab==='companies') return rCompanies();
   if(S.tab==='accounts') return rAccounts();
   if(S.tab==='import') return rImport();
@@ -606,6 +612,145 @@ function uploadContract(entryId){
     }catch(e){ toast('Upload failed: '+e.message); } };
   inp.click();
 }
+
+/* ============ Cash & Bank (balance register + daily snapshots) ============ */
+const BANKS=['BBL','KBank','KTB','SCB','TTB','Cash','Other'];
+const ACCT_TYPES=[['current','Current (กระแสรายวัน)'],['savings','Savings (ออมทรัพย์)'],['cash','Cash (เงินสด)']];
+const ACCT_TYPE_LBL={current:'Current',savings:'Savings',cash:'Cash'};
+function fmtB(n){ return '฿'+Math.round(n||0).toLocaleString('en-US'); }  /* bank register is always THB */
+function maskAcct(s){ if(!s) return ''; if(S.bankShowFull) return s; const digits=(s.match(/\d/g)||[]); if(digits.length<=4) return s; let seen=0; const keep=digits.length-4; return s.replace(/\d/g,d=>{ seen++; return seen<=keep?'x':d; }); }
+function bankSnap(accId, date){ return (DB.bankSnaps||[]).find(s=>s.account_id===accId && s.as_of===date) || null; }
+function bankDates(){ return [...new Set((DB.bankSnaps||[]).map(s=>s.as_of))].sort().reverse(); }
+function bankFiltered(){ let list=(DB.bankAccounts||[]).filter(a=>a.active!==false);
+  if(S.bankCompany!=='all') list=list.filter(a=>a.company===S.bankCompany);
+  if(S.bankBank!=='all') list=list.filter(a=>a.bank===S.bankBank);
+  if(S.bankType!=='all') list=list.filter(a=>a.acct_type===S.bankType);
+  const q=(S.bankQ||'').trim().toLowerCase();
+  if(q) list=list.filter(a=>((a.acct_no||'')+' '+(a.note||'')+' '+(a.company||'')).toLowerCase().includes(q));
+  return list; }
+function rBankCash(){
+  const date=S.bankDate; const accs=(DB.bankAccounts||[]).filter(a=>a.active!==false);
+  const snapOf=a=>bankSnap(a.id,date);
+  const bankAccs=accs.filter(a=>a.acct_type!=='cash'), cashAccs=accs.filter(a=>a.acct_type==='cash');
+  const bankUpd=bankAccs.filter(snapOf), cashUpd=cashAccs.filter(snapOf);
+  const bankTotal=bankUpd.reduce((s,a)=>s+Number(snapOf(a).balance||0),0);
+  const cashTotal=cashUpd.reduce((s,a)=>s+Number(snapOf(a).balance||0),0);
+  const grand=bankTotal+cashTotal;
+  const odUpd=accs.filter(a=>Number(a.od_limit)>0 && snapOf(a));
+  const waitBank=bankAccs.length-bankUpd.length, waitCash=cashAccs.length-cashUpd.length;
+  const dates=bankDates();
+  const head=`<div class="head"><div><h1>Cash &amp; Bank</h1><p class="mini">Daily balance snapshot per account · bank from statement · cash counted by hand · account no. shows last 4 digits · every change is logged</p></div></div>`;
+  const bar=`<div class="toolbar">
+     <label class="mini" style="align-self:center">Snapshot date</label>
+     <input type="date" value="${date}" onchange="S.bankDate=this.value;render()" style="width:auto">
+     <button class="btn pri" onclick="openBankAcct()">＋ Add account</button>
+     <button class="btn inc" onclick="useBankAsOpening()" title="Set the Cash Flow opening balance to this total">Use as Cash on Hand</button>
+     <div class="sp" style="flex:1"></div>
+     <button class="btn ghost sm" onclick="window.print()">🖨 Print</button></div>
+     ${dates.length?`<div class="mini" style="margin:-4px 0 12px">Snapshots: ${dates.slice(0,8).map(d=>`<a href="#" onclick="S.bankDate='${d}';render();return false" style="margin-right:10px">${fmtDate(d)}</a>`).join('')}</div>`:''}`;
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="v">${fmtB(grand)}</div><div class="l">Grand total · ${bankUpd.length+cashUpd.length} account(s) · ${fmtDate(date)}</div></div>
+    <div class="kpi"><div class="v">${fmtB(bankTotal)}</div><div class="l">Bank balance · ${bankUpd.length}/${bankAccs.length} updated${waitBank>0?' · '+waitBank+' waiting':''}</div></div>
+    <div class="kpi"><div class="v">${fmtB(cashTotal)}</div><div class="l">Cash on hand · ${cashUpd.length} point(s)${waitCash>0?' · '+waitCash+' waiting':''}</div></div>
+    <div class="kpi"><div class="v">${odUpd.length}</div><div class="l">OD accounts (updated)</div></div></div>`;
+  const companies=[...new Set(accs.map(a=>a.company).filter(Boolean))];
+  const banks=[...new Set(accs.map(a=>a.bank).filter(Boolean))];
+  const filt=`<div class="toolbar">
+    <select onchange="S.bankCompany=this.value;render()" style="width:auto"><option value="all">All companies</option>${companies.map(c=>`<option ${S.bankCompany===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <select onchange="S.bankBank=this.value;render()" style="width:auto"><option value="all">All banks</option>${banks.map(b=>`<option ${S.bankBank===b?'selected':''}>${esc(b)}</option>`).join('')}</select>
+    <select onchange="S.bankType=this.value;render()" style="width:auto"><option value="all">All types</option>${ACCT_TYPES.map(t=>`<option value="${t[0]}" ${S.bankType===t[0]?'selected':''}>${t[1]}</option>`).join('')}</select>
+    <input id="bankq" placeholder="🔍 account / note" value="${esc(S.bankQ)}" style="max-width:220px">
+    <label class="mini" style="align-self:center"><input type="checkbox" ${S.bankShowFull?'checked':''} onchange="S.bankShowFull=this.checked;render()" style="width:auto;margin-right:5px">show full no.</label></div>`;
+  const empty=accs.length===0;
+  const body= empty
+    ? `<div class="card"><div class="emptyc"><div class="big">🏦</div><h2 style="margin:10px 0 4px">No accounts yet</h2><p class="mini" style="max-width:440px;margin:0 auto 16px">Add your bank and cash accounts, then update each day's balance and attach the statement / count sheet.</p><button class="btn pri" onclick="openBankAcct()">＋ Add account</button></div></div>`
+    : `<div class="scroll"><table id="banktbl"><thead><tr><th>#</th><th>Company / owner</th><th>Bank</th><th>Account no.</th><th>Type</th><th class="n">Balance (฿)</th><th class="n">%</th><th>Note</th><th></th></tr></thead><tbody id="bankbody">${bankRows(bankFiltered(),date,grand)}</tbody></table></div>`;
+  g('main').innerHTML=head+bar+kpis+(empty?'':filt)+body+bankAuditHtml();
+  const inp=g('bankq'); if(inp) inp.oninput=()=>{ S.bankQ=inp.value; const b=g('bankbody'); if(b) b.innerHTML=bankRows(bankFiltered(),S.bankDate,grand); };
+}
+function bankRows(list,date,grand){
+  if(!list.length) return '<tr><td colspan="9" style="opacity:.5;padding:16px">No accounts match.</td></tr>';
+  return list.map((a,i)=>{ const s=bankSnap(a.id,date); const bal=s?Number(s.balance||0):null; const pct=(s&&grand)?(bal/grand*100):null;
+    const odtag= Number(a.od_limit)>0?` <span class="pill fc">OD ${fmtB(a.od_limit)}</span>`:'';
+    const typ= a.acct_type==='cash'?'<span class="pill off">Cash</span>':esc(ACCT_TYPE_LBL[a.acct_type]||a.acct_type||'');
+    const balCell = s
+      ? `<b>${fmtB(bal)}</b>${s.proof_path?` <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false" title="${esc(s.proof_name||'')}">📎</a>`:''}${s.status==='pending'?' <span class="pill off">pending</span>':''}`
+      : `<button class="btn sm ghost" onclick="openBankBal('${esc(a.id)}')">${a.acct_type==='cash'?'Count cash':'Upload statement'}</button>`;
+    return `<tr${a.acct_type==='cash'?' style="background:#fffdf5"':''}><td>${i+1}</td>
+      <td><b>${esc(a.company||'—')}</b>${a.link_ref?'<br><span class="mini">'+esc(a.link_ref)+'</span>':''}</td>
+      <td>${esc(a.bank||'')}</td>
+      <td class="mini">${esc(maskAcct(a.acct_no))}${odtag}</td>
+      <td>${typ}</td>
+      <td class="n">${balCell}</td>
+      <td class="n mini">${pct!=null?pct.toFixed(1)+'%':''}</td>
+      <td class="mini">${esc((s&&s.note)||a.note||'')}</td>
+      <td><button class="btn link" onclick="openBankBal('${esc(a.id)}')">update</button> · <button class="btn link" onclick="openBankAcct('${esc(a.id)}')">edit</button></td></tr>`;
+  }).join('');
+}
+function bankAuditHtml(){
+  const rows=DB.bankAudit||[]; const per=20, page=S.bankAuditPage||0, pages=Math.max(1,Math.ceil(rows.length/per));
+  const slice=rows.slice(page*per,page*per+per);
+  const actLbl=a=>({add:'🟢 add',edit:'🟡 edit',delete:'🔴 delete'}[a]||a||'');
+  const body=slice.map(x=>`<tr><td class="mini">${x.ts?new Date(x.ts).toLocaleString():''}</td><td class="mini">${esc(x.actor||'')}</td><td class="mini">${actLbl(x.action)}</td><td class="mini">${x.as_of?fmtDate(x.as_of):''}</td><td class="mini">${esc(x.company||'')}</td><td class="mini">${esc(x.bank||'')} ${esc(maskAcct(x.acct_no||''))}</td><td class="n mini">${x.old_balance!=null?fmtB(x.old_balance):'–'}</td><td class="n mini">${x.new_balance!=null?fmtB(x.new_balance):'–'}</td><td class="mini">${esc(x.note||'')}</td></tr>`).join('');
+  return `<div class="card" style="margin-top:18px"><div class="pad"><h2 style="margin:0">Change history (audit log)</h2><p class="mini">Auto-recorded on every balance change · append-only · ${rows.length} entries</p></div>
+   <div class="scroll" style="border:none;border-top:1px solid var(--line)"><table><thead><tr><th>Time</th><th>By</th><th>Action</th><th>As of</th><th>Company</th><th>Account</th><th class="n">Old</th><th class="n">New</th><th>Note</th></tr></thead><tbody>${body||'<tr><td colspan="9" style="opacity:.5;padding:14px">No changes yet.</td></tr>'}</tbody></table></div>
+   ${pages>1?`<div class="pad" style="display:flex;gap:8px;align-items:center"><button class="btn sm ghost" ${page<=0?'disabled':''} onclick="S.bankAuditPage=${page-1};render()">‹ Prev</button><span class="mini">Page ${page+1} / ${pages}</span><button class="btn sm ghost" ${page>=pages-1?'disabled':''} onclick="S.bankAuditPage=${page+1};render()">Next ›</button></div>`:''}</div>`;
+}
+function openBankAcct(id){ const a=id?DB.bankAccounts.find(x=>x.id===id):null;
+  openModal(`<h2>${id?'Edit':'Add'} account</h2><div class="grid2">
+    <div><label>Company / owner</label><input id="ba_co" list="ba_colist" value="${esc(a?a.company:'')}"><datalist id="ba_colist">${[...new Set((DB.bankAccounts||[]).map(x=>x.company).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div><label>Bank</label><input id="ba_bank" list="ba_banklist" value="${esc(a?a.bank:'')}" placeholder="BBL / SCB / Cash…"><datalist id="ba_banklist">${BANKS.map(b=>`<option value="${b}">`).join('')}</datalist></div>
+    <div><label>Account no.</label><input id="ba_no" value="${esc(a?a.acct_no:'')}" placeholder="xxx-x-xxxxx-x"></div>
+    <div><label>Type</label><select id="ba_type">${ACCT_TYPES.map(t=>`<option value="${t[0]}" ${((a&&a.acct_type)||'current')===t[0]?'selected':''}>${t[1]}</option>`).join('')}</select></div>
+    <div><label>OD limit (blank = none)</label><input type="number" step="any" id="ba_od" value="${a&&a.od_limit!=null?a.od_limit:''}"></div>
+    <div><label>OD note</label><input id="ba_odnote" value="${esc(a?a.od_note:'')}" placeholder="e.g. WISDOM OD 3.4M"></div>
+    <div><label>Linked account ref</label><input id="ba_link" value="${esc(a?a.link_ref:'')}"></div>
+    <div><label>Note</label><input id="ba_note" value="${esc(a?a.note:'')}"></div>
+    <div class="full"><label><input type="checkbox" id="ba_active" ${!a||a.active!==false?'checked':''} style="width:auto;margin-right:6px">Active</label></div>
+  </div><div class="right">${id?`<button class="btn danger" onclick="delBankAcct('${esc(id)}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveBankAcct('${id?esc(id):''}')">Save</button></div>`);
+}
+async function saveBankAcct(id){ const co=g('ba_co').value.trim(), no=g('ba_no').value.trim();
+  if(!co && !no){ toast('Enter company or account no.'); return; }
+  const a={id:id||uid('ba'),company:co||null,bank:g('ba_bank').value.trim()||null,acct_no:no||null,acct_type:g('ba_type').value,od_limit:g('ba_od').value?parseFloat(g('ba_od').value):null,od_note:g('ba_odnote').value.trim()||null,link_ref:g('ba_link').value.trim()||null,note:g('ba_note').value.trim()||null,active:g('ba_active').checked,sort:(DB.bankAccounts.find(x=>x.id===id)||{}).sort||DB.bankAccounts.length};
+  try{ await upsert('cf_bank_accounts',[a]); closeModal(); toast('Saved'); await loadAll(); S.tab='bank'; render(); }catch(e){ toast('Save failed: '+e.message); }
+}
+async function delBankAcct(id){ if(!confirm('Delete this account? (its balance snapshots stay in history)')) return; try{ await del('cf_bank_accounts',id); closeModal(); toast('Deleted'); await loadAll(); S.tab='bank'; render(); }catch(e){ toast('Failed: '+e.message); } }
+function openBankBal(accId){ const a=DB.bankAccounts.find(x=>x.id===accId); if(!a) return; const date=S.bankDate; const s=bankSnap(accId,date); const isCash=a.acct_type==='cash';
+  openModal(`<h2>${s?'Update':'Record'} balance</h2>
+   <div class="mini" style="margin-bottom:10px">${esc(a.company||'')} · ${esc(a.bank||'')} ${esc(maskAcct(a.acct_no))} · ${esc(ACCT_TYPE_LBL[a.acct_type]||'')} · as of <b>${fmtDate(date)}</b></div>
+   <div class="grid2">
+    <div><label>Balance (฿)</label><input type="number" step="any" id="bb_amt" value="${s?s.balance:''}"></div>
+    <div><label>Status</label><select id="bb_status"><option value="confirmed" ${(!s||s.status==='confirmed')?'selected':''}>Confirmed</option><option value="pending" ${s&&s.status==='pending'?'selected':''}>Pending confirm</option></select></div>
+    <div class="full"><label>${isCash?'Attach count sheet / photo (optional)':'Attach statement / bankbook image'}</label><input type="file" id="bb_file" accept="image/*,application/pdf">${s&&s.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(s.proof_name||'file')} · <a href="#" onclick="openFile('cf-bank','${esc(s.proof_path)}');return false">view</a></div>`:''}</div>
+    <div class="full"><label>Note</label><input id="bb_note" value="${esc(s?s.note:'')}"></div>
+   </div>
+   <div class="right">${s?`<button class="btn danger" onclick="delBankBal('${esc(accId)}')">Remove</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="bb_save" onclick="saveBankBal('${esc(accId)}')">Save</button></div>`);
+}
+async function saveBankBal(accId){ const btn=g('bb_save'); if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{ const a=DB.bankAccounts.find(x=>x.id===accId); const date=S.bankDate; const prev=bankSnap(accId,date);
+    const amt=parseFloat(g('bb_amt').value); if(isNaN(amt)){ toast('Enter a balance'); if(btn){btn.disabled=false;btn.textContent='Save';} return; }
+    let path=(prev&&prev.proof_path)||null, name=(prev&&prev.proof_name)||null;
+    const file=g('bb_file').files[0];
+    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); path='bank/'+accId+'-'+date+'-'+Date.now()+'.'+ext; await uploadTo('cf-bank',path,file); name=file.name; }
+    const id=prev?prev.id:uid('bs');
+    const row={id,account_id:accId,as_of:date,balance:amt,status:g('bb_status').value,proof_path:path,proof_name:name,note:g('bb_note').value.trim()||null,updated_by:USER&&USER.email};
+    await api('cf_bank_snapshots?on_conflict=account_id,as_of',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify([row])});
+    await api('cf_bank_audit',{method:'POST',prefer:'return=minimal',body:JSON.stringify([{actor:USER&&USER.email,action:prev?'edit':'add',as_of:date,account_id:accId,company:a.company,bank:a.bank,acct_no:a.acct_no,old_balance:prev?prev.balance:null,new_balance:amt,note:row.note}])});
+    closeModal(); toast('Saved'); await loadAll(); S.tab='bank'; render();
+  }catch(e){ toast('Save failed: '+e.message); if(btn){btn.disabled=false;btn.textContent='Save';} }
+}
+async function delBankBal(accId){ const date=S.bankDate; const prev=bankSnap(accId,date); if(!prev){ closeModal(); return; } if(!confirm('Remove this balance entry for '+fmtDate(date)+'?')) return;
+  try{ const a=DB.bankAccounts.find(x=>x.id===accId); await del('cf_bank_snapshots',prev.id);
+    await api('cf_bank_audit',{method:'POST',prefer:'return=minimal',body:JSON.stringify([{actor:USER&&USER.email,action:'delete',as_of:date,account_id:accId,company:a.company,bank:a.bank,acct_no:a.acct_no,old_balance:prev.balance,new_balance:null,note:null}])});
+    closeModal(); toast('Removed'); await loadAll(); S.tab='bank'; render();
+  }catch(e){ toast('Failed: '+e.message); } }
+async function useBankAsOpening(){ const date=S.bankDate; const accs=(DB.bankAccounts||[]).filter(a=>a.active!==false);
+  const grandTHB=accs.map(a=>bankSnap(a.id,date)).filter(Boolean).reduce((s,x)=>s+Number(x.balance||0),0);
+  const pri=primaryAccount(); if(!pri){ toast('No Cash Flow account to set'); return; }
+  const cur=pri.currency||'THB'; const opening = cur==='THB'? grandTHB : (grandTHB/cfRate(cur));
+  const msg = cur==='THB' ? fmtB(grandTHB) : (fmtB(grandTHB)+' ≈ '+fmt(opening)+' at ฿'+cfRate(cur)+'/'+cur);
+  if(!confirm('Set the Cash Flow opening balance ('+esc(pri.name)+') to '+msg+' as of '+fmtDate(date)+' ?')) return;
+  try{ await patchRow('cf_accounts',pri.id,{opening_balance:Math.round(opening),opening_date:date}); toast('Opening balance updated'); await loadAll(); S.tab='bank'; render(); }catch(e){ toast('Failed: '+e.message); } }
 
 /* ============ Companies ============ */
 function rCompanies(){
