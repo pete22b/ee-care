@@ -119,6 +119,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <button data-t="cashflow" class="on">Cash Flow</button>
     <button data-t="reports">Reports</button>
     <button data-t="receipts">Receipts</button>
+    <button data-t="stays">Stays</button>
     <button data-t="bank">Cash &amp; Bank</button>
     <button data-t="companies">Companies</button>
     <button data-t="accounts">Accounts</button>
@@ -231,15 +232,15 @@ function logout(){ SBC.auth.signOut().then(()=>location.reload(),()=>location.re
 async function loadAll(){
   g('main').innerHTML='<div class="emptyc"><div class="big">⏳</div>Loading cash flow…</div>';
   try{
-    const [co,ac,ca,en,li,ba,bs,bl]=await Promise.all([
+    const [co,ac,ca,en,li,ba,bs,bl,st]=await Promise.all([
       api('cf_companies?select=*&order=name.asc'), api('cf_accounts?select=*&order=sort.asc'),
       api('cf_categories?select=*&order=name.asc'), api('cf_entries?select=*&order=title.asc'),
       api('cf_lines?select=*&order=txn_date.asc'),
       api('cf_bank_accounts?select=*&order=sort.asc'), api('cf_bank_snapshots?select=*'),
-      api('cf_bank_audit?select=*&order=ts.desc&limit=300')
+      api('cf_bank_audit?select=*&order=ts.desc&limit=300'), api('cf_stays?select=*')
     ]);
     DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[],
-        bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[]};
+        bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[],stays:st||[]};
     if(!DB.accounts.length){ /* seed a Primary account like Pulse */
       const a={id:uid('ac'),name:'Pulse Cash Flow',opening_balance:0,opening_date:TODAY,currency:'THB',is_primary:true,sort:0};
       await upsert('cf_accounts',[a]); DB.accounts=[a];
@@ -255,6 +256,7 @@ function render(){
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
   if(S.tab==='receipts') return rReceipts();
+  if(S.tab==='stays') return rStays();
   if(S.tab==='bank') return rBankCash();
   if(S.tab==='companies') return rCompanies();
   if(S.tab==='accounts') return rAccounts();
@@ -680,6 +682,71 @@ function uploadContract(entryId){
     }catch(e){ toast('Upload failed: '+e.message); } };
   inp.click();
 }
+
+/* ============ Stays & MFEE eligibility ============ */
+function termOf(cno){ const t=parseInt(String(cno||'').split('/')[2]); return isNaN(t)?null:t; }
+function mfeeLinesFor(cno){ return allLines().filter(x=>x.e.category===cno && x.l.line_type==='mfee').map(x=>x.l).sort((a,b)=>a.txn_date<b.txn_date?-1:1); }
+function stayOf(cno,year){ return (DB.stays||[]).find(s=>s.contract===cno && Number(s.year)===Number(year))||null; }
+function eligibility(cno){ const out=mfeeLinesFor(cno).filter(l=>l.txn_date<=TODAY && !l.paid); return {blocked:out.length>0, out}; }
+function membershipContracts(){
+  const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); } });
+  return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
+}
+function rStays(){
+  const groups=membershipContracts();
+  let blocked=0, eligible=0, stayed=0;
+  groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; });
+  const head=`<div class="head"><div><h1>Stays &amp; Eligibility</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Mark each year's stay once MFEE is paid.</p></div></div>`;
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${eligible}</div><div class="l">Eligible to stay</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owes MFEE</div></div></div>`;
+  const blocks=groups.map(g=>{
+    const el=eligibility(g.cno); const fyo=Number(g.meta.fyo)||null; const term=termOf(g.cno); const lyo=(fyo&&term)?fyo+term-1:null;
+    const badge= el.blocked
+      ? `<span class="pill exp">🔴 Blocked — owes MFEE ${fmt(el.out.reduce((s,l)=>s+Number(l.amount||0),0))}</span>`
+      : `<span class="pill inc">🟢 Can stay</span>`;
+    let rows='';
+    if(fyo&&lyo){
+      for(let y=fyo;y<=lyo;y++){
+        const ml=mfeeLinesFor(g.cno).find(l=>l.txn_date.slice(0,4)==String(y));
+        const mfeeCell = !ml ? '<span class="pill inc" title="No MFEE this year (free/included)">free</span>'
+          : (ml.paid ? '<span class="pill inc">✓ paid</span>'
+            : (ml.txn_date<=TODAY ? '<span class="pill exp">● overdue</span>' : '<span class="pill off">due '+fmtDate(ml.txn_date)+'</span>'));
+        const mfeeAct = ml && !ml.paid ? ` <button class="btn link" onclick="markReceived('${esc(ml.id)}')">record MFEE</button>` : '';
+        const st=stayOf(g.cno,y);
+        const stayCell = st&&st.stayed ? `✓ Stayed${st.check_in?' ('+fmtDate(st.check_in)+(st.check_out?'–'+fmtDate(st.check_out):'')+')':''}` : '<span class="mini" style="opacity:.5">not yet</span>';
+        rows+=`<tr><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td><button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">${st?'edit':'log stay'}</button></td></tr>`;
+      }
+    } else {
+      rows=`<tr><td colspan="4" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
+    }
+    const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
+    return `<div class="card" style="margin-bottom:12px"><div class="pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)">
+      <div><b>${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
+      <div>${badge}</div></div>
+      <div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+  g('main').innerHTML=head+kpis+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
+}
+function openStay(cno,year){ const s=stayOf(cno,year);
+  openModal(`<h2>${s?'Edit':'Log'} stay — ${esc(cno)} · ${year}</h2>
+   <div class="grid2">
+    <div class="full"><label><input type="checkbox" id="st_on" ${!s||s.stayed?'checked':''} style="width:auto;margin-right:6px">Member stayed this year</label></div>
+    <div><label>Check-in</label><input type="date" id="st_in" value="${(s&&s.check_in)||''}"></div>
+    <div><label>Check-out</label><input type="date" id="st_out" value="${(s&&s.check_out)||''}"></div>
+    <div class="full"><label>Note</label><input id="st_note" value="${esc(s?s.note:'')}"></div>
+   </div>
+   <div class="right">${s?`<button class="btn danger" onclick="delStay('${esc(cno)}',${year})">Remove</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="saveStay('${esc(cno)}',${year})">Save</button></div>`);
+}
+async function saveStay(cno,year){
+  const s=stayOf(cno,year); const id=s?s.id:uid('sy');
+  const row={id,contract:cno,year:year,stayed:g('st_on').checked,check_in:g('st_in').value||null,check_out:g('st_out').value||null,note:g('st_note').value.trim()||null,updated_by:USER&&USER.email};
+  try{ await api('cf_stays?on_conflict=contract,year',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify([row])}); closeModal(); toast('Saved'); await loadAll(); S.tab='stays'; render(); }
+  catch(e){ toast('Save failed: '+e.message); }
+}
+async function delStay(cno,year){ const s=stayOf(cno,year); if(!s) return closeModal(); if(!confirm('Remove this stay record?')) return;
+  try{ await del('cf_stays',s.id); closeModal(); toast('Removed'); await loadAll(); S.tab='stays'; render(); }catch(e){ toast('Failed: '+e.message); } }
 
 /* ============ Cash & Bank (balance register + daily snapshots) ============ */
 const BANKS=['BBL','KBank','KTB','SCB','TTB','Cash','Other'];
