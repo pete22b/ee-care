@@ -332,11 +332,12 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',taxi:'sales',
+const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',receipts:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
-function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; return !c || myCats().indexOf(c)>=0; }
+function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
+function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
 function firstAllowedTab(){ return Object.keys(TAB_CAT).find(t=>canTab(t))||'dashboard'; }
 function applyAccess(){
   document.querySelectorAll('#tabs button').forEach(b=>{ b.hidden=!canTab(b.dataset.t); });
@@ -563,51 +564,72 @@ function taxiRateSet(v){ S.taxiRate=parseFloat(v)||0; try{ localStorage.setItem(
 function rTaxi(){ g('main').innerHTML=`<div class="head"><div><h1>Taxi — เบิกจ่ายค่าแท็กซี่</h1><p class="mini">reception บันทึกค่าแท็กซี่ที่พาแขกมาออฟฟิศ · ต่อแขก/ทัวร์</p></div></div>
    <div id="taxibody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
   loadTaxi().then(taxiPaint).catch(e=>{ const b=g('taxibody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
+const TAXI_ST={pending:{t:'รอบัญชีตรวจ',c:'exp'},approved:{t:'อนุมัติแล้ว',c:'inc'},rejected:{t:'ตีกลับ',c:'off'}};
+function taxiCanEdit(){ return !!(USER&&USER.is_admin) || hasCat('sales'); }
+function taxiCanReview(){ return !!(USER&&USER.is_admin) || hasCat('finance'); }
 function taxiPaint(){ const body=g('taxibody'); if(!body) return; const rows=DB.taxi||[]; const mk=TODAY.slice(0,7); const R='text-align:right';
   const monthRows=rows.filter(r=>(r.tour_date||'').slice(0,7)===mk); const monthTot=monthRows.reduce((s,r)=>s+Number(r.amount||0),0);
-  const unpaid=rows.filter(r=>!r.paid); const unpaidTot=unpaid.reduce((s,r)=>s+Number(r.amount||0),0);
+  const pending=rows.filter(r=>r.status==='pending'); const pendTot=pending.reduce((s,r)=>s+Number(r.amount||0),0);
+  const appr=rows.filter(r=>r.status==='approved'); const apprTot=appr.reduce((s,r)=>s+Number(r.amount||0),0);
   const kpis=`<div class="kpis" style="margin-bottom:14px">
     <div class="kpi"><div class="v">${fmt(monthTot)}</div><div class="l">ค่าแท็กซี่เดือนนี้ (${monthRows.length} เที่ยว)</div></div>
-    <div class="kpi"><div class="v" style="color:${unpaidTot>0?'var(--expense)':'var(--ink)'}">${fmt(unpaidTot)}</div><div class="l">รอเบิกจ่าย · ${unpaid.length} รายการ</div></div>
+    <div class="kpi"><div class="v" style="color:${pendTot>0?'var(--expense)':'var(--ink)'}">${fmt(pendTot)}</div><div class="l">รอบัญชีตรวจ · ${pending.length} รายการ</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(apprTot)}</div><div class="l">อนุมัติแล้ว · ${appr.length}</div></div>
     <div class="kpi"><div class="v">${fmt(rows.reduce((s,r)=>s+Number(r.amount||0),0))}</div><div class="l">รวมทั้งหมด (${rows.length})</div></div></div>`;
   const bar=`<div class="card pad" style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <label class="mini">เรตต่อเที่ยว (บาท)</label>
     <input type="number" value="${S.taxiRate||0}" onchange="taxiRateSet(this.value)" style="width:100px;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
-    <span class="mini" style="color:var(--ink3)">ใช้เติมอัตโนมัติตอนเพิ่มรายการ</span>
+    <span class="mini" style="color:var(--ink3)">เติมอัตโนมัติตอนเพิ่มรายการ</span>
     <span style="margin-left:auto"></span>
-    <button class="btn pri" onclick="openTaxiModal()">+ เพิ่มรายการ</button></div>`;
+    ${taxiCanReview()&&!taxiCanEdit()?'<span class="mini">โหมดฝ่ายบัญชี · ตรวจเอกสารแล้วอนุมัติ/ตีกลับ</span>':''}
+    ${taxiCanEdit()?'<button class="btn pri" onclick="openTaxiModal()">+ เพิ่มรายการ</button>':''}</div>`;
+  const canR=taxiCanReview(), canE=taxiCanEdit();
   let trs='';
-  rows.forEach(r=>{ const rp=(DB.mktReps||[]).find(x=>x.code===r.opc_code);
+  rows.forEach(r=>{ const rp=(DB.mktReps||[]).find(x=>x.code===r.opc_code); const st=TAXI_ST[r.status]||TAXI_ST.pending;
+    const doc = r.doc_path?`<a href="#" onclick="openFile('cf-receipts','${esc(r.doc_path)}');return false">📎 ดูเอกสาร</a>`:'<span class="mini" style="color:var(--expense)">ไม่มีเอกสาร</span>';
+    let act='';
+    if(r.status==='pending' && canR) act+=`<button class="btn sm" onclick="taxiReview('${r.id}','approved')">✓ อนุมัติ</button> <button class="btn sm ghost danger" onclick="taxiReview('${r.id}','rejected')">✗ ตีกลับ</button> `;
+    if(canE && r.status!=='approved') act+=`<button class="btn sm ghost" onclick="openTaxiModal('${r.id}')">แก้</button>`;
     trs+=`<tr>
       <td style="white-space:nowrap">${fmtDate(r.tour_date)}</td>
-      <td>${esc(r.guest_name||'—')}${r.note?'<br><span class="mini" style="color:var(--ink3)">'+esc(r.note)+'</span>':''}</td>
+      <td>${esc(r.guest_name||'—')}${r.note?'<br><span class="mini" style="color:var(--ink3)">'+esc(r.note)+'</span>':''}${r.status==='rejected'&&r.review_note?'<br><span class="mini" style="color:var(--expense)">ตีกลับ: '+esc(r.review_note)+'</span>':''}</td>
       <td style="white-space:nowrap">${r.opc_code?('<b>'+esc(r.opc_code)+'</b>'+(rp?' '+esc(rp.name):'')):'—'}</td>
       <td style="${R}">${fmt(r.amount)}</td>
-      <td>${r.paid?'<span class="pill inc">จ่ายแล้ว</span>':'<span class="pill exp">รอจ่าย</span>'}</td>
-      <td style="white-space:nowrap">${r.paid?'<button class="btn sm ghost" onclick="taxiPay(\''+r.id+'\',false)">ยกเลิก</button>':'<button class="btn sm" onclick="taxiPay(\''+r.id+'\',true)">✓ จ่าย</button>'} <button class="btn sm ghost" onclick="openTaxiModal(\''+r.id+'\')">แก้</button></td>
+      <td>${doc}</td>
+      <td><span class="pill ${st.c}">${st.t}</span></td>
+      <td style="white-space:nowrap">${act||'<span class="mini" style="color:var(--ink3)">—</span>'}</td>
     </tr>`; });
-  if(!rows.length) trs='<tr><td colspan="6"><div class="emptyc" style="padding:24px">ยังไม่มีรายการ — กด “เพิ่มรายการ”</div></td></tr>';
+  if(!rows.length) trs='<tr><td colspan="7"><div class="emptyc" style="padding:24px">ยังไม่มีรายการ'+(canE?' — กด “เพิ่มรายการ”':'')+'</div></td></tr>';
   const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px;border-bottom:1px solid var(--line)">${t}</th>`;
-  const head=`<tr>${th('วันที่')}${th('แขก')}${th('OPC ที่พามา')}${th('จำนวน',R)}${th('สถานะ')}${th('')}</tr>`;
+  const head=`<tr>${th('วันที่')}${th('แขก')}${th('OPC ที่พามา')}${th('จำนวน',R)}${th('เอกสาร')}${th('สถานะ')}${th('')}</tr>`;
   body.innerHTML=kpis+bar+`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${head}</thead><tbody>${trs}</tbody></table></div>`; }
 function openTaxiModal(id){ const r=id?(DB.taxi||[]).find(x=>x.id===id):null; const reps=(DB.mktReps||[]);
   const opts=reps.map(rp=>`<option value="${esc(rp.code)}" ${r&&r.opc_code===rp.code?'selected':''}>${esc(rp.code)} ${esc(rp.name)}</option>`).join('');
-  openModal(`<h2>${r?'แก้ไข':'เพิ่ม'}ค่าแท็กซี่</h2>
+  openModal(`<h2>${r?'แก้ไข':'เพิ่ม'}ค่าแท็กซี่ (เบิกจ่าย)</h2>
    <div class="grid2">
      <div><label>วันที่</label><input type="date" id="tx_date" value="${r?r.tour_date:TODAY}"></div>
      <div><label>OPC ที่พาแขกมา</label><select id="tx_opc"><option value="">—</option>${opts}</select></div>
      <div class="full"><label>ชื่อแขก</label><input id="tx_guest" value="${r?esc(r.guest_name||''):''}" placeholder="เช่น Mr. John Smith"></div>
      <div><label>จำนวนเงิน (บาท)</label><input type="number" id="tx_amt" value="${r?r.amount:(S.taxiRate||0)}"></div>
-     <div><label>สถานะ</label><select id="tx_paid"><option value="">รอจ่าย</option><option value="1" ${r&&r.paid?'selected':''}>จ่ายแล้ว (เบิกแล้ว)</option></select></div>
+     <div class="full"><label>แนบเอกสาร (ใบเสร็จ/สลิป — รูปหรือ PDF)</label><input type="file" id="tx_file" accept="image/*,application/pdf">${r&&r.doc_path?'<div class="mini" style="margin-top:4px">ไฟล์ปัจจุบัน: <a href="#" onclick="openFile(\'cf-receipts\',\''+esc(r.doc_path)+'\');return false">'+esc(r.doc_name||'ดูเอกสาร')+'</a> · เลือกไฟล์ใหม่เพื่อแทนที่</div>':''}</div>
      <div class="full"><label>หมายเหตุ</label><input id="tx_note" value="${r?esc(r.note||''):''}"></div>
    </div>
-   <div class="right" style="margin-top:14px">${r?'<button class="btn ghost danger" onclick="taxiDelete(\''+r.id+'\')">ลบ</button> ':''}<button class="btn" onclick="closeModal()">ยกเลิก</button> <button class="btn pri" onclick="saveTaxi('${r?r.id:''}')">บันทึก</button></div>`); }
-async function saveTaxi(id){ const paid=!!g('tx_paid').value;
-  const row={ id:id||uid('tx'), tour_date:g('tx_date').value||TODAY, guest_name:(g('tx_guest').value||'').trim()||null,
+   <p class="mini" style="margin-top:8px;color:var(--ink3)">บันทึกแล้วสถานะ = “รอบัญชีตรวจ” → ฝ่ายบัญชีเปิดเอกสารแล้วอนุมัติ/ตีกลับ</p>
+   <div class="right" style="margin-top:8px">${r&&(USER&&USER.is_admin)?'<button class="btn ghost danger" onclick="taxiDelete(\''+r.id+'\')">ลบ</button> ':''}<button class="btn" onclick="closeModal()">ยกเลิก</button> <button class="btn pri" id="tx_save" onclick="saveTaxi('${r?r.id:''}')">บันทึก</button></div>`); }
+async function saveTaxi(id){ const cur=id?(DB.taxi||[]).find(x=>x.id===id):null; const rid=id||uid('tx');
+  const f=g('tx_file'); const file=f&&f.files&&f.files[0];
+  let doc_path=cur?cur.doc_path:null, doc_name=cur?cur.doc_name:null;
+  const sv=g('tx_save'); if(sv){ sv.disabled=true; sv.textContent='กำลังบันทึก…'; }
+  if(file){ const ext=(file.name.split('.').pop()||'jpg').toLowerCase(); const path='taxi/'+rid+'-'+Date.now()+'.'+ext;
+    try{ await uploadTo('cf-receipts',path,file); doc_path=path; doc_name=file.name; }catch(e){ toast('อัปโหลดเอกสารไม่สำเร็จ: '+e.message); if(sv){sv.disabled=false;sv.textContent='บันทึก';} return; } }
+  const row={ id:rid, tour_date:g('tx_date').value||TODAY, guest_name:(g('tx_guest').value||'').trim()||null,
     opc_code:g('tx_opc').value||null, amount:parseFloat(g('tx_amt').value)||0, note:(g('tx_note').value||'').trim()||null,
-    paid, paid_date:paid?TODAY:null, recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() };
-  try{ await upsert('mkt_taxi',[row]); closeModal(); toast('บันทึกแล้ว'); await loadTaxi(); taxiPaint(); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
-async function taxiPay(id,val){ try{ await patchRow('mkt_taxi',id,{paid:val,paid_date:val?TODAY:null,updated_at:new Date().toISOString()}); await loadTaxi(); taxiPaint(); }catch(e){ toast('ไม่สำเร็จ: '+e.message); } }
+    doc_path, doc_name, status:(cur&&cur.status==='approved')?'approved':'pending', recorded_by:cur?cur.recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() };
+  if(cur&&cur.status==='rejected'){ row.review_note=null; }
+  try{ await upsert('mkt_taxi',[row]); closeModal(); toast('บันทึก + ส่งให้บัญชีตรวจแล้ว'); await loadTaxi(); taxiPaint(); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); if(sv){sv.disabled=false;sv.textContent='บันทึก';} } }
+async function taxiReview(id,decision){ let note=null;
+  if(decision==='rejected'){ note=prompt('เหตุผลที่ตีกลับ (ให้ reception แก้):'); if(note===null) return; }
+  try{ await patchRow('mkt_taxi',id,{status:decision, paid:decision==='approved', paid_date:decision==='approved'?TODAY:null, review_by:(USER&&USER.email)||null, review_at:new Date().toISOString(), review_note:note}); await loadTaxi(); taxiPaint(); toast(decision==='approved'?'อนุมัติแล้ว':'ตีกลับแล้ว'); }catch(e){ toast('ไม่สำเร็จ: '+e.message); } }
 async function taxiDelete(id){ if(!confirm('ลบรายการค่าแท็กซี่นี้?')) return; try{ await api('mkt_taxi?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); closeModal(); await loadTaxi(); taxiPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
 
 function render(){
