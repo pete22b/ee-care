@@ -51,6 +51,20 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
 .tabs button:hover{color:#20303c}
 .tabs button.on{color:#e08128;border-bottom-color:#e08128}
 .top .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2);white-space:nowrap;flex:none}
+.topright{margin-left:auto;display:flex;align-items:center;gap:14px;flex:none}
+.topright .right{margin-left:0}
+.gsearch{position:relative}
+.gsearch input{width:220px;max-width:38vw;padding:8px 12px;border-radius:20px;background:var(--bg);border:1px solid var(--line);font-size:12.5px}
+.gsearch input:focus{background:#fff;border-color:var(--brand);box-shadow:0 0 0 3px var(--brandsoft)}
+.gsres{position:absolute;top:calc(100% + 8px);right:0;width:380px;max-width:86vw;max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:60;padding:6px}
+.gsres .grp{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);padding:9px 10px 4px;font-weight:700}
+.gsitem{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer}
+.gsitem:hover,.gsitem.hl{background:var(--brandsoft)}
+.gsitem .ic{font-size:16px;flex:none;width:20px;text-align:center}
+.gsitem .tx b{font-size:13px;color:var(--ink)}
+.gsitem .tx .s{font-size:11px;color:var(--ink2)}
+.gsempty{padding:14px 12px;color:var(--ink3);font-size:12.5px}
+@media(max-width:720px){.gsearch input{width:130px}.gsres{width:300px}}
 .top .right a{color:#e08128}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 80px}
 .head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px}
@@ -131,7 +145,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <button data-t="accounts">Accounts</button>
     <button data-t="import">Import/Export</button>
   </div>
-  <div class="right" id="userbox"></div>
+  <div class="topright">
+    <div class="gsearch">
+      <input id="gsq" type="search" placeholder="🔍  ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
+      <div id="gsres" class="gsres hide"></div>
+    </div>
+    <div class="right" id="userbox"></div>
+  </div>
 </div></div>
 <div class="wrap" id="main"></div>
 <div id="mw" class="hide" onclick="if(event.target===this)closeModal()"></div>
@@ -258,6 +278,43 @@ async function loadAll(){
 
 /* ============ router ============ */
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab)); render(); });
+function goto(tab){ S.tab=tab; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===tab)); render(); }
+
+/* ============ global search (command palette) ============ */
+function cssId(s){ return String(s).replace(/[^a-z0-9]+/gi,'_'); }
+let _gs={list:[],hl:-1};
+function globalSearch(q){ q=(q||'').trim().toLowerCase(); if(q.length<2) return []; const res=[];
+  try{ membershipContracts().forEach(gp=>{ const m=gp.meta||{}; const names=((gp.entries[0]&&gp.entries[0].description)||'').replace(/\n/g,' & ');
+    const hay=[gp.cno,names,m.unit,m.nationality,m.rep,m.channel,m.city].filter(Boolean).join(' ').toLowerCase();
+    if(hay.indexOf(q)>=0) res.push({type:'Contract',icon:'📄',label:gp.cno,sub:[names,m.unit].filter(Boolean).join(' · '),
+      go:()=>{ goto('stays'); S.syOpen[gp.cno]=true; render(); setTimeout(()=>{ const el=g('sy_'+cssId(gp.cno)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600);} },90); }}); }); }catch(e){}
+  (DB.bookings||[]).forEach(b=>{ const hay=[b.member_name,b.membership_no,b.email].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
+    res.push({type:'Booking',icon:'📩',label:b.member_name||b.membership_no||'Booking',sub:[b.membership_no,b.check_in].filter(Boolean).join(' · '),go:()=>{ goto('bookings'); openBooking(b.id); }}); });
+  (DB.bankAccounts||[]).forEach(a=>{ const hay=[a.name,a.bank,a.number,a.company].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
+    res.push({type:'Bank',icon:'🏦',label:a.name||a.bank||'Account',sub:[a.bank,a.number].filter(Boolean).join(' · '),go:()=>goto('bank')}); });
+  (DB.companies||[]).forEach(c=>{ if((c.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Company',icon:'🏢',label:c.name,sub:'',go:()=>goto('companies')}); });
+  (DB.accounts||[]).forEach(a=>{ if((a.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Account',icon:'💳',label:a.name,sub:a.currency||'',go:()=>goto('accounts')}); });
+  return res.slice(0,25);
+}
+function onSearch(v){ const box=g('gsres'); if(!box) return;
+  if(!v||v.trim().length<2){ _gs={list:[],hl:-1}; box.classList.add('hide'); box.innerHTML=''; return; }
+  const list=globalSearch(v); _gs={list,hl:list.length?0:-1};
+  if(!list.length){ box.classList.remove('hide'); box.innerHTML='<div class="gsempty">ไม่พบ "'+esc(v)+'"</div>'; return; }
+  const order=['Contract','Booking','Bank','Company','Account']; const LB={Contract:'สัญญา',Booking:'การจอง',Bank:'บัญชีธนาคาร',Company:'บริษัท',Account:'บัญชี'}; let html='';
+  order.forEach(t=>{ const items=list.filter(r=>r.type===t); if(!items.length) return; html+='<div class="grp">'+LB[t]+'</div>';
+    items.forEach(r=>{ const idx=list.indexOf(r); html+=`<div class="gsitem${idx===_gs.hl?' hl':''}" data-i="${idx}" onmousedown="event.preventDefault();gsPick(${idx})"><div class="ic">${r.icon}</div><div class="tx"><b>${esc(r.label)}</b>${r.sub?'<div class="s">'+esc(r.sub)+'</div>':''}</div></div>`; }); });
+  box.classList.remove('hide'); box.innerHTML=html;
+}
+function paintGs(){ document.querySelectorAll('#gsres .gsitem').forEach(el=>{ const i=Number(el.dataset.i); el.classList.toggle('hl',i===_gs.hl); if(i===_gs.hl) el.scrollIntoView({block:'nearest'}); }); }
+function gsPick(i){ const r=_gs.list[i]; if(!r) return; g('gsres').classList.add('hide'); const inp=g('gsq'); if(inp){inp.value='';inp.blur();} _gs={list:[],hl:-1}; r.go(); }
+function gsKey(e){ const box=g('gsres'); const n=_gs.list.length;
+  if(e.key==='Escape'){ if(box)box.classList.add('hide'); e.target.value=''; e.target.blur(); return; }
+  if(!n) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); _gs.hl=(_gs.hl+1)%n; paintGs(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _gs.hl=(_gs.hl-1+n)%n; paintGs(); }
+  else if(e.key==='Enter'){ if(_gs.hl>=0){ e.preventDefault(); gsPick(_gs.hl); } } }
+document.addEventListener('keydown',e=>{ if(e.key==='/' && !e.ctrlKey && !e.metaKey){ const a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; const inp=g('gsq'); if(inp){ e.preventDefault(); inp.focus(); inp.select&&inp.select(); } } });
+document.addEventListener('click',e=>{ const box=g('gsres'); if(box && !box.classList.contains('hide') && !e.target.closest('.gsearch')) box.classList.add('hide'); });
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='dashboard') return rDashboard();
@@ -990,7 +1047,7 @@ function rStays(){
       rows=`<tr><td colspan="4" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
     }
     const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
-    return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer${open?';border-bottom:1px solid var(--line)':''}" onclick="toggleSy('${esc(g.cno)}')">
+    return `<div class="card" id="sy_${cssId(g.cno)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer${open?';border-bottom:1px solid var(--line)':''}" onclick="toggleSy('${esc(g.cno)}')">
       <div><b>${open?'▾':'▸'} ${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${badge}${iiBadge}${upBadge}</div></div>
       ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
