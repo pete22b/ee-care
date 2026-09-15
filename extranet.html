@@ -804,8 +804,9 @@ function rBookings(){
     const elig= !cno ? '<span class="mini" style="opacity:.5">no linked contract</span>'
       : (el.blocked ? '<span class="pill exp">🔴 owes MFEE</span>' : '<span class="pill inc">🟢 OK to stay</span>');
     const st=b.status||'new';
+    const roomPill= st==='new' ? (b.room_ok?' <span class="pill inc">🏨 room ✓</span>':' <span class="pill fc">🏨 awaiting room</span>') : '';
     const pill=`<span class="pill ${st==='new'?'fc':(st==='confirmed'?'inc':(st==='declined'?'exp':'off'))}">${BOOK_ST[st]||st}</span>`;
-    const act= st==='new' ? `<button class="btn sm inc" onclick="confirmBooking('${esc(b.id)}')">Confirm</button> <button class="btn link" onclick="setBooking('${esc(b.id)}','declined')">decline</button>`
+    const act= st==='new' ? `${b.room_ok?`<button class="btn sm inc" onclick="confirmBooking('${esc(b.id)}')">Confirm</button>`:`<button class="btn sm" onclick="openBooking('${esc(b.id)}')">🏨 check room</button>`} <button class="btn link" onclick="setBooking('${esc(b.id)}','declined')">decline</button>`
       : (st==='confirmed'? `<button class="btn sm ghost" onclick="setBooking('${esc(b.id)}','done')">Mark done</button>`:'');
     return `<tr>
       <td class="mini">${b.created_at?fmtDate(String(b.created_at).slice(0,10)):''}</td>
@@ -813,7 +814,7 @@ function rBookings(){
       <td class="mini">${esc(b.email||'')}</td>
       <td class="mini">${b.check_in?fmtDate(b.check_in):'?'} – ${b.check_out?fmtDate(b.check_out):'?'}${b.guests?'<br>'+b.guests+' guest(s)':''}</td>
       <td class="mini">${esc(b.requests||'')}</td>
-      <td>${elig}</td>
+      <td>${elig}${roomPill}</td>
       <td>${pill}</td>
       <td style="white-space:nowrap">${act} <button class="btn link" onclick="openBooking('${esc(b.id)}')">details</button></td></tr>`;
   }).join('');
@@ -823,11 +824,75 @@ function rBookings(){
   g('main').innerHTML=head+kpis+seg+body;
 }
 async function setBooking(id,status){ try{ await patchRow('cf_bookings',id,{status,updated_by:USER&&USER.email}); toast('Updated'); await loadAll(); S.tab='bookings'; render(); }catch(e){ toast('Failed: '+e.message); } }
-function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b);
+async function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b);
+  if(!b.room_ok){ if(!confirm('Reservations has not confirmed a room is available for these dates yet.\nThe reservations team should check the resort calendar first.\n\nConfirm anyway?')) { openBooking(id); return; } }
   if(!cno){ if(!confirm('This request is not linked to a verified contract yet.\nPlease check the member name / contract number first.\n\nConfirm the booking anyway?')) { openBooking(id); return; } }
   else { const el=eligibility(cno); if(el.blocked){ if(!confirm('⚠ '+cno+' owes Management Fee (MFEE).\nThe member should NOT stay until it is paid.\n\nConfirm anyway?')) return; } }
-  setBooking(id,'confirmed');
+  try{
+    await patchRow('cf_bookings',id,{status:'confirmed',contract:cno||b.contract||null,updated_by:USER&&USER.email});
+    // Confirm = also log the stay for that year, so eligibility & entitlement reflect it.
+    if(cno && b.check_in){ const yr=Number(String(b.check_in).slice(0,4)); const s=stayOf(cno,yr); const sid=s?s.id:uid('sy');
+      await api('cf_stays?on_conflict=contract,year',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',
+        body:JSON.stringify([{id:sid,contract:cno,year:yr,stayed:true,check_in:b.check_in,check_out:b.check_out||null,note:(s&&s.note)||'from booking request',updated_by:USER&&USER.email}])}); }
+    toast('Confirmed'+(cno&&b.check_in?' · stay logged':'')); await loadAll(); S.tab='bookings'; render();
+  }catch(e){ toast('Failed: '+e.message); }
 }
+function contractGroup(cno){ return membershipContracts().find(g=>g.cno===cno)||null; }
+/* Full verification: everything the system CAN check for "can this member really stay?".
+   Room/date availability is NOT here — it lives in the resort calendar, so it's a manual step. */
+function bookingChecks(b,cno){
+  const out=[]; const yr=Number(String(b.check_in||'').slice(0,4))||null;
+  const avail = b.room_ok
+    ? {s:'ok',t:'Room availability (reservations)',d:'Confirmed available'+(b.room_by?' · by '+esc(b.room_by):'')+(b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):'')}
+    : {s:'manual',t:'Room availability (reservations)',d:'Reservations must check the resort calendar for '+(b.check_in?fmtDate(b.check_in):'?')+' – '+(b.check_out?fmtDate(b.check_out):'?')+' and confirm a room is free. Required before Confirm.'};
+  if(!cno){ out.push({s:'fail',t:'Member not found',d:'No contract matches this membership no. / name. Link one below, or verify the member before confirming.'});
+    out.push(avail); return out; }
+  const grp=contractGroup(cno); const desc=grp?grp.entries.map(e=>e.description||'').join(' ').toLowerCase():'';
+  const nm=(b.member_name||'').trim().toLowerCase(); const first=nm.split(/\s+/)[0]||'';
+  const nameOk = first.length>2 && desc.indexOf(first)>=0;
+  out.push({s:'ok',t:'Member found',d:esc(cno)+(b.contract?' · linked manually':' · auto-matched from '+(b.membership_no?'membership no.':'name'))});
+  out.push({s:nameOk?'ok':'warn',t:'Name matches contract',d:nameOk?'The name appears on the contract.':'Name not found on the contract — verify ID / spelling before confirming.'});
+  const fyo=Number(grp&&grp.meta&&grp.meta.fyo)||null, term=termOf(cno), lyo=(fyo&&term)?fyo+term-1:null;
+  if(fyo&&lyo&&yr){ const active=yr>=fyo&&yr<=lyo; out.push({s:active?'ok':'fail',t:'Membership active for '+yr,d:active?('valid '+fyo+'–'+lyo):('contract runs '+fyo+'–'+lyo+' — the requested stay year is outside the term.')}); }
+  else out.push({s:'warn',t:'Membership period',d:'Contract term unknown in the system — verify manually.'});
+  const el=eligibility(cno); out.push({s:el.blocked?'fail':'ok',t:'Management Fee (MFEE)',d:el.blocked?('owes '+fmt(el.out.reduce((s,l)=>s+Number(l.amount||0),0))+' — member must pay before staying.'):'No outstanding MFEE.'});
+  if(yr){ const st=stayOf(cno,yr); if(st&&st.stayed) out.push({s:'warn',t:'Already stayed in '+yr,d:'A stay is already logged for this year — check the remaining entitlement.'}); }
+  out.push(avail);
+  return out;
+}
+function checksHtml(b,cno){ const ic={ok:'✅',warn:'⚠️',fail:'🔴',manual:'🔎'};
+  const rows=bookingChecks(b,cno).map(c=>`<div style="display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line)"><div style="flex:0 0 20px">${ic[c.s]||'•'}</div><div><b>${c.t}</b><br><span class="mini">${c.d}</span></div></div>`).join('');
+  const anyFail=bookingChecks(b,cno).some(c=>c.s==='fail');
+  return `<div style="background:var(--card2,#f7f7f9);border-radius:10px;padding:8px 12px">
+    <div style="font-weight:700;margin-bottom:2px">Verification checklist ${anyFail?'<span class="pill exp">needs attention</span>':'<span class="pill inc">member side OK</span>'}</div>
+    ${rows}
+    <div class="mini" style="padding-top:6px;opacity:.7">Confirm only after the resort calendar shows the dates are free. Nothing is confirmed automatically.</div></div>`;
+}
+/* Pull the full contract on file into the booking view when a contract is matched. */
+function contractDetailsHtml(cno){ const grp=contractGroup(cno); if(!grp) return ''; const m=grp.meta||{};
+  const term=termOf(cno), fyo=Number(m.fyo)||null, lyo=(fyo&&term)?fyo+term-1:null; const ii=iiOf(m);
+  const mfeeNext=mfeeLinesFor(cno).find(l=>!l.paid);
+  const names=(grp.entries.map(e=>e.description).filter(Boolean)[0]||'').replace(/\n/g,' & ');
+  const row=(k,v)=> v?`<div><label>${k}</label><div>${v}</div></div>`:'';
+  return `<div class="full" style="background:var(--card2,#f7f7f9);border-radius:10px;padding:8px 12px">
+   <div style="font-weight:700;margin-bottom:4px">📄 Contract on file — ${esc(cno)}</div>
+   <div class="grid2" style="gap:4px 12px">
+    ${row('Member(s)',esc(names))}
+    ${row('Unit',esc(m.unit||''))}
+    ${row('Type / Season',esc([m.contract_type,m.season].filter(Boolean).join(' · ')))}
+    ${row('Weeks',m.weeks?esc(String(m.weeks)):'')}
+    ${row('Nationality',esc(m.nationality||''))}
+    ${row('Term',(fyo&&lyo)?fyo+'–'+lyo+' · '+term+' yr':'')}
+    ${row('Interval',ii?esc(ii.label)+(ii.until?' · to '+ii.until:''):'')}
+    ${row('MFEE / year',m.mfee_year?fmt(m.mfee_year):'')}
+    ${row('MFEE next due',mfeeNext?fmtDate(mfeeNext.txn_date)+' · '+fmt(mfeeNext.amount):'none outstanding')}
+    ${row('Sales rep',esc(m.rep||''))}
+   </div></div>`;
+}
+async function setRoomOk(id,val){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
+  try{ await patchRow('cf_bookings',id, val?{room_ok:true,room_by:(USER&&USER.email)||null,room_at:new Date().toISOString(),updated_by:USER&&USER.email}:{room_ok:false,room_by:null,room_at:null,updated_by:USER&&USER.email});
+    toast(val?'Room confirmed':'Room mark cleared'); await loadAll(); const cur=(DB.bookings||[]).find(x=>x.id===id); if(cur&&document.getElementById('modal')&&document.getElementById('modal').style.display!=='none') openBooking(id); else { S.tab='bookings'; render(); }
+  }catch(e){ toast('Failed: '+e.message); } }
 function openBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b); const el=cno?eligibility(cno):null;
   openModal(`<h2>Booking request</h2>
    <div class="grid2">
@@ -839,10 +904,17 @@ function openBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) r
     <div><label>Status</label><select id="bk_status">${Object.keys(BOOK_ST).map(k=>`<option value="${k}" ${(b.status||'new')===k?'selected':''}>${BOOK_ST[k]}</option>`).join('')}</select></div>
     <div class="full"><label>Special requests</label><div>${esc(b.requests||'—')}</div></div>
     <div class="full"><label>Link to contract no. (for eligibility)</label><input id="bk_contract" value="${esc(b.contract||cno||'')}" placeholder="e.g. EST/1010/5/AH/T1"></div>
-    <div class="full">${cno?(el.blocked?'<span class="pill exp">🔴 '+esc(cno)+' owes MFEE — do not confirm until paid</span>':'<span class="pill inc">🟢 '+esc(cno)+' OK to stay</span>'):'<span class="mini">No contract auto-matched — link one above to check MFEE.</span>'}</div>
+    ${cno?contractDetailsHtml(cno):''}
+    <div class="full">${checksHtml(b,cno)}</div>
+    <div class="full" style="border:1px solid ${b.room_ok?'var(--income)':'var(--line)'};border-radius:10px;padding:8px 12px">
+      <label style="display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer">
+        <input type="checkbox" style="width:auto;margin-top:3px" ${b.room_ok?'checked':''} onclick="setRoomOk('${esc(id)}',this.checked)">
+        <span><b>🏨 Reservations: room checked &amp; available</b>${b.room_ok&&b.room_by?'<br><span class="mini">confirmed by '+esc(b.room_by)+(b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):'')+'</span>':'<br><span class="mini">The reservations team ticks this once the resort calendar is checked and a room is held for these dates. Required before Confirm.</span>'}</span>
+      </label>
+    </div>
     <div class="full"><label>Internal note</label><input id="bk_note" value="${esc(b.note||'')}"></div>
    </div>
-   <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn pri" onclick="saveBooking('${esc(id)}')">Save</button></div>`);
+   <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button>${(b.status||'new')==='new'?(b.room_ok?`<button class="btn sm inc" onclick="closeModal();confirmBooking('${esc(id)}')">Confirm booking</button>`:`<button class="btn sm" disabled title="Reservations must confirm the room first" style="opacity:.45;cursor:not-allowed">Confirm (awaiting room)</button>`):''}<button class="btn pri" onclick="saveBooking('${esc(id)}')">Save</button></div>`);
 }
 async function saveBooking(id){ try{ await patchRow('cf_bookings',id,{status:g('bk_status').value,contract:g('bk_contract').value.trim()||null,note:g('bk_note').value.trim()||null,updated_by:USER&&USER.email}); closeModal(); toast('Saved'); await loadAll(); S.tab='bookings'; render(); }catch(e){ toast('Failed: '+e.message); } }
 
