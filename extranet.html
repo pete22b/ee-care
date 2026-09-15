@@ -612,7 +612,12 @@ function metaLine(e){ const m=em(e); const p=[];
   if(m.nationality||m.city) p.push('🌏 '+[m.nationality,m.city].filter(Boolean).join(' · '));
   if(m.unit) p.push('🏠 '+m.unit+(m.contract_type?(' · '+m.contract_type):'')+(m.season?(' '+m.season):''));
   if(m.channel) p.push('📣 '+m.channel);
-  const team=[]; if(m.rep)team.push('Rep '+m.rep); if(m.fu)team.push('FU '+m.fu); if(team.length) p.push(team.join(' · '));
+  const s=m.sales||{}; const team=[];
+  if(s.consultant||m.rep) team.push('Rep '+(s.consultant||m.rep));
+  if(s.to && s.to!==(s.consultant||m.rep)) team.push('Closer '+s.to);
+  if(s.man) team.push('Mgr '+s.man);
+  if(!s.man && m.fu) team.push('FU '+m.fu);
+  if(team.length) p.push(team.join(' · '));
   return p.join(' · '); }
 function metaText(e){ const m=em(e); return [m.nationality,m.unit,m.contract_type,m.season,m.channel,m.generator,m.rep,m.manager,m.fu].filter(Boolean).join(' '); }
 function metaOpts(field){ return [...new Set(DB.entries.map(e=>em(e)[field]).filter(Boolean))].sort(); }
@@ -1064,7 +1069,7 @@ function contractDetailsHtml(cno){ const grp=contractGroup(cno); if(!grp) return
     ${row('Interval',ii?esc(ii.label)+(ii.until?' · to '+ii.until:''):'')}
     ${row('MFEE / year',m.mfee_year?fmt(m.mfee_year):'')}
     ${row('MFEE next due',mfeeNext?fmtDate(mfeeNext.txn_date)+' · '+fmt(mfeeNext.amount):'none outstanding')}
-    ${row('Sales rep',esc(m.rep||''))}
+    ${(function(){const s=m.sales||{};const t=[];if(s.consultant||m.rep)t.push('Rep '+(s.consultant||m.rep));if(s.to&&s.to!==(s.consultant||m.rep))t.push('Closer '+s.to);if(s.man)t.push('Mgr '+s.man);if(s.channel)t.push(s.channel);return row('Sales team',esc(t.join(' · ')));})()}
     ${row('Email',esc(m.email||''))}
     ${row('Phone',esc(m.phone||''))}
    </div>
