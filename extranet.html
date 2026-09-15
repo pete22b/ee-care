@@ -1061,11 +1061,14 @@ function rStays(){
           : (ml.paid ? '<span class="pill inc">✓ paid</span>'
             : (ml.txn_date<=TODAY ? '<span class="pill exp">● overdue</span>' : '<span class="pill off">due '+fmtDate(ml.txn_date)+'</span>'));
         const mfeeAct = ml && !ml.paid ? ` <button class="btn link" onclick="markReceived('${esc(ml.id)}')">record MFEE</button>` : '';
-        const st=stayOf(g.cno,y);
-        const stayCell = st&&st.stayed ? `✓ Stayed${st.check_in?' ('+fmtDate(st.check_in)+(st.check_out?'–'+fmtDate(st.check_out):'')+')':''}` : '<span class="mini" style="opacity:.5">not yet</span>';
-        // dim years whose MFEE is only due in the FUTURE (not overdue, not paid) and no stay yet — focus the eye on what's actionable now
-        const idle = ml && !ml.paid && ml.txn_date>TODAY && !(st&&st.stayed);
-        rows+=`<tr style="${idle?'opacity:.45':''}"><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td><button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">${st?'edit':'log stay'}</button></td></tr>`;
+        const st=stayOf(g.cno,y); const stayed=st&&st.stayed;
+        // Stay side only: you can't log a stay for a year that hasn't started yet → dim + disable it (left/MFEE side stays fully active so payments can be recorded early)
+        const canLog = stayed || y<=CUR_YEAR;
+        const stayCell = stayed ? `✓ Stayed${st.check_in?' ('+fmtDate(st.check_in)+(st.check_out?'–'+fmtDate(st.check_out):'')+')':''}` : `<span class="mini" style="opacity:${canLog?'.5':'.3'}">not yet</span>`;
+        const stayAct = stayed ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">edit</button>`
+          : (canLog ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">log stay</button>`
+                    : `<span class="mini" style="opacity:.3;cursor:not-allowed" title="Can't log a stay before ${y} — the year hasn't started yet">log stay</span>`);
+        rows+=`<tr><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td>${stayAct}</td></tr>`;
       }
     } else {
       rows=`<tr><td colspan="4" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
