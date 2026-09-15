@@ -760,40 +760,52 @@ function reportBy(keyFn,label,ps){
 /* ============ Receipts (payment tracking + evidence) ============ */
 function lineStatus(l){ return l.paid?'paid':((l.txn_date<TODAY)?'overdue':'due'); }
 function toggleRc(id){ S.rcOpen[id]=!S.rcOpen[id]; render(); }
-function rcAll(open){ S.rcOpen={}; if(open) DB.entries.forEach(e=>S.rcOpen[e.id]=true); render(); }
+function rcKey(e){ return e.category||('entry:'+e.id); }
+function rcAll(open){ S.rcOpen={}; if(open) DB.entries.forEach(e=>S.rcOpen[rcKey(e)]=true); render(); }
+const RC_SECTIONS=[['Sale payments',['deposit','admin','installment']],['Management Fee (MFEE)',['mfee']],['Interval',['ii_fee','ii_renewal','ii_exchange']],['Other',null]];
+const RC_KNOWN=['deposit','admin','installment','mfee','ii_fee','ii_renewal','ii_exchange'];
 function rReceipts(){
-  const groups={}; allLines().forEach(({l,e})=>{ (groups[e.id]=groups[e.id]||{e,ls:[]}).ls.push(l); });
+  // group by CONTRACT (category); entries with no category fall back to their own id
+  const groups={};
+  allLines().forEach(({l,e})=>{ const k=rcKey(e); const g=(groups[k]=groups[k]||{key:k,cno:e.category||null,entries:{},items:[]}); g.items.push({l,e}); g.entries[e.id]=e; });
   const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0;
   allLines().forEach(({l})=>{ const a=Number(l.amount)||0; if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
-  const head=`<div class="head"><div><h1>Receipts &amp; Evidence</h1><p class="mini">Mark each instalment received and attach the slip / credit advice · store the signed contract scan per contract</p></div></div>`;
+  const head=`<div class="head"><div><h1>Receipts &amp; Evidence</h1><p class="mini">One card per contract · mark each instalment received and attach the slip / credit advice · store the signed contract scan</p></div></div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recv)}</div><div class="l">Received to date</div></div>
     <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (scheduled)</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
     <div class="kpi"><div class="v">${fmt(dueSoon)}</div><div class="l">Due in next 30 days</div></div></div>`;
-  const entries=Object.values(groups).sort((a,b)=>(a.e.category||'')<(b.e.category||'')?-1:1);
+  const list=Object.values(groups).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
   const bar=`<div class="toolbar" style="margin-bottom:10px"><button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button></div>`;
-  const blocks=entries.map(({e,ls})=>{
-    ls.sort((a,b)=>a.txn_date<b.txn_date?-1:1);
-    const open=!!S.rcOpen[e.id];
-    const paidN=ls.filter(l=>l.paid).length; const paidSum=ls.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
-    const totSum=ls.reduce((s,l)=>s+Number(l.amount||0),0);
-    const odN=ls.filter(l=>!l.paid && l.txn_date<TODAY).length;
-    const rows=ls.map(l=>{ const st=lineStatus(l);
+  const rowFor=(l)=>{ const st=lineStatus(l);
       const pill= st==='paid'?'<span class="pill inc">✓ Received</span>':(st==='overdue'?'<span class="pill exp">● Overdue</span>':'<span class="pill off">Due</span>');
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
       const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm pri" onclick="markReceived('${esc(l.id)}')">Mark received</button>`;
-      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n">${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`;
-    }).join('');
-    // contract PDF is per CONTRACT, not per entry — show it only on the main card (the one with the payment schedule)
-    const isMain = ls.some(l=>['deposit','admin','installment'].includes(l.line_type)) || /sales/i.test(e.title||'');
-    const cp = contractPathFor(e.category);
-    const scan= !isMain ? '' : (cp.path
-      ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(e.id)}')">replace</button>`
-      : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`);
-    const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===ls.length?' <span class="pill inc">complete</span>':'');
-    return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(e.id)}')">
-      <div><b>${open?'▾':'▸'} ${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(e)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(e))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
+      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n">${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
+  const blocks=list.map(gp=>{
+    const open=!!S.rcOpen[gp.key];
+    const allL=gp.items.map(x=>x.l);
+    const paidN=allL.filter(l=>l.paid).length; const paidSum=allL.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
+    const totSum=allL.reduce((s,l)=>s+Number(l.amount||0),0);
+    const odN=allL.filter(l=>!l.paid && l.txn_date<TODAY).length;
+    const ents=Object.values(gp.entries);
+    const mainE = ents.find(e=>gp.items.some(x=>x.e.id===e.id && ['deposit','admin','installment'].includes(x.l.line_type))) || ents.find(e=>/sales/i.test(e.title||'')) || ents[0];
+    // build sectioned rows
+    let rows='';
+    RC_SECTIONS.forEach(([label,types])=>{
+      let sl=allL.filter(l=> types? types.includes(l.line_type) : !RC_KNOWN.includes(l.line_type));
+      if(!sl.length) return; sl.sort((a,b)=>a.txn_date<b.txn_date?-1:1);
+      const sp=sl.filter(l=>l.paid).length; const stot=sl.reduce((s,l)=>s+Number(l.amount||0),0);
+      rows+=`<tr><td colspan="8" style="background:var(--line2);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)">${label} · ${sp}/${sl.length} · ${fmt(stot)}</td></tr>`+sl.map(rowFor).join('');
+    });
+    const cp = gp.cno? contractPathFor(gp.cno) : {path:null};
+    const scan= !gp.cno ? '' : (cp.path
+      ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(mainE.id)}')">replace</button>`
+      : `<button class="btn sm ghost" onclick="uploadContract('${esc(mainE.id)}')">📄 Upload signed contract</button>`);
+    const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===allL.length?' <span class="pill inc">complete</span>':'');
+    return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
+      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${allL.length} instalments</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
       ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
@@ -1051,7 +1063,9 @@ function rStays(){
         const mfeeAct = ml && !ml.paid ? ` <button class="btn link" onclick="markReceived('${esc(ml.id)}')">record MFEE</button>` : '';
         const st=stayOf(g.cno,y);
         const stayCell = st&&st.stayed ? `✓ Stayed${st.check_in?' ('+fmtDate(st.check_in)+(st.check_out?'–'+fmtDate(st.check_out):'')+')':''}` : '<span class="mini" style="opacity:.5">not yet</span>';
-        rows+=`<tr><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td><button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">${st?'edit':'log stay'}</button></td></tr>`;
+        // dim years whose MFEE is only due in the FUTURE (not overdue, not paid) and no stay yet — focus the eye on what's actionable now
+        const idle = ml && !ml.paid && ml.txn_date>TODAY && !(st&&st.stayed);
+        rows+=`<tr style="${idle?'opacity:.45':''}"><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td><button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">${st?'edit':'log stay'}</button></td></tr>`;
       }
     } else {
       rows=`<tr><td colspan="4" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
