@@ -909,6 +909,8 @@ function bookingChecks(b,cno){
   const nameOk = first.length>2 && desc.indexOf(first)>=0;
   out.push({s:'ok',t:'Member found',d:esc(cno)+(b.contract?' · linked manually':' · auto-matched from '+(b.membership_no?'membership no.':'name'))});
   out.push({s:nameOk?'ok':'warn',t:'Name matches contract',d:nameOk?'The name appears on the contract.':'Name not found on the contract — verify ID / spelling before confirming.'});
+  const cEmail=grp&&grp.meta&&grp.meta.email?String(grp.meta.email).trim().toLowerCase():''; const bEmail=(b.email||'').trim().toLowerCase();
+  if(cEmail){ out.push({s: bEmail&&bEmail===cEmail?'ok':(bEmail?'warn':'manual'), t:'Email matches contract', d: bEmail&&bEmail===cEmail?'Booking email matches the contract on file.':(bEmail?'Booking email differs from contract ('+esc(grp.meta.email)+') — verify identity.':'No booking email to compare.')}); }
   const fyo=Number(grp&&grp.meta&&grp.meta.fyo)||null, term=termOf(cno), lyo=(fyo&&term)?fyo+term-1:null;
   if(fyo&&lyo&&yr){ const active=yr>=fyo&&yr<=lyo; out.push({s:active?'ok':'fail',t:'Membership active for '+yr,d:active?('valid '+fyo+'–'+lyo):('contract runs '+fyo+'–'+lyo+' — the requested stay year is outside the term.')}); }
   else out.push({s:'warn',t:'Membership period',d:'Contract term unknown in the system — verify manually.'});
@@ -944,7 +946,11 @@ function contractDetailsHtml(cno){ const grp=contractGroup(cno); if(!grp) return
     ${row('MFEE / year',m.mfee_year?fmt(m.mfee_year):'')}
     ${row('MFEE next due',mfeeNext?fmtDate(mfeeNext.txn_date)+' · '+fmt(mfeeNext.amount):'none outstanding')}
     ${row('Sales rep',esc(m.rep||''))}
-   </div></div>`;
+    ${row('Email',esc(m.email||''))}
+    ${row('Phone',esc(m.phone||''))}
+   </div>
+   ${m.contract_pdf?`<div style="margin-top:8px"><a href="#" onclick="openFile('cf-contracts','${esc(m.contract_pdf)}');return false">📎 View signed contract PDF${m.contract_pdf_name?' — '+esc(m.contract_pdf_name):''}</a></div>`:''}
+   </div>`;
 }
 async function markRoom(id,val){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
   const patch = val
@@ -1049,7 +1055,7 @@ function rStays(){
     const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
     return `<div class="card" id="sy_${cssId(g.cno)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer${open?';border-bottom:1px solid var(--line)':''}" onclick="toggleSy('${esc(g.cno)}')">
       <div><b>${open?'▾':'▸'} ${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${badge}${iiBadge}${upBadge}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.meta.contract_pdf?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.meta.contract_pdf)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${badge}${iiBadge}${upBadge}</div></div>
       ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
   g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
