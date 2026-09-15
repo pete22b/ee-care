@@ -1055,6 +1055,8 @@ function rStays(){
     const upBadge= (u&&u.upsell)? `<span class="pill" style="background:#fbf1d8;color:#8a6d1f" title="${esc(u.soonest.what)} ${u.soonest.year}">⭐ Upsell — ${esc(u.soonest.what)} ${u.soonest.year}${u.due<0?' (expired)':''}</span>` : '';
     let rows='';
     if(fyo&&lyo){
+      // the member's "active" entitlement year = earliest year in the term they haven't used yet (log-stay opens here; later years stay locked)
+      let activeYear=null; for(let yy=fyo;yy<=lyo;yy++){ const s=stayOf(g.cno,yy); if(!(s&&s.stayed)){ activeYear=yy; break; } }
       for(let y=fyo;y<=lyo;y++){
         const ml=mfeeLinesFor(g.cno).find(l=>l.txn_date.slice(0,4)==String(y));
         const mfeeCell = !ml ? '<span class="pill inc" title="No MFEE this year (free/included)">free</span>'
@@ -1062,8 +1064,8 @@ function rStays(){
             : (ml.txn_date<=TODAY ? '<span class="pill exp">● overdue</span>' : '<span class="pill off">due '+fmtDate(ml.txn_date)+'</span>'));
         const mfeeAct = ml && !ml.paid ? ` <button class="btn link" onclick="markReceived('${esc(ml.id)}')">record MFEE</button>` : '';
         const st=stayOf(g.cno,y); const stayed=st&&st.stayed;
-        // Stay side only: you can't log a stay for a year that hasn't started yet → dim + disable it (left/MFEE side stays fully active so payments can be recorded early)
-        const canLog = stayed || y<=CUR_YEAR;
+        // Stay side only: allow logging for the current active entitlement year (earliest unused, e.g. FYO) and any past/current year (retroactive); lock later years still to come.
+        const canLog = stayed || y===activeYear || y<=CUR_YEAR;
         const stayCell = stayed ? `✓ Stayed${st.check_in?' ('+fmtDate(st.check_in)+(st.check_out?'–'+fmtDate(st.check_out):'')+')':''}` : `<span class="mini" style="opacity:${canLog?'.5':'.3'}">not yet</span>`;
         const stayAct = stayed ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">edit</button>`
           : (canLog ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">log stay</button>`
