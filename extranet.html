@@ -788,7 +788,7 @@ function rReceipts(){
   const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
       const pill= st==='paid'?`<span class="pill inc">✓ ${exp?'Paid':'Received'}</span>`:(st==='overdue'?'<span class="pill exp">● Overdue</span>':`<span class="pill off">${exp?'To pay':'Due'}</span>`);
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
-      const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
+      const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">${lineLocked(l)?'🔒 view':'edit'}</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
       return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method))+cardTag(l):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
   const blocks=list.map(gp=>{
     const open=!!S.rcOpen[gp.key];
@@ -821,8 +821,53 @@ function rReceipts(){
   }).join('');
   g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
 }
+/* ===== Payment record locking + audit trail =====
+   A payment that is paid AND has evidence attached is LOCKED (read-only). Unlocking to edit needs a reason and is logged.
+   Every change (record/edit/unlock/undo/replaced evidence) is written to cf_pay_audit for review. Old evidence files are kept, never overwritten. */
+function lineLocked(l){ return !!(l && l.paid && l.proof_path); }
+function catOf(l){ return (DB.entries.find(e=>e.id===l.entry_id)||{}).category||null; }
+async function logPayAudit(l, action, reason, detail){
+  try{ await api('cf_pay_audit',{method:'POST',prefer:'return=minimal',body:JSON.stringify([{
+    line_id:l.id, entry_id:l.entry_id, contract:catOf(l), action:action, actor:(USER&&USER.email)||null, reason:reason||null, detail:detail||null}])}); }catch(e){}
+}
+async function unlockPay(id){
+  const l=DB.lines.find(x=>x.id===id); if(!l) return;
+  const reason=prompt('This payment is LOCKED (paid + evidence attached).\nEnter a reason to unlock it for editing — this is logged:');
+  if(reason===null) return; if(!reason.trim()){ toast('A reason is required to unlock'); return; }
+  await logPayAudit(l,'unlock',reason.trim());
+  S.payUnlocked=S.payUnlocked||{}; S.payUnlocked[id]=true;
+  toast('Unlocked for editing'); markReceived(id);
+}
+async function loadPayAudit(id){ const box=g('r_audit'); if(!box) return;
+  try{ const rows=await api('cf_pay_audit?select=*&line_id=eq.'+encodeURIComponent(id)+'&order=ts.desc&limit=30');
+    if(!rows||!rows.length){ box.innerHTML='<span class="mini" style="opacity:.5">No changes recorded yet.</span>'; return; }
+    box.innerHTML=rows.map(r=>{ const d=r.detail||{}; let ch='';
+      if(d.changes) ch=Object.entries(d.changes).map(([k,v])=>`<div class="mini" style="opacity:.8">${esc(k)}: ${esc(String(v.from))} → ${esc(String(v.to))}</div>`).join('');
+      const oldf=d.old_proof_path?` · <a href="#" onclick="openFile('cf-receipts','${esc(d.old_proof_path)}');return false">ไฟล์เดิม</a>`:'';
+      const A={record:'บันทึกจ่าย',edit:'แก้ไข',unlock:'ปลดล็อก',undo:'ยกเลิกจ่าย','replace-evidence':'เปลี่ยนหลักฐาน'};
+      return `<div style="padding:6px 0;border-top:1px solid var(--line2)"><b>${esc(A[r.action]||r.action)}</b> · ${fmtDate(String(r.ts).slice(0,10))} · ${esc(r.actor||'')}${r.reason?'<br><span class="mini">เหตุผล: “'+esc(r.reason)+'”</span>':''}${ch}${oldf}</div>`;
+    }).join('');
+  }catch(e){ box.innerHTML='<span class="mini">ประวัติโหลดไม่ได้</span>'; }
+}
+function openLockedView(l,e){
+  const pm=l.pay_meta||{}; const exp=e.kind==='expense';
+  openModal(`<h2>${exp?'Payment made':'Payment received'} <span class="pill inc" style="vertical-align:middle">🔒 locked</span></h2>
+   <div class="mini" style="margin-bottom:10px">${esc(e.category||'')} · ${esc(l.memo||'')}</div>
+   <div class="grid2">
+     <div><label>Date</label><div>${l.paid_date?fmtDate(l.paid_date):'—'}</div></div>
+     <div><label>Amount</label><div>${fmt(l.paid_amount!=null?l.paid_amount:l.amount)}</div></div>
+     <div><label>Method</label><div>${esc(methodLabel(l.method))}</div></div>
+     <div><label>Reference / note</label><div>${esc(l.paid_note||'—')}</div></div>
+   </div>
+   ${(pm.card_last4||pm.card_brand)?`<div class="full" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">💳 Card slip</div><div class="mini">${[pm.card_brand,pm.card_last4?'••'+esc(pm.card_last4):'',pm.card_thb?'THB '+Number(pm.card_thb).toLocaleString():'',pm.card_ref?'ref '+esc(pm.card_ref):'',pm.card_auth?'auth '+esc(pm.card_auth):'',pm.card_term?esc(pm.card_term):''].filter(Boolean).join(' · ')}</div></div>`:''}
+   ${l.proof_path?`<div style="margin-top:10px">📎 หลักฐาน: <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">${esc(l.proof_name||'file')}</a></div>`:''}
+   <div style="margin-top:14px"><label>ประวัติการเปลี่ยนแปลง (audit)</label><div id="r_audit" style="margin-top:4px">กำลังโหลด…</div></div>
+   <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn" onclick="unlockPay('${esc(l.id)}')">🔓 Unlock to edit</button></div>`);
+  loadPayAudit(l.id);
+}
 function markReceived(lineId){
   const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
+  if(lineLocked(l) && !(S.payUnlocked&&S.payUnlocked[lineId])) return openLockedView(l,e);
   const exp=e.kind==='expense'; const pm=l.pay_meta||{};
   openModal(`<h2>${l.paid?(exp?'Edit payment made':'Edit payment received'):(exp?'Record payment made':'Record payment received')}${exp?' <span class="pill exp" style="vertical-align:middle">we pay</span>':''}</h2>
    <div class="mini" style="margin-bottom:4px">${esc(e.category||'')} · ${esc(l.memo||'')} · due ${fmtDate(l.txn_date)} · scheduled ${fmt(l.amount)}</div>
@@ -849,13 +894,15 @@ function markReceived(lineId){
     <div class="full"><label>Attach evidence — card slip / credit advice (image or PDF)</label><input type="file" id="r_file" accept="image/*,application/pdf">
       ${l.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(l.proof_name||'file')} · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">view</a></div>`:''}</div>
    </div>
+   ${l.paid?`<div style="margin-top:12px"><label>ประวัติการเปลี่ยนแปลง (audit)</label><div id="r_audit" style="margin-top:4px">กำลังโหลด…</div></div>`:''}
    <div class="right">${l.paid?`<button class="btn danger" onclick="undoReceipt('${esc(l.id)}')">Undo ${exp?'payment':'received'}</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="r_save" onclick="saveReceipt('${esc(l.id)}')">Save</button></div>`);
+  if(l.paid) loadPayAudit(l.id);
 }
 async function saveReceipt(id){
   const btn=g('r_save'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   try{
-    const l=DB.lines.find(x=>x.id===id); const file=g('r_file').files[0]; let path=l.proof_path||null, name=l.proof_name||null;
-    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); path='receipts/'+id+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',path,file); name=file.name; }
+    const l=DB.lines.find(x=>x.id===id); const wasPaid=!!l.paid; const file=g('r_file').files[0]; let path=l.proof_path||null, name=l.proof_name||null; let oldProof=null;
+    if(file){ if(l.proof_path){ oldProof=l.proof_path; } const ext=(file.name.split('.').pop()||'bin').toLowerCase(); path='receipts/'+id+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',path,file); name=file.name; }
     const method=g('r_method').value;
     let pay_meta=null;
     if(method==='card'){
@@ -871,11 +918,27 @@ async function saveReceipt(id){
     }
     const patch={paid:true,paid_date:g('r_date').value||TODAY,paid_amount:parseFloat(g('r_amt').value)||Number(l.amount),method:method,paid_note:g('r_note').value.trim()||null,paid_by:USER&&USER.email,proof_path:path,proof_name:name,pay_meta:pay_meta};
     await patchRow('cf_lines',id,patch);
-    closeModal(); toast('Payment recorded'); await loadAll(); S.tab='receipts'; render();
+    // audit: what changed
+    const F=(a,b)=>String(a==null?'':a)!==String(b==null?'':b);
+    const changes={};
+    if(F(l.paid_date,patch.paid_date)) changes['date']={from:l.paid_date||'—',to:patch.paid_date};
+    if(F(l.paid_amount,patch.paid_amount)) changes['amount']={from:l.paid_amount!=null?fmt(l.paid_amount):'—',to:fmt(patch.paid_amount)};
+    if(F(l.method,patch.method)) changes['method']={from:methodLabel(l.method)||'—',to:methodLabel(patch.method)};
+    if(F(l.paid_note,patch.paid_note)) changes['note']={from:l.paid_note||'—',to:patch.paid_note||'—'};
+    const detail={}; if(Object.keys(changes).length) detail.changes=changes;
+    if(file) detail.new_proof=name; if(oldProof) detail.old_proof_path=oldProof;
+    await logPayAudit(l, wasPaid?'edit':'record', null, Object.keys(detail).length?detail:null);
+    if(oldProof) await logPayAudit(l,'replace-evidence',null,{old_proof_path:oldProof,new_proof:name});
+    if(S.payUnlocked) delete S.payUnlocked[id];
+    closeModal(); toast(wasPaid?'Payment updated':'Payment recorded'); await loadAll(); S.tab='receipts'; render();
   }catch(e){ toast('Save failed: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Save'; } }
 }
-async function undoReceipt(id){ if(!confirm('Undo this payment record? (keeps the attached file)')) return;
-  try{ await patchRow('cf_lines',id,{paid:false,paid_date:null,paid_amount:null,method:null,paid_note:null}); closeModal(); toast('Undone'); await loadAll(); S.tab='receipts'; render(); }
+async function undoReceipt(id){ if(!confirm('Undo this payment record? (keeps the attached file + audit history)')) return;
+  const l=DB.lines.find(x=>x.id===id);
+  try{ await patchRow('cf_lines',id,{paid:false,paid_date:null,paid_amount:null,method:null,paid_note:null});
+    if(l) await logPayAudit(l,'undo',null,{was:{amount:l.paid_amount!=null?fmt(l.paid_amount):'—',date:l.paid_date||'—',method:methodLabel(l.method)||'—'}});
+    if(S.payUnlocked) delete S.payUnlocked[id];
+    closeModal(); toast('Undone'); await loadAll(); S.tab='receipts'; render(); }
   catch(e){ toast('Failed: '+e.message); } }
 function uploadContract(entryId){
   const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*,application/pdf';
