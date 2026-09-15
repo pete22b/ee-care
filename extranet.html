@@ -785,9 +785,12 @@ function rReceipts(){
       const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm pri" onclick="markReceived('${esc(l.id)}')">Mark received</button>`;
       return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n">${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`;
     }).join('');
-    const scan= e.contract_path
-      ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(e.contract_path)}');return false">${esc(e.contract_name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(e.id)}')">replace</button>`
-      : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`;
+    // contract PDF is per CONTRACT, not per entry — show it only on the main card (the one with the payment schedule)
+    const isMain = ls.some(l=>['deposit','admin','installment'].includes(l.line_type)) || /sales/i.test(e.title||'');
+    const cp = contractPathFor(e.category);
+    const scan= !isMain ? '' : (cp.path
+      ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(e.id)}')">replace</button>`
+      : `<button class="btn sm ghost" onclick="uploadContract('${esc(e.id)}')">📄 Upload signed contract</button>`);
     const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===ls.length?' <span class="pill inc">complete</span>':'');
     return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(e.id)}')">
       <div><b>${open?'▾':'▸'} ${esc(e.category||e.title)}</b> <span class="mini">· ${esc((e.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(e)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(e))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${ls.length} instalments</span></div>
@@ -949,7 +952,7 @@ function contractDetailsHtml(cno){ const grp=contractGroup(cno); if(!grp) return
     ${row('Email',esc(m.email||''))}
     ${row('Phone',esc(m.phone||''))}
    </div>
-   ${m.contract_pdf?`<div style="margin-top:8px"><a href="#" onclick="openFile('cf-contracts','${esc(m.contract_pdf)}');return false">📎 View signed contract PDF${m.contract_pdf_name?' — '+esc(m.contract_pdf_name):''}</a></div>`:''}
+   ${grp.contract_path?`<div style="margin-top:8px"><a href="#" onclick="openFile('cf-contracts','${esc(grp.contract_path)}');return false">📎 View signed contract PDF${grp.contract_name?' — '+esc(grp.contract_name):''}</a></div>`:''}
    </div>`;
 }
 async function markRoom(id,val){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
@@ -1014,9 +1017,10 @@ function upsellInfo(g){ const ii=iiOf(g.meta); const term=termOf(g.cno); const f
 function toggleSy(cno){ S.syOpen[cno]=!S.syOpen[cno]; render(); }
 function syAll(open){ S.syOpen={}; if(open) membershipContracts().forEach(g=>S.syOpen[g.cno]=true); render(); }
 function membershipContracts(){
-  const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); } });
+  const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); if(e.contract_path && !g.contract_path){ g.contract_path=e.contract_path; g.contract_name=e.contract_name; } } });
   return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
 }
+function contractPathFor(cat){ const e=(DB.entries||[]).find(x=>x.category===cat && x.contract_path); return e?{path:e.contract_path,name:e.contract_name}:{path:null,name:null}; }
 function rStays(){
   const groups=membershipContracts();
   let blocked=0, eligible=0, upsell=0;
@@ -1055,7 +1059,7 @@ function rStays(){
     const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
     return `<div class="card" id="sy_${cssId(g.cno)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer${open?';border-bottom:1px solid var(--line)':''}" onclick="toggleSy('${esc(g.cno)}')">
       <div><b>${open?'▾':'▸'} ${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.meta.contract_pdf?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.meta.contract_pdf)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${badge}${iiBadge}${upBadge}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.contract_path?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.contract_path)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${badge}${iiBadge}${upBadge}</div></div>
       ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
   g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
