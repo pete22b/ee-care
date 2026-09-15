@@ -843,7 +843,7 @@ function contractGroup(cno){ return membershipContracts().find(g=>g.cno===cno)||
 function bookingChecks(b,cno){
   const out=[]; const yr=Number(String(b.check_in||'').slice(0,4))||null;
   const avail = b.room_ok
-    ? {s:'ok',t:'Room availability (reservations)',d:'Confirmed available'+(b.room_by?' · by '+esc(b.room_by):'')+(b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):'')}
+    ? {s:'ok',t:'Room availability (reservations)',d:'Booked'+(b.room_unit?' · '+esc(b.room_unit):'')+(b.room_ref?' · ref '+esc(b.room_ref):'')+(b.room_by?' · by '+esc(b.room_by):'')+(b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):'')}
     : {s:'manual',t:'Room availability (reservations)',d:'Reservations must check the resort calendar for '+(b.check_in?fmtDate(b.check_in):'?')+' – '+(b.check_out?fmtDate(b.check_out):'?')+' and confirm a room is free. Required before Confirm.'};
   if(!cno){ out.push({s:'fail',t:'Member not found',d:'No contract matches this membership no. / name. Link one below, or verify the member before confirming.'});
     out.push(avail); return out; }
@@ -889,10 +889,16 @@ function contractDetailsHtml(cno){ const grp=contractGroup(cno); if(!grp) return
     ${row('Sales rep',esc(m.rep||''))}
    </div></div>`;
 }
-async function setRoomOk(id,val){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
-  try{ await patchRow('cf_bookings',id, val?{room_ok:true,room_by:(USER&&USER.email)||null,room_at:new Date().toISOString(),updated_by:USER&&USER.email}:{room_ok:false,room_by:null,room_at:null,updated_by:USER&&USER.email});
-    toast(val?'Room confirmed':'Room mark cleared'); await loadAll(); const cur=(DB.bookings||[]).find(x=>x.id===id); if(cur&&document.getElementById('modal')&&document.getElementById('modal').style.display!=='none') openBooking(id); else { S.tab='bookings'; render(); }
-  }catch(e){ toast('Failed: '+e.message); } }
+async function markRoom(id,val){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
+  const patch = val
+    ? {room_ok:true, room_unit:(g('bk_room_unit')?g('bk_room_unit').value.trim():'')||null, room_ref:(g('bk_room_ref')?g('bk_room_ref').value.trim():'')||null, room_by:(USER&&USER.email)||null, room_at:new Date().toISOString(), updated_by:USER&&USER.email}
+    : {room_ok:false, room_by:null, room_at:null, updated_by:USER&&USER.email};
+  try{ await patchRow('cf_bookings',id,patch); toast(val?'Room booked & confirmed':'Room cleared'); await loadAll(); openBooking(id); }catch(e){ toast('Failed: '+e.message); } }
+async function markNotified(id,val){ try{ await patchRow('cf_bookings',id, val?{notified:true,notified_at:new Date().toISOString(),updated_by:USER&&USER.email}:{notified:false,notified_at:null,updated_by:USER&&USER.email}); toast(val?'Marked as notified':'Unmarked'); await loadAll(); openBooking(id); }catch(e){ toast('Failed: '+e.message); } }
+function confirmMailto(b){ const cin=b.check_in?fmtDate(b.check_in):'—', cout=b.check_out?fmtDate(b.check_out):'—';
+  const subj='Your Elite Escapes booking is confirmed';
+  const body='Dear '+(b.member_name||'Member')+',\n\nWe are delighted to confirm your stay at Patong Bay Hill Resort.\n\nCheck-in:  '+cin+'\nCheck-out: '+cout+'\nGuests:    '+(b.guests||'-')+'\n'+(b.room_unit?'Room:      '+b.room_unit+'\n':'')+(b.room_ref?'Reference: '+b.room_ref+'\n':'')+(b.requests?'\nYour requests: '+b.requests+'\n':'')+'\nWe look forward to welcoming you.\n\nWarm regards,\nElite Escapes Concierge\nmemberservice@elite-escapes.club  ·  +66 76 683 083';
+  return 'mailto:'+encodeURIComponent(b.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body); }
 function openBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b); const el=cno?eligibility(cno):null;
   openModal(`<h2>Booking request</h2>
    <div class="grid2">
@@ -906,12 +912,23 @@ function openBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) r
     <div class="full"><label>Link to contract no. (for eligibility)</label><input id="bk_contract" value="${esc(b.contract||cno||'')}" placeholder="e.g. EST/1010/5/AH/T1"></div>
     ${cno?contractDetailsHtml(cno):''}
     <div class="full">${checksHtml(b,cno)}</div>
-    <div class="full" style="border:1px solid ${b.room_ok?'var(--income)':'var(--line)'};border-radius:10px;padding:8px 12px">
-      <label style="display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer">
-        <input type="checkbox" style="width:auto;margin-top:3px" ${b.room_ok?'checked':''} onclick="setRoomOk('${esc(id)}',this.checked)">
-        <span><b>🏨 Reservations: room checked &amp; available</b>${b.room_ok&&b.room_by?'<br><span class="mini">confirmed by '+esc(b.room_by)+(b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):'')+'</span>':'<br><span class="mini">The reservations team ticks this once the resort calendar is checked and a room is held for these dates. Required before Confirm.</span>'}</span>
-      </label>
+    <div class="full" style="border:1px solid ${b.room_ok?'var(--income)':'var(--gold,#e08128)'};border-radius:10px;padding:10px 12px">
+      <div style="font-weight:700;margin-bottom:6px">🏨 Reservations — book the room first</div>
+      <div class="grid2" style="gap:6px 12px">
+        <div><label>Assigned room / unit</label><input id="bk_room_unit" value="${esc(b.room_unit||'')}" placeholder="e.g. Building A - 101"></div>
+        <div><label>Booking reference (resort PMS)</label><input id="bk_room_ref" value="${esc(b.room_ref||'')}" placeholder="resort confirmation no."></div>
+      </div>
+      ${b.room_ok
+        ? `<div class="mini" style="color:var(--income);margin-top:8px">✅ Room booked &amp; confirmed available${b.room_by?' · by '+esc(b.room_by):''}${b.room_at?' · '+fmtDate(String(b.room_at).slice(0,10)):''}</div>
+           <div style="margin-top:6px"><button class="btn sm ghost" onclick="markRoom('${esc(id)}',true)">Update room info</button> <button class="btn link" onclick="markRoom('${esc(id)}',false)">clear</button></div>`
+        : `<div class="mini" style="margin-top:6px">Check the resort calendar &amp; hold a room for these dates, fill the room above, then confirm. The Confirm button stays locked until you do.</div>
+           <div style="margin-top:6px"><button class="btn sm inc" onclick="markRoom('${esc(id)}',true)">✓ Room booked &amp; available</button></div>`}
     </div>
+    ${(b.status)==='confirmed'?`<div class="full" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+      <div style="font-weight:700;margin-bottom:4px">📧 Notify member</div>
+      ${b.notified?`<div class="mini" style="color:var(--income)">✅ Member notified${b.notified_at?' · '+fmtDate(String(b.notified_at).slice(0,10)):''}</div>`:`<div class="mini">Booking is confirmed &amp; the room is booked — send the confirmation to the member, then mark it done.</div>`}
+      <div style="margin-top:6px"><a class="btn sm" href="${confirmMailto(b)}">✉ Draft confirmation email</a> ${b.notified?`<button class="btn link" onclick="markNotified('${esc(id)}',false)">unmark</button>`:`<button class="btn sm ghost" onclick="markNotified('${esc(id)}',true)">✓ Mark member notified</button>`}</div>
+    </div>`:''}
     <div class="full"><label>Internal note</label><input id="bk_note" value="${esc(b.note||'')}"></div>
    </div>
    <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button>${(b.status||'new')==='new'?(b.room_ok?`<button class="btn sm inc" onclick="closeModal();confirmBooking('${esc(id)}')">Confirm booking</button>`:`<button class="btn sm" disabled title="Reservations must confirm the room first" style="opacity:.45;cursor:not-allowed">Confirm (awaiting room)</button>`):''}<button class="btn pri" onclick="saveBooking('${esc(id)}')">Save</button></div>`);
