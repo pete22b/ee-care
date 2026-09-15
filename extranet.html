@@ -762,33 +762,38 @@ function lineStatus(l){ return l.paid?'paid':((l.txn_date<TODAY)?'overdue':'due'
 function toggleRc(id){ S.rcOpen[id]=!S.rcOpen[id]; render(); }
 function rcKey(e){ return e.category||('entry:'+e.id); }
 function rcAll(open){ S.rcOpen={}; if(open) DB.entries.forEach(e=>S.rcOpen[rcKey(e)]=true); render(); }
-const RC_SECTIONS=[['Sale payments',['deposit','admin','installment']],['Management Fee (MFEE)',['mfee']],['Interval',['ii_fee','ii_renewal','ii_exchange']],['Other',null]];
+const RC_SECTIONS=[['Sale payments',['deposit','admin','installment']],['Management Fee (MFEE)',['mfee']],['Interval — we pay',['ii_fee','ii_renewal','ii_exchange']],['Other',null]];
 const RC_KNOWN=['deposit','admin','installment','mfee','ii_fee','ii_renewal','ii_exchange'];
 function rReceipts(){
   // group by CONTRACT (category); entries with no category fall back to their own id
-  const groups={};
-  allLines().forEach(({l,e})=>{ const k=rcKey(e); const g=(groups[k]=groups[k]||{key:k,cno:e.category||null,entries:{},items:[]}); g.items.push({l,e}); g.entries[e.id]=e; });
-  const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0;
-  allLines().forEach(({l})=>{ const a=Number(l.amount)||0; if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
-  const head=`<div class="head"><div><h1>Receipts &amp; Evidence</h1><p class="mini">One card per contract · mark each instalment received and attach the slip / credit advice · store the signed contract scan</p></div></div>`;
+  const groups={}; const kindOf={};
+  allLines().forEach(({l,e})=>{ const k=rcKey(e); const g=(groups[k]=groups[k]||{key:k,cno:e.category||null,entries:{},items:[]}); g.items.push({l,e}); g.entries[e.id]=e; kindOf[l.id]=e.kind; });
+  // KPIs cover INCOME only (money in). Expenses (we pay) are shown per contract but not counted as receipts.
+  const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0, payOut=0;
+  allLines().forEach(({l,e})=>{ const a=Number(l.amount)||0;
+    if(e.kind==='expense'){ if(!l.paid) payOut+=a; return; }
+    if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
+  const head=`<div class="head"><div><h1>Receipts &amp; Evidence</h1><p class="mini">One card per contract · money in (mark received) and Interval fees we pay (mark paid), each with its slip / credit advice · store the signed contract scan</p></div></div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recv)}</div><div class="l">Received to date</div></div>
-    <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (scheduled)</div></div>
+    <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (to receive)</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
-    <div class="kpi"><div class="v">${fmt(dueSoon)}</div><div class="l">Due in next 30 days</div></div></div>`;
+    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(payOut)}</div><div class="l">Interval fees to pay</div></div></div>`;
   const list=Object.values(groups).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
   const bar=`<div class="toolbar" style="margin-bottom:10px"><button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button></div>`;
-  const rowFor=(l)=>{ const st=lineStatus(l);
-      const pill= st==='paid'?'<span class="pill inc">✓ Received</span>':(st==='overdue'?'<span class="pill exp">● Overdue</span>':'<span class="pill off">Due</span>');
+  const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
+      const pill= st==='paid'?`<span class="pill inc">✓ ${exp?'Paid':'Received'}</span>`:(st==='overdue'?'<span class="pill exp">● Overdue</span>':`<span class="pill off">${exp?'To pay':'Due'}</span>`);
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
-      const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm pri" onclick="markReceived('${esc(l.id)}')">Mark received</button>`;
-      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n">${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
+      const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
+      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
   const blocks=list.map(gp=>{
     const open=!!S.rcOpen[gp.key];
     const allL=gp.items.map(x=>x.l);
-    const paidN=allL.filter(l=>l.paid).length; const paidSum=allL.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
-    const totSum=allL.reduce((s,l)=>s+Number(l.amount||0),0);
-    const odN=allL.filter(l=>!l.paid && l.txn_date<TODAY).length;
+    const incL=gp.items.filter(x=>x.e.kind!=='expense').map(x=>x.l); const expL=gp.items.filter(x=>x.e.kind==='expense').map(x=>x.l);
+    const paidN=incL.filter(l=>l.paid).length; const paidSum=incL.filter(l=>l.paid).reduce((s,l)=>s+Number(l.paid_amount!=null?l.paid_amount:l.amount),0);
+    const totSum=incL.reduce((s,l)=>s+Number(l.amount||0),0);
+    const expTot=expL.reduce((s,l)=>s+Number(l.amount||0),0);
+    const odN=incL.filter(l=>!l.paid && l.txn_date<TODAY).length;
     const ents=Object.values(gp.entries);
     const mainE = ents.find(e=>gp.items.some(x=>x.e.id===e.id && ['deposit','admin','installment'].includes(x.l.line_type))) || ents.find(e=>/sales/i.test(e.title||'')) || ents[0];
     // build sectioned rows
@@ -796,24 +801,26 @@ function rReceipts(){
     RC_SECTIONS.forEach(([label,types])=>{
       let sl=allL.filter(l=> types? types.includes(l.line_type) : !RC_KNOWN.includes(l.line_type));
       if(!sl.length) return; sl.sort((a,b)=>a.txn_date<b.txn_date?-1:1);
+      const isExp=sl.every(l=>kindOf[l.id]==='expense');
       const sp=sl.filter(l=>l.paid).length; const stot=sl.reduce((s,l)=>s+Number(l.amount||0),0);
-      rows+=`<tr><td colspan="8" style="background:var(--line2);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)">${label} · ${sp}/${sl.length} · ${fmt(stot)}</td></tr>`+sl.map(rowFor).join('');
+      rows+=`<tr><td colspan="8" style="background:var(--line2);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:${isExp?'var(--expense)':'var(--ink2)'}">${label} · ${sp}/${sl.length} ${isExp?'paid':'received'} · ${fmt(stot)}</td></tr>`+sl.map(rowFor).join('');
     });
     const cp = gp.cno? contractPathFor(gp.cno) : {path:null};
     const scan= !gp.cno ? '' : (cp.path
       ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(mainE.id)}')">replace</button>`
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(mainE.id)}')">📄 Upload signed contract</button>`);
-    const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===allL.length?' <span class="pill inc">complete</span>':'');
+    const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===incL.length&&incL.length?' <span class="pill inc">complete</span>':'');
     return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
-      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${allL.length} instalments</span></div>
+      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${incL.length} instalments${expTot?' · <span style="color:var(--expense)">Interval we pay '+fmt(expTot)+'</span>':''}</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
-      ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Due date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Received</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
+      ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
   g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
 }
 function markReceived(lineId){
   const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
-  openModal(`<h2>${l.paid?'Edit payment':'Record payment received'}</h2>
+  const exp=e.kind==='expense';
+  openModal(`<h2>${l.paid?(exp?'Edit payment made':'Edit payment received'):(exp?'Record payment made':'Record payment received')}${exp?' <span class="pill exp" style="vertical-align:middle">we pay</span>':''}</h2>
    <div class="mini" style="margin-bottom:4px">${esc(e.category||'')} · ${esc(l.memo||'')} · due ${fmtDate(l.txn_date)} · scheduled ${fmt(l.amount)}</div>
    <div class="grid2" style="margin-top:12px">
     <div><label>Received date</label><input type="date" id="r_date" value="${l.paid_date||TODAY}"></div>
@@ -827,7 +834,7 @@ function markReceived(lineId){
     <div class="full"><label>Attach evidence — card slip / credit advice (image or PDF)</label><input type="file" id="r_file" accept="image/*,application/pdf">
       ${l.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(l.proof_name||'file')} · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">view</a></div>`:''}</div>
    </div>
-   <div class="right">${l.paid?`<button class="btn danger" onclick="undoReceipt('${esc(l.id)}')">Undo received</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="r_save" onclick="saveReceipt('${esc(l.id)}')">Save</button></div>`);
+   <div class="right">${l.paid?`<button class="btn danger" onclick="undoReceipt('${esc(l.id)}')">Undo ${exp?'payment':'received'}</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn pri" id="r_save" onclick="saveReceipt('${esc(l.id)}')">Save</button></div>`);
 }
 async function saveReceipt(id){
   const btn=g('r_save'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
