@@ -189,6 +189,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="bank">Cash &amp; Bank</button>
       <button data-t="cashflow">Cash Flow</button>
       <button data-t="receipts">Receipts</button>
+      <button data-t="ar">AR · ยอดค้างรับ</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">ข้อมูลระบบ</div>
@@ -334,7 +335,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',receipts:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',receipts:'finance',ar:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -518,6 +519,63 @@ async function taxiPost(row){ await ensureExpEntry('en_mkt_taxi','ค่าแ�
   await upsert('cf_lines',[{id:'ln_taxi_'+row.id,entry_id:'en_mkt_taxi',amount:Number(row.amount||0),txn_date:row.tour_date||TODAY,repeat:'never',line_type:'taxi',memo:'ค่าแท็กซี่'+(row.guest_name?(' · '+row.guest_name):'')+(row.opc_code?(' · '+row.opc_code):''),paid:true}]); }
 async function taxiUnpost(id){ try{ await api('cf_lines?id=eq.'+encodeURIComponent('ln_taxi_'+id),{method:'DELETE',prefer:'return=minimal'}); }catch(e){} }
 
+/* ============ AR — receivables by customer + aging ============ */
+function arDaysOverdue(d){ return Math.round((Date.parse(TODAY)-Date.parse(d))/86400000); }
+function arData(){
+  const rows=allLines().filter(x=>x.e.kind==='income' && x.e.active!==false && (x.l.repeat||'never')==='never' && !x.l.paid && ['deposit','admin','installment','mfee'].indexOf(x.l.line_type||'')>=0);
+  const nameByCat={}; DB.entries.forEach(e=>{ if(e.category && e.description && !nameByCat[e.category]) nameByCat[e.category]=(e.description||'').replace(/\n/g,' & '); });
+  const g={};
+  rows.forEach(x=>{ const cat=x.e.category||x.e.id; const amt=Number(x.l.amount||0);
+    const o=(g[cat]=g[cat]||{cat,name:nameByCat[cat]||'',out:0,over:0,cur:0,b1:0,b2:0,b3:0,b4:0,mfee:0,next:null,oldest:null});
+    o.out+=amt; if(x.l.line_type==='mfee') o.mfee+=amt;
+    if(!o.next||x.l.txn_date<o.next) o.next=x.l.txn_date;
+    if(x.l.txn_date<=TODAY){ o.over+=amt; if(!o.oldest||x.l.txn_date<o.oldest)o.oldest=x.l.txn_date;
+      const d=arDaysOverdue(x.l.txn_date); if(d<=30)o.b1+=amt; else if(d<=60)o.b2+=amt; else if(d<=90)o.b3+=amt; else o.b4+=amt;
+    } else o.cur+=amt;
+  });
+  return Object.values(g).sort((a,b)=>b.over-a.over || b.out-a.out);
+}
+function rAR(){ const data=arData();
+  const T={out:0,over:0,cur:0,b1:0,b2:0,b3:0,b4:0};
+  data.forEach(o=>{ T.out+=o.out;T.over+=o.over;T.cur+=o.cur;T.b1+=o.b1;T.b2+=o.b2;T.b3+=o.b3;T.b4+=o.b4; });
+  const R='text-align:right', C='text-align:center';
+  const head=`<div class="head"><div><h1>AR · ยอดค้างรับ (Aging)</h1><p class="mini">ยอดค้างรับจากสมาชิกรายสัญญา · แยกช่วงอายุหนี้ · กดตัดจ่ายที่ Receipts</p></div></div>`;
+  const kpis=`<div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="v">${fmt(T.out)}</div><div class="l">ยอดค้างรับรวม (${data.length} สัญญา)</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(T.over)}</div><div class="l">เกินกำหนดชำระ</div></div>
+    <div class="kpi"><div class="v">${fmt(T.cur)}</div><div class="l">ยังไม่ถึงกำหนด</div></div>
+    <div class="kpi"><div class="v" style="color:${T.b4>0?'var(--expense)':'var(--ink)'}">${fmt(T.b4)}</div><div class="l">ค้างเกิน 90 วัน</div></div></div>`;
+  // aging summary bar
+  const buckets=[['ยังไม่ถึงกำหนด',T.cur,'#2f7d5b'],['1–30 วัน',T.b1,'#a9812a'],['31–60',T.b2,'#c67b1e'],['61–90',T.b3,'#d8583c'],['90+',T.b4,'#b0201a']];
+  const bmax=Math.max(...buckets.map(b=>b[1]),1);
+  const barRows=buckets.map(b=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+    <div style="width:110px;font-size:12.5px;color:var(--ink2)">${b[0]}</div>
+    <div style="flex:1;background:var(--bg,#eee);border-radius:6px;overflow:hidden;height:18px"><div style="width:${(b[1]/bmax*100).toFixed(1)}%;height:100%;background:${b[2]}"></div></div>
+    <div style="width:96px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">${fmt(b[1])}</div></div>`).join('');
+  const aging=`<div class="card pad" style="margin-bottom:16px"><h2 style="margin:0 0 8px;font-size:18px">สรุปช่วงอายุหนี้ (Aging)</h2>${barRows}</div>`;
+  const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
+  let trs='';
+  data.forEach(o=>{ const od=o.oldest?arDaysOverdue(o.oldest):0;
+    trs+=`<tr>
+      <td style="white-space:nowrap"><b>${esc(o.cat)}</b>${o.name?'<br><span class="mini" style="color:var(--ink2)">'+esc(o.name)+'</span>':''}</td>
+      <td style="${R}"><b>${fmt(o.out)}</b></td>
+      <td style="${R}">${o.cur?fmt(o.cur):'<span style="color:var(--ink3)">—</span>'}</td>
+      <td style="${R}">${o.b1?fmt(o.b1):'—'}</td>
+      <td style="${R}">${o.b2?fmt(o.b2):'—'}</td>
+      <td style="${R}">${o.b3?fmt(o.b3):'—'}</td>
+      <td style="${R}${o.b4?';color:var(--expense);font-weight:700':''}">${o.b4?fmt(o.b4):'—'}</td>
+      <td style="${C}">${o.over>0?'<span class="pill exp">เกิน '+od+' วัน</span>':(o.next?'<span class="mini">'+fmtDate(o.next)+'</span>':'—')}</td>
+      <td style="${R}"><button class="btn sm" onclick="arGo('${esc(o.cat)}')">ตัดจ่าย</button></td>
+    </tr>`; });
+  if(!data.length) trs='<tr><td colspan="9"><div class="emptyc" style="padding:24px">🎉 ไม่มียอดค้างรับ</div></td></tr>';
+  const totR=`<tr style="border-top:2px solid var(--line);font-weight:700">
+    <td>รวม</td><td style="${R}">${fmt(T.out)}</td><td style="${R}">${fmt(T.cur)}</td><td style="${R}">${fmt(T.b1)}</td><td style="${R}">${fmt(T.b2)}</td><td style="${R}">${fmt(T.b3)}</td><td style="${R}">${fmt(T.b4)}</td><td></td><td></td></tr>`;
+  const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('สัญญา / ลูกค้า')}${th('ค้างรวม',R)}${th('ยังไม่ถึง',R)}${th('1–30',R)}${th('31–60',R)}${th('61–90',R)}${th('90+',R)}${th('สถานะ',C)}${th('',R)}</tr></thead><tbody>${trs}${data.length?totR:''}</tbody></table></div>`;
+  g('main').innerHTML=head+kpis+aging+table;
+}
+function arGo(cat){ goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
+  setTimeout(()=>{ const el=g('rc_'+cssId(cat)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600); } },90); }
+
 /* ---- OPC Wages history / trends ---- */
 async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
 function rMktHistory(){
@@ -655,6 +713,7 @@ function render(){
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
   if(S.tab==='receipts') return rReceipts();
+  if(S.tab==='ar') return rAR();
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
   if(S.tab==='taxi') return rTaxi();
@@ -1151,7 +1210,7 @@ function rReceipts(){
       ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(mainE.id)}')">replace</button>`
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(mainE.id)}')">📄 Upload signed contract</button>`);
     const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===incL.length&&incL.length?' <span class="pill inc">complete</span>':'');
-    return `<div class="card" style="margin-bottom:10px"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
+    return `<div class="card" id="rc_${cssId(gp.key)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
       <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${incL.length} instalments${expTot?' · <span style="color:var(--expense)">Interval we pay '+fmt(expTot)+'</span>':''}</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
       ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
