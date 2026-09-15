@@ -411,8 +411,9 @@ function mktCalc(m){ const w=m.days||{},dl=m.deal||{},ex=m.extra||{},de=m.ded||{
   const extra=(+ex.sunday||0)+(+ex.double||0)+(+ex.backpay||0), gross=tour+bonus+extra;
   const ded=(+de.tax||0)+(+de.ss||0)+(+de.dac||0)+(+de.chargeback||0)+(+de.hold||0);
   return {q,qp,ct,pack,full,tour,bonus,extra,gross,ded,net:gross-ded}; }
-function rMktWages(){ const p=mktPeriod();
-  g('main').innerHTML=`<div class="head"><div><h1>OPC Wages · DGR</h1><p class="mini">ค่าจ้างทีมการตลาด/OPC รายสัปดาห์ — คำนวณอัตโนมัติจาก Q/Q+/CT และโบนัสดีล</p></div></div>
+function mktSeg(){ return `<div class="seg" style="margin-bottom:14px"><button class="${S.mktView==='history'?'':'on'}" onclick="S.mktView='entry';render()">กรอกรายสัปดาห์</button><button class="${S.mktView==='history'?'on':''}" onclick="S.mktView='history';render()">สรุปย้อนหลัง</button></div>`; }
+function rMktWages(){ if(S.mktView==='history') return rMktHistory(); const p=mktPeriod();
+  g('main').innerHTML=`<div class="head"><div><h1>OPC Wages · DGR</h1><p class="mini">ค่าจ้างทีมการตลาด/OPC รายสัปดาห์ — คำนวณอัตโนมัติจาก Q/Q+/CT และโบนัสดีล</p></div></div>${mktSeg()}
    <div class="card pad" style="margin-bottom:12px;font-size:12.5px;color:var(--ink2);line-height:1.7">
      <b>กติกา:</b> 1 Q = ${fmt(MKT_RATE.q)} · 1 Q+ = ${fmt(MKT_RATE.qp)} · 1 CT = ${fmt(MKT_RATE.ct)} &nbsp;|&nbsp;
      <b>Deal bonus</b> (จ่ายเมื่อ<u>เซ็นสัญญา + มัดจำ ≥ 1,000 USD</u> เท่านั้น ทั้ง Q และ CT): 5 ปี = Pack ${fmt(MKT_RATE.pack)} · 10/20 ปี = Full ${fmt(MKT_RATE.full)} &nbsp;|&nbsp;
@@ -500,6 +501,59 @@ async function mktSave(){ const p=mktPeriod(); const reps=DB.mktReps||[];
     period_start:p.startISO, period_end:p.endISO, rep_code:rp.code, rep_name:rp.name, team:rp.team, role:rp.role,
     days:m.days, deal:m.deal, extra:m.extra, ded:m.ded, updated_at:new Date().toISOString() }; });
   try{ await upsert('mkt_dgr',rows); toast('บันทึกค่าจ้างสัปดาห์ที่ '+p.week+' แล้ว ('+reps.length+' คน)'); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
+
+/* ---- OPC Wages history / trends ---- */
+async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
+function rMktHistory(){
+  g('main').innerHTML=`<div class="head"><div><h1>OPC Wages · สรุปย้อนหลัง</h1><p class="mini">ค่าจ้างสุทธิรายสัปดาห์ต่อคน · ปี 2026</p></div></div>${mktSeg()}
+   <div id="mktbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
+  mktLoadHistory().then(mktPaintHistory).catch(e=>{ const b=g('mktbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
+function mktOverrideForWeek(rows){ const teams={}; rows.forEach(r=>{ const c=mktCalc(r); const t=r.team||'-'; teams[t]=teams[t]||{a:{q:0,qp:0,ct:0,pack:0,full:0},mgr:false}; ['q','qp','ct','pack','full'].forEach(k=>teams[t].a[k]+=c[k]); if(r.role==='manager') teams[t].mgr=true; });
+  let ov=0; Object.values(teams).forEach(tm=>{ if(tm.mgr){ const a=tm.a; ov+=a.q*MKT_MGR.q+a.qp*MKT_MGR.qp+a.ct*MKT_MGR.ct+a.pack*MKT_MGR.pack+a.full*MKT_MGR.full; } }); return ov; }
+function mktSpark(vals,w,h){ if(!vals.length) return ''; const mx=Math.max(...vals,1); const dx=vals.length>1?w/(vals.length-1):0;
+  const pts=vals.map((v,i)=>[i*dx, h-(v/mx)*(h-4)-2]); const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const last=pts[pts.length-1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle"><path d="${d}" fill="none" stroke="#1c3350" stroke-width="1.8"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="#a9812a"/></svg>`; }
+function mktPaintHistory(){ const body=g('mktbody'); if(!body) return; const rows=S.mktHist||[]; const reps=DB.mktReps||[];
+  if(!rows.length){ body.innerHTML='<div class="emptyc"><div class="big">📊</div>ยังไม่มีข้อมูลย้อนหลัง</div>'; return; }
+  const weeks=[...new Set(rows.map(r=>r.week))].sort((a,b)=>a-b);
+  const byRep={}, wStaff={}, wMgr={};
+  rows.forEach(r=>{ const c=mktCalc(r); (byRep[r.rep_code]=byRep[r.rep_code]||{})[r.week]=c.net; wStaff[r.week]=(wStaff[r.week]||0)+c.net; });
+  weeks.forEach(w=>{ wMgr[w]=mktOverrideForWeek(rows.filter(r=>r.week===w)); });
+  const wTot={}; weeks.forEach(w=>wTot[w]=(wStaff[w]||0)+(wMgr[w]||0));
+  const grand=weeks.reduce((s,w)=>s+wTot[w],0);
+  // rep rows sorted by total net desc
+  const repRows=reps.map(rp=>{ const m=byRep[rp.code]||{}; const vals=weeks.map(w=>m[w]||0); const tot=vals.reduce((s,v)=>s+v,0); return {rp,vals,tot,active:tot>0||weeks.some(w=>m[w]!=null)}; })
+    .filter(x=>x.active).sort((a,b)=>b.tot-a.tot);
+  const topRep=repRows[0];
+  // weekly bar chart (total payroll)
+  const R='text-align:right', C='text-align:center';
+  const bw=Math.max(360, weeks.length*84), bh=210, pad=34, mx=Math.max(...weeks.map(w=>wTot[w]),1), gapw=(bw-pad)/weeks.length;
+  let bars='';
+  weeks.forEach((w,i)=>{ const x=pad+i*gapw+gapw*0.18, bwid=gapw*0.64; const sh=(wStaff[w]/mx)*(bh-40), mh=(wMgr[w]/mx)*(bh-40); const y0=bh-20;
+    bars+=`<rect x="${x.toFixed(1)}" y="${(y0-sh).toFixed(1)}" width="${bwid.toFixed(1)}" height="${sh.toFixed(1)}" rx="3" fill="#1c3350"/>`;
+    if(mh>0.5) bars+=`<rect x="${x.toFixed(1)}" y="${(y0-sh-mh).toFixed(1)}" width="${bwid.toFixed(1)}" height="${mh.toFixed(1)}" rx="3" fill="#a9812a"/>`;
+    bars+=`<text x="${(x+bwid/2).toFixed(1)}" y="${(y0-sh-mh-6).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink2)">${Math.round(wTot[w]/1000)}k</text>`;
+    bars+=`<text x="${(x+bwid/2).toFixed(1)}" y="${(bh-6).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="var(--ink3)">W${w}</text>`; });
+  const chart=`<div class="card pad" style="margin-bottom:16px"><h2 style="margin:0 0 4px;font-size:18px">ค่าจ้างรวมรายสัปดาห์</h2>
+    <p class="mini" style="margin:0 0 10px"><span style="color:#1c3350">■</span> พนักงานสุทธิ &nbsp; <span style="color:#a9812a">■</span> Manager override</p>
+    <div style="overflow-x:auto"><svg width="${bw}" height="${bh}" viewBox="0 0 ${bw} ${bh}" style="max-width:100%">${bars}</svg></div></div>`;
+  // KPIs
+  const kpis=`<div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="v">${fmt(grand)}</div><div class="l">จ่ายรวมทั้งหมด (${weeks.length} สัปดาห์)</div></div>
+    <div class="kpi"><div class="v">${fmt(Math.round(grand/weeks.length))}</div><div class="l">เฉลี่ยต่อสัปดาห์</div></div>
+    <div class="kpi"><div class="v">${topRep?esc(topRep.rp.name):'—'}</div><div class="l">จ่ายสูงสุด · ${topRep?fmt(topRep.tot):''}</div></div>
+    <div class="kpi"><div class="v">${repRows.length}</div><div class="l">พนักงานที่มีค่าจ้าง</div></div></div>`;
+  // table
+  const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
+  let trs='';
+  repRows.forEach(x=>{ const cells=weeks.map(w=>{ const v=x.vals[weeks.indexOf(w)]; return `<td style="${R}">${v?fmt(v):'<span style="color:var(--ink3)">—</span>'}</td>`; }).join('');
+    trs+=`<tr><td style="white-space:nowrap"><b>${esc(x.rp.code)}</b> ${esc(x.rp.name)}${x.rp.role==='manager'?' <span class="pill fc">Mgr</span>':''}</td><td style="${C}">${mktSpark(x.vals,84,26)}</td>${cells}<td style="${R}"><b>${fmt(x.tot)}</b></td></tr>`; });
+  const totCells=weeks.map(w=>`<td style="${R}">${fmt(wStaff[w]||0)}</td>`).join('');
+  const totRow=`<tr style="border-top:2px solid var(--line);font-weight:700"><td>รวมพนักงานสุทธิ</td><td></td>${totCells}<td style="${R}">${fmt(weeks.reduce((s,w)=>s+(wStaff[w]||0),0))}</td></tr>`;
+  const head=`<tr>${th('พนักงาน')}${th('แนวโน้ม',C)}${weeks.map(w=>th('W'+w,R)).join('')}${th('รวม',R)}</tr>`;
+  const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead>${head}</thead><tbody>${trs}${totRow}</tbody></table></div>`;
+  body.innerHTML=kpis+chart+table; }
 
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
