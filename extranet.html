@@ -228,6 +228,10 @@ async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURICom
 async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
 async function openFile(bucket, path){ try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
 function methodLabel(m){ return {transfer:'Transfer · credit advice',card:'Card slip',cash:'Cash',other:'Other'}[m]||m||''; }
+function cardTag(l){ const p=l&&l.pay_meta; if(!p||!(p.card_last4||p.card_brand)) return '';
+  const tip=[p.card_brand,p.card_last4?'••'+p.card_last4:'',p.card_thb?'THB '+Number(p.card_thb).toLocaleString():'',p.card_ref?'ref '+p.card_ref:'',p.card_auth?'auth '+p.card_auth:''].filter(Boolean).join(' · ');
+  const face=(p.card_brand?esc(p.card_brand)+' ':'')+(p.card_last4?'••'+esc(p.card_last4):'')+(p.card_thb?' · ฿'+Number(p.card_thb).toLocaleString():'');
+  return '<br><span class="mini" style="opacity:.75" title="'+esc(tip)+'">💳 '+face+'</span>'; }
 
 /* ============ auth + boot ============ */
 function renderGate(msg){
@@ -785,7 +789,7 @@ function rReceipts(){
       const pill= st==='paid'?`<span class="pill inc">✓ ${exp?'Paid':'Received'}</span>`:(st==='overdue'?'<span class="pill exp">● Overdue</span>':`<span class="pill off">${exp?'To pay':'Due'}</span>`);
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
       const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">edit</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
-      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method)):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
+      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method))+cardTag(l):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
   const blocks=list.map(gp=>{
     const open=!!S.rcOpen[gp.key];
     const allL=gp.items.map(x=>x.l);
@@ -819,18 +823,29 @@ function rReceipts(){
 }
 function markReceived(lineId){
   const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
-  const exp=e.kind==='expense';
+  const exp=e.kind==='expense'; const pm=l.pay_meta||{};
   openModal(`<h2>${l.paid?(exp?'Edit payment made':'Edit payment received'):(exp?'Record payment made':'Record payment received')}${exp?' <span class="pill exp" style="vertical-align:middle">we pay</span>':''}</h2>
    <div class="mini" style="margin-bottom:4px">${esc(e.category||'')} · ${esc(l.memo||'')} · due ${fmtDate(l.txn_date)} · scheduled ${fmt(l.amount)}</div>
    <div class="grid2" style="margin-top:12px">
     <div><label>Received date</label><input type="date" id="r_date" value="${l.paid_date||TODAY}"></div>
     <div><label>Amount received</label><input type="number" step="any" id="r_amt" value="${l.paid_amount!=null?l.paid_amount:l.amount}"></div>
-    <div><label>Method</label><select id="r_method">
+    <div><label>Method</label><select id="r_method" onchange="var d=g('r_cardbox');if(d)d.style.display=this.value==='card'?'':'none'">
       <option value="transfer" ${l.method==='transfer'?'selected':''}>Bank transfer (credit advice)</option>
       <option value="card" ${l.method==='card'?'selected':''}>Card (slip)</option>
       <option value="cash" ${l.method==='cash'?'selected':''}>Cash</option>
       <option value="other" ${l.method==='other'?'selected':''}>Other</option></select></div>
     <div><label>Reference / note</label><input id="r_note" value="${esc(l.paid_note||'')}"></div>
+    <div class="full" id="r_cardbox" style="${l.method==='card'?'':'display:none'};border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">💳 Card slip details</div>
+      <div class="grid2">
+        <div><label>Card type</label><select id="r_card_brand">${['','Mastercard','Visa','Amex','JCB','UnionPay','Other'].map(o=>`<option ${(pm.card_brand||'')===o?'selected':''}>${o||'—'}</option>`).join('')}</select></div>
+        <div><label>Last 4 digits</label><input id="r_card_last4" maxlength="4" inputmode="numeric" value="${esc(pm.card_last4||'')}" placeholder="9844"></div>
+        <div><label>Amount charged (THB)</label><input type="number" step="any" id="r_card_thb" value="${pm.card_thb!=null?pm.card_thb:''}" placeholder="133960"></div>
+        <div><label>Ref / Trace no.</label><input id="r_card_ref" value="${esc(pm.card_ref||'')}" placeholder="029425"></div>
+        <div><label>Approval code</label><input id="r_card_auth" value="${esc(pm.card_auth||'')}" placeholder="068019"></div>
+        <div><label>Terminal / bank</label><input id="r_card_term" value="${esc(pm.card_term||'')}" placeholder="Bangkok Bank"></div>
+      </div>
+    </div>
     <div class="full"><label>Attach evidence — card slip / credit advice (image or PDF)</label><input type="file" id="r_file" accept="image/*,application/pdf">
       ${l.proof_path?`<div class="mini" style="margin-top:4px">Current: ${esc(l.proof_name||'file')} · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">view</a></div>`:''}</div>
    </div>
@@ -841,7 +856,20 @@ async function saveReceipt(id){
   try{
     const l=DB.lines.find(x=>x.id===id); const file=g('r_file').files[0]; let path=l.proof_path||null, name=l.proof_name||null;
     if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); path='receipts/'+id+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',path,file); name=file.name; }
-    const patch={paid:true,paid_date:g('r_date').value||TODAY,paid_amount:parseFloat(g('r_amt').value)||Number(l.amount),method:g('r_method').value,paid_note:g('r_note').value.trim()||null,paid_by:USER&&USER.email,proof_path:path,proof_name:name};
+    const method=g('r_method').value;
+    let pay_meta=null;
+    if(method==='card'){
+      const pm={};
+      const gv=id2=>{const el=g(id2);return el?String(el.value).trim():'';};
+      const brand=gv('r_card_brand'); if(brand&&brand!=='—') pm.card_brand=brand;
+      const last4=gv('r_card_last4'); if(last4) pm.card_last4=last4;
+      const thb=gv('r_card_thb'); if(thb) pm.card_thb=parseFloat(thb);
+      const ref=gv('r_card_ref'); if(ref) pm.card_ref=ref;
+      const auth=gv('r_card_auth'); if(auth) pm.card_auth=auth;
+      const term=gv('r_card_term'); if(term) pm.card_term=term;
+      if(Object.keys(pm).length) pay_meta=pm;
+    }
+    const patch={paid:true,paid_date:g('r_date').value||TODAY,paid_amount:parseFloat(g('r_amt').value)||Number(l.amount),method:method,paid_note:g('r_note').value.trim()||null,paid_by:USER&&USER.email,proof_path:path,proof_name:name,pay_meta:pay_meta};
     await patchRow('cf_lines',id,patch);
     closeModal(); toast('Payment recorded'); await loadAll(); S.tab='receipts'; render();
   }catch(e){ toast('Save failed: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Save'; } }
