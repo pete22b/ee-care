@@ -120,7 +120,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <img src="logo.png" alt="Elite Escapes" class="logo">
   </div>
   <div class="tabs" id="tabs">
-    <button data-t="cashflow" class="on">Cash Flow</button>
+    <button data-t="dashboard" class="on">Dashboard</button>
+    <button data-t="cashflow">Cash Flow</button>
     <button data-t="reports">Reports</button>
     <button data-t="receipts">Receipts</button>
     <button data-t="stays">Stays</button>
@@ -149,7 +150,7 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 /* ============ state + data ============ */
 let DB={companies:[],accounts:[],categories:[],entries:[],lines:[]};
 const today=new Date(); const TODAY=iso(today);
-const S={tab:'cashflow', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
+const S={tab:'dashboard', view:'month', start:TODAY.slice(0,7), span:12, q:'', repType:'all',
   report:'ie', rStart:TODAY.slice(0,7), rSpan:12, excludePast:false, collapsed:{}, rcOpen:{},
   bankDate:TODAY, bankCompany:'all', bankBank:'all', bankType:'all', bankQ:'', bankShowFull:false, bankAuditPage:0, weekRef:TODAY,
   fRep:'all', fChan:'all', fNat:'all', syOpen:{}};
@@ -257,6 +258,7 @@ async function loadAll(){
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab)); render(); });
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
+  if(S.tab==='dashboard') return rDashboard();
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
   if(S.tab==='receipts') return rReceipts();
@@ -315,6 +317,92 @@ function buildMatrix(ps, opts){
 }
 
 /* ============ Cash Flow worksheet ============ */
+/* ============ Dashboard (home) ============ */
+function dashCashNow(){ const accs=(DB.bankAccounts||[]).filter(a=>a.active!==false); if(!accs.length) return null;
+  let tot=0,any=false; accs.forEach(a=>{ const s=(DB.bankSnaps||[]).filter(x=>x.account_id===a.id&&x.as_of<=TODAY).sort((x,y)=>x.as_of<y.as_of?1:-1)[0]; if(s){tot+=Number(s.balance||0);any=true;} }); return any?tot:null; }
+function dealDate(e){ const d=DB.lines.find(l=>l.entry_id===e.id&&l.line_type==='deposit'); return d?d.txn_date:null; }
+function dealValue(e){ return DB.lines.filter(l=>l.entry_id===e.id&&['deposit','admin','installment'].indexOf(l.line_type)>=0).reduce((s,l)=>s+Number(l.amount||0),0); }
+function rDashboard(){
+  const mk=TODAY.slice(0,7), yr=TODAY.slice(0,4);
+  const ps=periods('month',mk,12); const M=buildMatrix(ps);
+  const monthIn=M.incTot[mk]||0, monthOut=M.expTot[mk]||0;
+  const beginNow=M.beginByP[ps[0].key];
+  const end90=M.endByP[ps[Math.min(3,ps.length-1)].key];
+  // lowest projected balance over 12 mo
+  let lowK=ps[0].key, lowV=M.endByP[ps[0].key]; ps.forEach(p=>{ if(M.endByP[p.key]<lowV){lowV=M.endByP[p.key];lowK=p.key;} });
+  // income collection tracking (explicit one-off lines carry paid)
+  const incLines=allLines().filter(x=>x.e.kind==='income'&&x.e.active!==false&&(x.l.repeat||'never')==='never');
+  const overdue=incLines.filter(x=>x.l.txn_date<=TODAY&&!x.l.paid).sort((a,b)=>a.l.txn_date<b.l.txn_date?-1:1);
+  const dueMonth=incLines.filter(x=>x.l.txn_date.slice(0,7)===mk&&x.l.txn_date>=TODAY&&!x.l.paid);
+  const outstanding=incLines.filter(x=>!x.l.paid).reduce((s,x)=>s+Number(x.l.amount||0),0);
+  const overdueAmt=overdue.reduce((s,x)=>s+Number(x.l.amount||0),0);
+  const cashNow=dashCashNow();
+  // members
+  const groups=membershipContracts(); let blocked=0,upsell=0,stayedThisYr=0;
+  groups.forEach(g=>{ if(eligibility(g.cno).blocked)blocked++; const u=upsellInfo(g); if(u&&u.upsell)upsell++; if((DB.stays||[]).some(s=>s.contract===g.cno&&String(s.year)===yr&&s.stayed))stayedThisYr++; });
+  // bank statements not updated for chosen bank date
+  const banksToUpdate=(DB.bankAccounts||[]).filter(a=>a.active!==false&&a.acct_type!=='cash');
+  const notUpdated=banksToUpdate.filter(a=>!(DB.bankSnaps||[]).some(s=>s.account_id===a.id&&s.as_of===S.bankDate));
+  // sales
+  const deals=DB.entries.filter(e=>e.kind==='income'&&DB.lines.some(l=>l.entry_id===e.id&&l.line_type==='deposit'));
+  const dMonth=deals.filter(e=>{const d=dealDate(e);return d&&d.slice(0,7)===mk;});
+  const dYear=deals.filter(e=>{const d=dealDate(e);return d&&d.slice(0,4)===yr;});
+  const valYear=dYear.reduce((s,e)=>s+dealValue(e),0);
+  const byField=(list,f)=>{ const m={}; list.forEach(e=>{ const k=em(e)[f]||'—'; m[k]=(m[k]||0)+dealValue(e); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  const head=`<div class="head"><div><h1>Dashboard</h1><p class="mini">Cash position · 12-month forecast · what needs action today</p></div></div>`;
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="v">${cashNow!=null?fmtB(cashNow):'<span style="opacity:.4">—</span>'}</div><div class="l">Bank &amp; cash on hand${cashNow==null?' · <span style="color:var(--expense)">enter in Cash &amp; Bank</span>':''}</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(monthIn)}</div><div class="l">Income this month</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(monthOut)}</div><div class="l">Expenses this month</div></div>
+    <div class="kpi"><div class="v">${fmt(end90)}</div><div class="l">Projected cash · +90 days</div></div>
+    <div class="kpi"><div class="v" style="color:${overdueAmt>0?'var(--expense)':'var(--ink)'}">${fmt(overdueAmt)}</div><div class="l">Overdue · ${overdue.length} item(s)</div></div>
+    <div class="kpi"><div class="v">${fmt(outstanding)}</div><div class="l">Total outstanding (to collect)</div></div>
+  </div>`;
+  // forecast SVG (ending cash line)
+  const vals=ps.map(p=>M.endByP[p.key]); const mn=Math.min(...vals,0), mx=Math.max(...vals,1); const W=920,H=140,pad=8;
+  const x=i=>pad+i*((W-2*pad)/(ps.length-1)); const y=v=>H-pad-((v-mn)/((mx-mn)||1))*(H-2*pad);
+  const pts=vals.map((v,i)=>x(i)+','+y(v)).join(' ');
+  const area=`M${x(0)},${H-pad} L${pts.split(' ').join(' L')} L${x(ps.length-1)},${H-pad} Z`;
+  const lowI=ps.findIndex(p=>p.key===lowK);
+  const chart=`<div class="card pad" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h2 style="margin:0">Cash forecast · next 12 months</h2><div class="mini">Lowest: <b style="color:${lowV<0?'var(--expense)':'var(--ink)'}">${fmt(lowV)}</b> in ${ps[lowI].label}${lowV<0?' ⚠️ goes negative':''}</div></div>
+    <svg viewBox="0 0 ${W} ${H+22}" style="width:100%;height:auto;margin-top:8px" preserveAspectRatio="none">
+      <path d="${area}" fill="rgba(14,159,142,.10)"/>
+      <polyline points="${pts}" fill="none" stroke="var(--brand)" stroke-width="2"/>
+      ${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${i===lowI?3.5:2}" fill="${i===lowI?'var(--expense)':'var(--brand)'}"/>`).join('')}
+      ${ps.map((p,i)=>i%2===0?`<text x="${x(i)}" y="${H+16}" font-size="10" fill="#93a1af" text-anchor="middle">${p.label.split(' ')[0]}</text>`:'').join('')}
+    </svg></div>`;
+  // to-do list
+  const todo=[];
+  if(overdue.length) todo.push({ic:'🔴',t:`${overdue.length} overdue payment(s) · ${fmt(overdueAmt)}`,s:'follow up to collect',go:'receipts'});
+  if(dueMonth.length) todo.push({ic:'🟡',t:`${dueMonth.length} payment(s) due this month · ${fmt(dueMonth.reduce((s,x)=>s+Number(x.l.amount||0),0))}`,s:'prepare to collect',go:'receipts'});
+  if(notUpdated.length) todo.push({ic:'🏦',t:`${notUpdated.length} bank account(s) not updated (${fmtDate(S.bankDate)})`,s:'upload statement',go:'bank'});
+  if(blocked) todo.push({ic:'🚫',t:`${blocked} member(s) blocked — owe MFEE`,s:'cannot stay until paid',go:'stays'});
+  if(upsell) todo.push({ic:'⭐',t:`${upsell} contract(s) due for renewal / upsell`,s:'Interval or membership expiring',go:'stays'});
+  if(lowV<0) todo.push({ic:'⚠️',t:`Cash projected negative in ${ps[lowI].label} (${fmt(lowV)})`,s:'review expenses / collections',go:'cashflow'});
+  const todoHtml=`<div class="card" style="margin-bottom:16px"><div class="pad" style="border-bottom:1px solid var(--line)"><h2 style="margin:0">Action needed today</h2></div>
+    ${todo.length?todo.map(t=>`<div class="click" onclick="S.tab='${t.go}';render()" style="display:flex;gap:12px;align-items:center;padding:11px 18px;border-bottom:1px solid var(--line2)"><div style="font-size:18px">${t.ic}</div><div style="flex:1"><b>${esc(t.t)}</b><br><span class="mini">${esc(t.s)}</span></div><div class="mini" style="color:var(--brand)">open →</div></div>`).join(''):'<div class="pad mini" style="color:var(--income)">✓ All clear — nothing overdue.</div>'}</div>`;
+  // sales
+  const repRows=byField(dYear,'rep').slice(0,5).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
+  const chanRows=byField(dYear,'channel').slice(0,5).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
+  const natRows=byField(dYear,'nationality').slice(0,5).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
+  const sales=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:16px">
+    <div class="card pad"><h2 style="margin:0 0 8px">Sales</h2>
+      <div class="kpi" style="box-shadow:none;border:none;padding:0"><div class="v">${dMonth.length}</div><div class="l">New deals this month</div></div>
+      <div style="margin-top:10px" class="mini">This year: <b>${dYear.length} deals · ${fmt(valYear)}</b></div></div>
+    <div class="card pad"><h2 style="margin:0 0 8px">By sales rep (year)</h2><table>${repRows||'<tr><td class="mini">—</td></tr>'}</table></div>
+    <div class="card pad"><h2 style="margin:0 0 8px">By channel</h2><table>${chanRows||'<tr><td class="mini">—</td></tr>'}</table>
+      <h2 style="margin:12px 0 6px">By nationality</h2><table>${natRows||'<tr><td class="mini">—</td></tr>'}</table></div>
+  </div>`;
+  // members summary
+  const mem=`<div class="kpis">
+    <div class="kpi click" onclick="S.tab='stays';render()"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${groups.length-blocked}</div><div class="l">Eligible to stay</div></div>
+    <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owe MFEE</div></div>
+    <div class="kpi"><div class="v">${stayedThisYr}</div><div class="l">Stayed in ${yr}</div></div>
+    <div class="kpi"><div class="v" style="color:#b7893b">${upsell}</div><div class="l">Renew / upsell soon</div></div>
+  </div>`;
+  g('main').innerHTML=head+kpis+chart+todoHtml+sales+`<h2 style="margin:4px 2px 10px">Members &amp; stays</h2>`+mem;
+}
 function rCashflow(){
   const empty=DB.entries.length===0;
   const bar=`<div class="toolbar">
