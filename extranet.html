@@ -937,6 +937,12 @@ function bookingChecks(b,cno){
   if(fyo&&lyo&&yr){ const active=yr>=fyo&&yr<=lyo; out.push({s:active?'ok':'fail',t:'Membership active for '+yr,d:active?('valid '+fyo+'–'+lyo):('contract runs '+fyo+'–'+lyo+' — the requested stay year is outside the term.')}); }
   else out.push({s:'warn',t:'Membership period',d:'Contract term unknown in the system — verify manually.'});
   const el=eligibility(cno); out.push({s:el.blocked?'fail':'ok',t:'Management Fee (MFEE)',d:el.blocked?('owes '+fmt(el.out.reduce((s,l)=>s+Number(l.amount||0),0))+' — member must pay before staying.'):'No outstanding MFEE.'});
+  // Stay entitlement (weeks): does the member have a week available for the requested year?
+  if(grp && yr){ const ent=entitlement(grp); const e=ent&&ent.per[yr];
+    if(e){ out.push({s: e.remaining>=1?'ok':'warn', t:'Stay entitlement '+yr,
+      d: e.remaining>=1 ? (e.remaining+' of '+e.avail+' week(s) available'+(e.carriedIn?' (incl '+e.carriedIn+' carried over)':'')+'.')
+        : (e.used>0?'This year’s week is already used.':'No entitlement week left for '+yr+' — carried-over week expired.') }); }
+    else if(ent) out.push({s:'warn',t:'Stay entitlement',d:'Requested year '+yr+' is outside the entitlement term ('+ent.fyo+'–'+ent.lyo+').'}); }
   if(yr){ const st=stayOf(cno,yr); if(st&&st.stayed) out.push({s:'warn',t:'Already stayed in '+yr,d:'A stay is already logged for this year — check the remaining entitlement.'}); }
   out.push(avail);
   return out;
@@ -1040,6 +1046,30 @@ function membershipContracts(){
   return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
 }
 function contractPathFor(cat){ const e=(DB.entries||[]).find(x=>x.category===cat && x.contract_path); return e?{path:e.contract_path,name:e.contract_name}:{path:null,name:null}; }
+/* Week-based stay entitlement (per contract T&C):
+   - earn `weeks` per occupancy year (default 1);
+   - each logged stay uses 1 week;
+   - unused weeks roll over to the FOLLOWING year only, then expire (T&C 2.4);
+   Returns {per:{year:{earned,avail,used,remaining,over,carriedIn}}, fyo,lyo,wk,term,usedTot,earnedTot}. */
+function entitlement(g){
+  const fyo=Number(g.meta&&g.meta.fyo)||null, term=termOf(g.cno);
+  if(!fyo||!term) return null;
+  const lyo=fyo+term-1, wk=Number(g.meta&&g.meta.weeks)||1;
+  const per={}; let buckets=[]; // {ey:year earned, left}
+  for(let y=fyo;y<=lyo;y++){
+    buckets=buckets.filter(b=>b.ey>=y-1);                 // weeks older than last year expire
+    const carriedIn=buckets.reduce((s,b)=>s+b.left,0);    // leftover from prior (still valid) year
+    buckets.push({ey:y,left:wk});
+    const avail=buckets.reduce((s,b)=>s+b.left,0);
+    const st=stayOf(g.cno,y); const used=(st&&st.stayed)?1:0;
+    let u=used; buckets.sort((a,b)=>a.ey-b.ey);
+    for(const b of buckets){ const t=Math.min(b.left,u); b.left-=t; u-=t; }
+    const remaining=buckets.reduce((s,b)=>s+b.left,0);
+    per[y]={earned:wk,carriedIn,avail,used,remaining,over:u>0};
+  }
+  const usedTot=Object.values(per).reduce((s,r)=>s+r.used,0);
+  return {per,fyo,lyo,wk,term,usedTot,earnedTot:wk*term};
+}
 function rStays(){
   const groups=membershipContracts().filter(g=>!(g.meta&&g.meta.subscription));
   let blocked=0, eligible=0, upsell=0;
@@ -1060,6 +1090,7 @@ function rStays(){
     const ii=iiOf(g.meta); const u=upsellInfo(g);
     const iiBadge= ii? `<span class="pill fc" title="Interval International membership">🌐 Interval ${esc(ii.tier)}${ii.until?' · until '+ii.until:''}</span>` : '';
     const upBadge= (u&&u.upsell)? `<span class="pill" style="background:#fbf1d8;color:#8a6d1f" title="${esc(u.soonest.what)} ${u.soonest.year}">⭐ Upsell — ${esc(u.soonest.what)} ${u.soonest.year}${u.due<0?' (expired)':''}</span>` : '';
+    const ent=entitlement(g);
     let rows='';
     if(fyo&&lyo){
       // the member's "active" entitlement year = earliest year in the term they haven't used yet (log-stay opens here; later years stay locked)
@@ -1077,16 +1108,20 @@ function rStays(){
         const stayAct = stayed ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">edit</button>`
           : (canLog ? `<button class="btn link" onclick="openStay('${esc(g.cno)}',${y})">log stay</button>`
                     : `<span class="mini" style="opacity:.3;cursor:not-allowed" title="Can't log a stay before ${y} — the year hasn't started yet">log stay</span>`);
-        rows+=`<tr><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td>${stayAct}</td></tr>`;
+        const e=ent&&ent.per[y];
+        const wkCell = !e ? '' : (e.over
+            ? '<span class="pill exp" title="Used more weeks than available">⚠ over</span>'
+            : `<span title="${e.earned} earned${e.carriedIn?' + '+e.carriedIn+' carried in':''} · ${e.used} used">${e.remaining}/${e.avail} wk${e.carriedIn?' <span class="mini">(+'+e.carriedIn+' carried)</span>':''}</span>`);
+        rows+=`<tr><td><b>${y}</b>${y==fyo?' <span class="mini">FYO</span>':(y==lyo?' <span class="mini">LYO</span>':'')}</td><td>${mfeeCell}${mfeeAct}</td><td>${stayCell}</td><td class="mini">${wkCell}</td><td>${stayAct}</td></tr>`;
       }
     } else {
-      rows=`<tr><td colspan="4" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
+      rows=`<tr><td colspan="5" class="mini" style="opacity:.6">No occupancy years (FYO/term missing) — add FYO in the entry's Sales report details</td></tr>`;
     }
     const cust=(g.entries[0]&&g.entries[0].description||'').split('\n')[0];
     return `<div class="card" id="sy_${cssId(g.cno)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer${open?';border-bottom:1px solid var(--line)':''}" onclick="toggleSy('${esc(g.cno)}')">
       <div><b>${open?'▾':'▸'} ${esc(g.cno)}</b> <span class="mini">· ${esc(cust)}${g.meta.unit?' · '+esc(g.meta.unit):''}${fyo?' · stay '+fyo+'–'+lyo:''}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.contract_path?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.contract_path)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${badge}${iiBadge}${upBadge}</div></div>
-      ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.contract_path?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.contract_path)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${ent?`<span class="pill" style="background:var(--brandsoft);color:var(--brand2)" title="${ent.wk} week(s)/yr · ${ent.usedTot} used of ${ent.earnedTot}">📅 Weeks ${ent.usedTot}/${ent.earnedTot} used</span>`:''}${badge}${iiBadge}${upBadge}</div></div>
+      ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th>Weeks left</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
   g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
 }
