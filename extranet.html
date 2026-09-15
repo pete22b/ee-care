@@ -360,6 +360,7 @@ function gsKey(e){ const box=g('gsres'); const n=_gs.list.length;
   else if(e.key==='ArrowUp'){ e.preventDefault(); _gs.hl=(_gs.hl-1+n)%n; paintGs(); }
   else if(e.key==='Enter'){ if(_gs.hl>=0){ e.preventDefault(); gsPick(_gs.hl); } } }
 document.addEventListener('keydown',e=>{ if(e.key==='/' && !e.ctrlKey && !e.metaKey){ const a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; const inp=g('gsq'); if(inp){ e.preventDefault(); inp.focus(); inp.select&&inp.select(); } } });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const box=g('gsres'); if(box && !box.classList.contains('hide')){ box.classList.add('hide'); const inp=g('gsq'); if(inp){ inp.value=''; inp.blur(); } _gs={list:[],hl:-1}; } });
 document.addEventListener('click',e=>{ const box=g('gsres'); if(box && !box.classList.contains('hide') && !e.target.closest('.gsearch')) box.classList.add('hide'); });
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
