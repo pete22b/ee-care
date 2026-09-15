@@ -398,7 +398,7 @@ function rDashboard(){
   const overdueAmt=overdue.reduce((s,x)=>s+Number(x.l.amount||0),0);
   const cashNow=dashCashNow();
   // members
-  const groups=membershipContracts(); let blocked=0,upsell=0,stayedThisYr=0;
+  const groups=membershipContracts().filter(g=>!(g.meta&&g.meta.subscription)); let blocked=0,upsell=0,stayedThisYr=0;
   groups.forEach(g=>{ if(eligibility(g.cno).blocked)blocked++; const u=upsellInfo(g); if(u&&u.upsell)upsell++; if((DB.stays||[]).some(s=>s.contract===g.cno&&String(s.year)===yr&&s.stayed))stayedThisYr++; });
   // bank statements not updated for chosen bank date
   const banksToUpdate=(DB.bankAccounts||[]).filter(a=>a.active!==false&&a.acct_type!=='cash');
@@ -1041,7 +1041,7 @@ function membershipContracts(){
 }
 function contractPathFor(cat){ const e=(DB.entries||[]).find(x=>x.category===cat && x.contract_path); return e?{path:e.contract_path,name:e.contract_name}:{path:null,name:null}; }
 function rStays(){
-  const groups=membershipContracts();
+  const groups=membershipContracts().filter(g=>!(g.meta&&g.meta.subscription));
   let blocked=0, eligible=0, upsell=0;
   groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; const u=upsellInfo(g); if(u&&u.upsell) upsell++; });
   const head=`<div class="head"><div><h1>Stays &amp; Eligibility</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div></div>`;
