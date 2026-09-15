@@ -502,7 +502,21 @@ async function mktSave(){ const p=mktPeriod(); const reps=DB.mktReps||[];
   const rows=reps.map(rp=>{ const m=S.mktData[rp.code]; return { id:p.year+'_'+p.week+'_'+rp.code, year:p.year, week:p.week,
     period_start:p.startISO, period_end:p.endISO, rep_code:rp.code, rep_name:rp.name, team:rp.team, role:rp.role,
     days:m.days, deal:m.deal, extra:m.extra, ded:m.ded, updated_at:new Date().toISOString() }; });
-  try{ await upsert('mkt_dgr',rows); toast('บันทึกค่าจ้างสัปดาห์ที่ '+p.week+' แล้ว ('+reps.length+' คน)'); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
+  try{ await upsert('mkt_dgr',rows);
+    // sync to accounting (Cashflow/P&L) — weekly payroll expense
+    const total=reps.reduce((s,rp)=>s+mktCalc(S.mktData[rp.code]).net,0)+mktOverrideForWeek(reps.map(rp=>Object.assign({team:rp.team,role:rp.role},S.mktData[rp.code])));
+    const fri=new Date(p.startISO+'T00:00:00'); fri.setDate(fri.getDate()+5);
+    await syncWageLine(p.year,p.week,total,iso(fri)); await reloadEL();
+    toast('บันทึก + ลงบัญชีแล้ว (สัปดาห์ '+p.week+', '+reps.length+' คน)');
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
+/* ---- accounting sync (wages + taxi -> cf_entries/cf_lines) ---- */
+async function reloadEL(){ try{ const [en,li]=await Promise.all([api('cf_entries?select=*&order=title.asc'),api('cf_lines?select=*&order=txn_date.asc')]); if(en)DB.entries=en; if(li)DB.lines=li; }catch(e){} }
+async function ensureExpEntry(id,title,category){ await upsert('cf_entries',[{id,kind:'expense',title,category,account:(primaryAccount()||{}).id||null,active:true,meta:{source:'auto'}}]); }
+async function syncWageLine(year,week,amount,dateISO){ await ensureExpEntry('en_mkt_wages','ค่าจ้างทีมการตลาด (OPC)','Marketing/OPC Wages');
+  await upsert('cf_lines',[{id:'ln_mktw_'+year+'_'+week,entry_id:'en_mkt_wages',amount:Math.round(amount||0),txn_date:dateISO,repeat:'never',line_type:'mktwage',memo:'ค่าจ้าง OPC สัปดาห์ '+week,paid:true}]); }
+async function taxiPost(row){ await ensureExpEntry('en_mkt_taxi','ค่าแท็กซี่พาแขก (OPC)','Taxi (OPC)');
+  await upsert('cf_lines',[{id:'ln_taxi_'+row.id,entry_id:'en_mkt_taxi',amount:Number(row.amount||0),txn_date:row.tour_date||TODAY,repeat:'never',line_type:'taxi',memo:'ค่าแท็กซี่'+(row.guest_name?(' · '+row.guest_name):'')+(row.opc_code?(' · '+row.opc_code):''),paid:true}]); }
+async function taxiUnpost(id){ try{ await api('cf_lines?id=eq.'+encodeURIComponent('ln_taxi_'+id),{method:'DELETE',prefer:'return=minimal'}); }catch(e){} }
 
 /* ---- OPC Wages history / trends ---- */
 async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
@@ -629,8 +643,11 @@ async function saveTaxi(id){ const cur=id?(DB.taxi||[]).find(x=>x.id===id):null;
   try{ await upsert('mkt_taxi',[row]); closeModal(); toast('บันทึก + ส่งให้บัญชีตรวจแล้ว'); await loadTaxi(); taxiPaint(); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); if(sv){sv.disabled=false;sv.textContent='บันทึก';} } }
 async function taxiReview(id,decision){ let note=null;
   if(decision==='rejected'){ note=prompt('เหตุผลที่ตีกลับ (ให้ reception แก้):'); if(note===null) return; }
-  try{ await patchRow('mkt_taxi',id,{status:decision, paid:decision==='approved', paid_date:decision==='approved'?TODAY:null, review_by:(USER&&USER.email)||null, review_at:new Date().toISOString(), review_note:note}); await loadTaxi(); taxiPaint(); toast(decision==='approved'?'อนุมัติแล้ว':'ตีกลับแล้ว'); }catch(e){ toast('ไม่สำเร็จ: '+e.message); } }
-async function taxiDelete(id){ if(!confirm('ลบรายการค่าแท็กซี่นี้?')) return; try{ await api('mkt_taxi?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); closeModal(); await loadTaxi(); taxiPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
+  const row=(DB.taxi||[]).find(x=>x.id===id);
+  try{ await patchRow('mkt_taxi',id,{status:decision, paid:decision==='approved', paid_date:decision==='approved'?TODAY:null, review_by:(USER&&USER.email)||null, review_at:new Date().toISOString(), review_note:note});
+    if(decision==='approved'&&row){ await taxiPost(row); } else { await taxiUnpost(id); }
+    await reloadEL(); await loadTaxi(); taxiPaint(); toast(decision==='approved'?'อนุมัติ + ลงบัญชีแล้ว':'ตีกลับแล้ว'); }catch(e){ toast('ไม่สำเร็จ: '+e.message); } }
+async function taxiDelete(id){ if(!confirm('ลบรายการค่าแท็กซี่นี้?')) return; try{ await api('mkt_taxi?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); await taxiUnpost(id); await reloadEL(); closeModal(); await loadTaxi(); taxiPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
 
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
