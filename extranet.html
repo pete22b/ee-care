@@ -805,7 +805,7 @@ function rBookings(){
       : (el.blocked ? '<span class="pill exp">🔴 owes MFEE</span>' : '<span class="pill inc">🟢 OK to stay</span>');
     const st=b.status||'new';
     const pill=`<span class="pill ${st==='new'?'fc':(st==='confirmed'?'inc':(st==='declined'?'exp':'off'))}">${BOOK_ST[st]||st}</span>`;
-    const act= st==='new' ? `<button class="btn sm inc" onclick="setBooking('${esc(b.id)}','confirmed')">Confirm</button> <button class="btn link" onclick="setBooking('${esc(b.id)}','declined')">decline</button>`
+    const act= st==='new' ? `<button class="btn sm inc" onclick="confirmBooking('${esc(b.id)}')">Confirm</button> <button class="btn link" onclick="setBooking('${esc(b.id)}','declined')">decline</button>`
       : (st==='confirmed'? `<button class="btn sm ghost" onclick="setBooking('${esc(b.id)}','done')">Mark done</button>`:'');
     return `<tr>
       <td class="mini">${b.created_at?fmtDate(String(b.created_at).slice(0,10)):''}</td>
@@ -823,6 +823,11 @@ function rBookings(){
   g('main').innerHTML=head+kpis+seg+body;
 }
 async function setBooking(id,status){ try{ await patchRow('cf_bookings',id,{status,updated_by:USER&&USER.email}); toast('Updated'); await loadAll(); S.tab='bookings'; render(); }catch(e){ toast('Failed: '+e.message); } }
+function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b);
+  if(!cno){ if(!confirm('This request is not linked to a verified contract yet.\nPlease check the member name / contract number first.\n\nConfirm the booking anyway?')) { openBooking(id); return; } }
+  else { const el=eligibility(cno); if(el.blocked){ if(!confirm('⚠ '+cno+' owes Management Fee (MFEE).\nThe member should NOT stay until it is paid.\n\nConfirm anyway?')) return; } }
+  setBooking(id,'confirmed');
+}
 function openBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b); const el=cno?eligibility(cno):null;
   openModal(`<h2>Booking request</h2>
    <div class="grid2">
