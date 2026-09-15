@@ -43,17 +43,18 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
 :root{--side-w:248px}
 /* left sidebar nav — PISONA-style grouped dark card */
 .side{position:fixed;top:0;left:0;bottom:0;width:var(--side-w);z-index:40;
-  display:flex;flex-direction:column;padding:14px;gap:14px;overflow:hidden}
+  display:flex;flex-direction:column;padding:14px;gap:14px;overflow:hidden;
+  border-left:4px solid #1f5fa0}
 .side .brand{display:flex;align-items:center;gap:12px;flex:none;height:44px;padding:0 8px}
 .side .brand .logo{height:36px;width:auto;display:block}
 .sidecard{flex:1;min-height:0;overflow-y:auto;-ms-overflow-style:none;scrollbar-width:thin;
-  background:linear-gradient(180deg,#123a44 0%,#0e2a33 100%);
+  background:linear-gradient(180deg,#40566a 0%,#1c3d5a 48%,#0b2338 100%);
   border-radius:18px;padding:18px 12px;display:flex;flex-direction:column;gap:6px;
-  box-shadow:0 14px 40px -18px rgba(9,30,36,.55)}
+  box-shadow:0 14px 40px -18px rgba(9,24,44,.6)}
 .sidecard::-webkit-scrollbar{width:6px}
 .sidecard::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:6px}
 .side-title{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
-  color:#7fd8c4;padding:2px 12px 8px}
+  color:#d8b568;padding:2px 12px 8px}
 .navgrp{display:flex;flex-direction:column;gap:2px;margin-top:8px}
 .navgrp:first-of-type{margin-top:0}
 .navlbl{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
@@ -63,7 +64,7 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
   font-size:13px;letter-spacing:.01em;white-space:nowrap;border-radius:10px;line-height:1.1;
   transition:background .12s,color .12s}
 .sidecard button:hover{color:#fff;background:rgba(255,255,255,.08)}
-.sidecard button.on{color:#123038;background:#fff;font-weight:700;
+.sidecard button.on{color:#123453;background:#fff;font-weight:700;
   box-shadow:0 4px 14px -6px rgba(0,0,0,.4)}
 /* top bar (content column only) */
 .top{position:sticky;top:0;z-index:30;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);box-shadow:0 2px 12px -8px rgba(16,32,48,.18)}
