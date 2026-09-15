@@ -296,6 +296,12 @@ async function boot(){
   if(rows&&rows.length) USER=Object.assign({},rows[0],{name:rows[0].name||nm});
   else if(em.endsWith('@elite-escapes.club')) USER={email:em,name:nm,role:'editor'};
   else { await SBC.auth.signOut(); renderGate('Access only via company Gmail @elite-escapes.club'); return; }
+  // load role -> allowed categories (Supabase cf_roles). Least-privilege on any miss.
+  try{ const rl=await api('cf_roles?select=cats,is_admin&role=eq.'+encodeURIComponent(USER.role||''));
+    if(rl&&rl.length){ USER.cats=rl[0].cats||['overview']; USER.is_admin=!!rl[0].is_admin; }
+    else { USER.cats=['overview']; USER.is_admin=false; }
+  }catch(e){ USER.cats=['overview']; USER.is_admin=false; }
+  applyAccess();
   closeGate();
   g('userbox').innerHTML=`👤 ${esc(USER.name||USER.email)} · <a href="#" onclick="logout();return false">Sign out</a>`;
   await loadAll();
@@ -322,9 +328,22 @@ async function loadAll(){
   }catch(e){ g('main').innerHTML='<div class="emptyc">Failed to load: '+esc(e.message)+'</div>'; }
 }
 
+/* ============ access control (role -> menu category) ============ */
+const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',
+  bank:'finance',cashflow:'finance',receipts:'finance',companies:'data',accounts:'data',import:'data'};
+function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
+function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; return !c || myCats().indexOf(c)>=0; }
+function firstAllowedTab(){ return Object.keys(TAB_CAT).find(t=>canTab(t))||'dashboard'; }
+function applyAccess(){
+  document.querySelectorAll('#tabs button').forEach(b=>{ b.hidden=!canTab(b.dataset.t); });
+  // hide a group's label + wrapper when all its buttons are hidden
+  document.querySelectorAll('.navgrp').forEach(gp=>{ const any=[...gp.querySelectorAll('button')].some(b=>!b.hidden); gp.hidden=!any; });
+  if(!canTab(S.tab)) S.tab=firstAllowedTab();
+}
+
 /* ============ router ============ */
-document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{ S.tab=b.dataset.t; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab)); render(); });
-function goto(tab){ S.tab=tab; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===tab)); render(); }
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{ if(!canTab(b.dataset.t)) return; S.tab=b.dataset.t; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab)); render(); });
+function goto(tab){ if(!canTab(tab)) tab=firstAllowedTab(); S.tab=tab; document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===tab)); render(); }
 
 /* ============ global search (command palette) ============ */
 function cssId(s){ return String(s).replace(/[^a-z0-9]+/gi,'_'); }
@@ -332,15 +351,15 @@ let _gs={list:[],hl:-1};
 function globalSearch(q){ q=(q||'').trim().toLowerCase(); if(q.length<2) return []; const res=[];
   try{ membershipContracts().forEach(gp=>{ const m=gp.meta||{}; const names=((gp.entries[0]&&gp.entries[0].description)||'').replace(/\n/g,' & ');
     const hay=[gp.cno,names,m.unit,m.nationality,m.rep,m.channel,m.city].filter(Boolean).join(' ').toLowerCase();
-    if(hay.indexOf(q)>=0) res.push({type:'Contract',icon:'📄',label:gp.cno,sub:[names,m.unit].filter(Boolean).join(' · '),
+    if(hay.indexOf(q)>=0) res.push({type:'Contract',icon:'📄',tab:'stays',label:gp.cno,sub:[names,m.unit].filter(Boolean).join(' · '),
       go:()=>{ goto('stays'); S.syOpen[gp.cno]=true; render(); setTimeout(()=>{ const el=g('sy_'+cssId(gp.cno)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600);} },90); }}); }); }catch(e){}
   (DB.bookings||[]).forEach(b=>{ const hay=[b.member_name,b.membership_no,b.email].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
-    res.push({type:'Booking',icon:'📩',label:b.member_name||b.membership_no||'Booking',sub:[b.membership_no,b.check_in].filter(Boolean).join(' · '),go:()=>{ goto('bookings'); openBooking(b.id); }}); });
+    res.push({type:'Booking',icon:'📩',tab:'bookings',label:b.member_name||b.membership_no||'Booking',sub:[b.membership_no,b.check_in].filter(Boolean).join(' · '),go:()=>{ goto('bookings'); openBooking(b.id); }}); });
   (DB.bankAccounts||[]).forEach(a=>{ const hay=[a.name,a.bank,a.number,a.company].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
-    res.push({type:'Bank',icon:'🏦',label:a.name||a.bank||'Account',sub:[a.bank,a.number].filter(Boolean).join(' · '),go:()=>goto('bank')}); });
-  (DB.companies||[]).forEach(c=>{ if((c.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Company',icon:'🏢',label:c.name,sub:'',go:()=>goto('companies')}); });
-  (DB.accounts||[]).forEach(a=>{ if((a.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Account',icon:'💳',label:a.name,sub:a.currency||'',go:()=>goto('accounts')}); });
-  return res.slice(0,25);
+    res.push({type:'Bank',icon:'🏦',tab:'bank',label:a.name||a.bank||'Account',sub:[a.bank,a.number].filter(Boolean).join(' · '),go:()=>goto('bank')}); });
+  (DB.companies||[]).forEach(c=>{ if((c.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Company',icon:'🏢',tab:'companies',label:c.name,sub:'',go:()=>goto('companies')}); });
+  (DB.accounts||[]).forEach(a=>{ if((a.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Account',icon:'💳',tab:'accounts',label:a.name,sub:a.currency||'',go:()=>goto('accounts')}); });
+  return res.filter(r=>canTab(r.tab)).slice(0,25);
 }
 function onSearch(v){ const box=g('gsres'); if(!box) return;
   if(!v||v.trim().length<2){ _gs={list:[],hl:-1}; box.classList.add('hide'); box.innerHTML=''; return; }
