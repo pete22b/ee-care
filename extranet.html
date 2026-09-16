@@ -435,10 +435,15 @@ function rMktWages(){ if(S.mktView==='history') return rMktHistory(); const p=mk
   mktLoad().then(mktPaint).catch(e=>{ const b=g('mktbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
 function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; const reps=DB.mktReps||[];
   const R='text-align:right', C='text-align:center';
+  // team aggregation → per-manager override (computed first so manager rows can show it live)
+  const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; const tm=(teams[t]=teams[t]||{q:0,qp:0,ct:0,pack:0,full:0,mgr:null});
+    tm.pack+=c.pack; tm.full+=c.full; if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; } if(rp.role==='manager') tm.mgr=rp; });
+  const mgrOv={}; Object.values(teams).forEach(tm=>{ if(tm.mgr) mgrOv[tm.mgr.code]=tm.q*MKT_MGR.q+tm.qp*MKT_MGR.qp+tm.ct*MKT_MGR.ct+tm.pack*MKT_MGR.pack+tm.full*MKT_MGR.full; });
   const tot={q:0,qp:0,ct:0,pack:0,full:0,tour:0,bonus:0,gross:0,ded:0,net:0}; let rows='';
   reps.forEach(rp=>{ const m=S.mktData[rp.code]; const raw=mktCalc(m); const isMgr=rp.role==='manager';
     const c = isMgr ? Object.assign({},raw,{tour:0,bonus:0,extra:0,gross:0,ded:0,net:0}) : raw;
     Object.keys(tot).forEach(k=>tot[k]+=c[k]);
+    const ov = isMgr ? (mgrOv[rp.code]||0) : 0;
     const inp=(grp,sub,val)=>`<input type="number" min="0" value="${val||0}" onchange="mktSet('${rp.code}','${grp}','${sub}',this.value)" style="width:52px;${C};padding:5px;border:1px solid var(--line);border-radius:6px">`;
     const dim=`<td style="${C};opacity:.4;background:var(--bg)"><span class="mini" title="ผู้จัดการไม่รับค่าทัวร์ของตัวเอง">—</span></td>`;
     rows+=`<tr>
@@ -449,10 +454,10 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
       <td style="${C}">${inp('deal','pack',m.deal.pack)}</td>
       <td style="${C}">${inp('deal','full',m.deal.full)}</td>
       <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':fmt(c.tour)}</td>
-      <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':(c.bonus?fmt(c.bonus):'—')}</td>
-      <td style="${R}">${isMgr?'<span class="mini" style="opacity:.6" title="รับผ่าน Manager override">override</span>':'<b>'+fmt(c.gross)+'</b>'}</td>
+      <td style="${R}">${isMgr?'<span class="mini" style="opacity:.7">override</span>':(c.bonus?fmt(c.bonus):'—')}</td>
+      <td style="${R}"><b>${isMgr?fmt(ov):fmt(c.gross)}</b></td>
       <td style="${R};color:var(--expense)">${isMgr?'—':(c.ded?('−'+fmt(c.ded)):'—')}</td>
-      <td style="${R}">${isMgr?'—':'<b>'+fmt(c.net)+'</b>'}</td>
+      <td style="${R}"><b>${isMgr?fmt(ov):fmt(c.net)}</b></td>
       <td style="white-space:nowrap">${isMgr?'':'<button class="btn sm ghost" onclick="mktMore(\''+rp.code+'\')">หัก/โบนัส…</button> <button class="btn sm ghost" onclick="mktSlip(\''+rp.code+'\')" title="Payslip">🧾</button>'}</td>
     </tr>`; });
   const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line)">${t}</th>`;
@@ -461,11 +466,9 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
     <td>รวม (${reps.length} คน)</td><td style="${C}">${tot.q}</td><td style="${C}">${tot.qp}</td><td style="${C}">${tot.ct}</td>
     <td style="${C}">${tot.pack}</td><td style="${C}">${tot.full}</td><td style="${R}">${fmt(tot.tour)}</td><td style="${R}">${fmt(tot.bonus)}</td>
     <td style="${R}">${fmt(tot.gross)}</td><td style="${R};color:var(--expense)">−${fmt(tot.ded)}</td><td style="${R}">${fmt(tot.net)}</td><td></td></tr>`;
-  // manager override
-  const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; const tm=(teams[t]=teams[t]||{q:0,qp:0,ct:0,pack:0,full:0,mgr:null});
-    tm.pack+=c.pack; tm.full+=c.full; if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; } if(rp.role==='manager') tm.mgr=rp; });
+  // manager override (reuse teams + mgrOv computed above)
   let mgr='',mgrTot=0; Object.keys(teams).sort().forEach(t=>{ const tm=teams[t]; if(!tm.mgr) return;
-    const ov=tm.q*MKT_MGR.q+tm.qp*MKT_MGR.qp+tm.ct*MKT_MGR.ct+tm.pack*MKT_MGR.pack+tm.full*MKT_MGR.full; mgrTot+=ov;
+    const ov=mgrOv[tm.mgr.code]||0; mgrTot+=ov;
     mgr+=`<tr><td style="white-space:nowrap">${esc(tm.mgr.name)} <span class="mini">(ทีม ${esc(t)})</span></td><td style="${C}">${tm.q}</td><td style="${C}">${tm.qp}</td><td style="${C}">${tm.ct}</td><td style="${C}">${tm.pack}</td><td style="${C}">${tm.full}</td><td style="${R}"><b>${fmt(ov)}</b></td></tr>`; });
   const mgrHtml=mgr?`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="pad" style="padding-bottom:0"><h2 style="margin:0 0 4px">Manager override</h2><p class="mini" style="margin:0 0 8px">Q ${MKT_MGR.q} · Q+ ${MKT_MGR.qp} · CT ${MKT_MGR.ct} (เฉพาะทัวร์ลูกทีม ไม่รวมทัวร์ผู้จัดการเอง) · ดีล Pack ${MKT_MGR.pack} · Full ${MKT_MGR.full} (รวมดีลของผู้จัดการด้วย)</p></div>
      <table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${`<tr>${th('ผู้จัดการ')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack',C)}${th('Full',C)}${th('Override',R)}</tr>`}</thead><tbody>${mgr}
