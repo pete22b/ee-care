@@ -212,7 +212,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="income">รับเงิน · สลิป</button>
       <button data-t="receipts">Receipts</button>
       <button data-t="ar">AR · ยอดค้างรับ</button>
-      <button data-t="chist">ประวัติจ่ายรายสัญญา</button>
       <button data-t="ap">AP · ต้องจ่าย</button>
     </div>
     <div class="navgrp">
@@ -360,7 +359,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',chist:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -905,7 +904,6 @@ function render(){
   if(S.tab==='income') return rIncome();
   if(S.tab==='receipts') return rReceipts();
   if(S.tab==='ar') return rAR();
-  if(S.tab==='chist') return rContractHistory();
   if(S.tab==='ap') return rAP();
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
