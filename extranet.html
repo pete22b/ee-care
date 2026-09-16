@@ -203,7 +203,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Stays</button>
       <button data-t="guests">ทะเบียนแขก (DGR)</button>
-      <button data-t="taxi">Taxi (Reception)</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">Marketing</div>
@@ -369,7 +368,7 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',taxi:['sales','finance'],
+const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
@@ -903,9 +902,9 @@ async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไ�
       days[String(dayIdx)]={q:byRep[code].q,qp:byRep[code].qp,ct:byRep[code].ct,pack:byRep[code].pack,full:byRep[code].full};
       ups.push({ id:iw.year+'_'+iw.week+'_'+code, year:iw.year, week:iw.week, period_start:iso(sun), period_end:iso(pe), rep_code:code, rep_name:rp.name||code, team:rp.team||null, role:rp.role||'staff', days, deal:ex.deal||{}, extra:ex.extra||{}, ded:ex.ded||{}, updated_by:'guest-sync', updated_at:new Date().toISOString() }); });
     if(ups.length) await upsert('mkt_dgr',ups);
-    const tx=gs.filter(x=>Number(x.taxi||0)>0).map(x=>({ id:'gtx_'+x.id, tour_date:x.tour_date, guest_name:x.guest_name, opc_code:x.source, amount:Number(x.taxi||0), note:'จากทะเบียนแขก', status:'pending', recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() }));
-    if(tx.length) await upsert('mkt_taxi',tx);
-    toast('สรุปเข้า OPC Wages ('+ups.length+' คน) + Taxi ('+tx.length+' รายการ) แล้ว');
+    const tx=gs.filter(x=>Number(x.taxi||0)>0).map(x=>({ id:'gtx_'+x.id, tour_date:x.tour_date, guest_name:x.guest_name, opc_code:x.source, amount:Number(x.taxi||0), note:'จากทะเบียนแขก', status:'approved', recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() }));
+    if(tx.length){ await upsert('mkt_taxi',tx); for(const t of tx){ await taxiPost(t); } await reloadEL(); }
+    toast('สรุปเข้า OPC Wages ('+ups.length+' คน) + Taxi ค้างจ่าย ('+tx.length+' รายการ → จ่ายที่ Contracts & Payments)');
   }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
 
 function render(){
@@ -920,7 +919,6 @@ function render(){
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
   if(S.tab==='guests') return rGuests();
-  if(S.tab==='taxi') return rTaxi();
   if(S.tab==='mktwages') return rMktWages();
   if(S.tab==='bank') return rBankCash();
   if(S.tab==='companies') return rCompanies();
