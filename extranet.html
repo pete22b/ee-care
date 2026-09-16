@@ -436,21 +436,24 @@ function rMktWages(){ if(S.mktView==='history') return rMktHistory(); const p=mk
 function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; const reps=DB.mktReps||[];
   const R='text-align:right', C='text-align:center';
   const tot={q:0,qp:0,ct:0,pack:0,full:0,tour:0,bonus:0,gross:0,ded:0,net:0}; let rows='';
-  reps.forEach(rp=>{ const m=S.mktData[rp.code]; const c=mktCalc(m); Object.keys(tot).forEach(k=>tot[k]+=c[k]);
+  reps.forEach(rp=>{ const m=S.mktData[rp.code]; const raw=mktCalc(m); const isMgr=rp.role==='manager';
+    const c = isMgr ? Object.assign({},raw,{tour:0,bonus:0,extra:0,gross:0,ded:0,net:0}) : raw;
+    Object.keys(tot).forEach(k=>tot[k]+=c[k]);
     const inp=(grp,sub,val)=>`<input type="number" min="0" value="${val||0}" onchange="mktSet('${rp.code}','${grp}','${sub}',this.value)" style="width:52px;${C};padding:5px;border:1px solid var(--line);border-radius:6px">`;
+    const dim=`<td style="${C};opacity:.4;background:var(--bg)"><span class="mini" title="ผู้จัดการไม่รับค่าทัวร์ของตัวเอง">—</span></td>`;
     rows+=`<tr>
-      <td style="white-space:nowrap"><b>${esc(rp.code)}</b> ${esc(rp.name)}${rp.role==='manager'?' <span class="pill fc">Mgr</span>':''}</td>
-      <td style="${C}">${inp('days','q',m.days.q)}</td>
-      <td style="${C}">${inp('days','qp',m.days.qp)}</td>
-      <td style="${C}">${inp('days','ct',m.days.ct)}</td>
+      <td style="white-space:nowrap"><b>${esc(rp.code)}</b> ${esc(rp.name)}${isMgr?' <span class="pill fc">Mgr</span>':''}</td>
+      ${isMgr?dim:`<td style="${C}">${inp('days','q',m.days.q)}</td>`}
+      ${isMgr?dim:`<td style="${C}">${inp('days','qp',m.days.qp)}</td>`}
+      ${isMgr?dim:`<td style="${C}">${inp('days','ct',m.days.ct)}</td>`}
       <td style="${C}">${inp('deal','pack',m.deal.pack)}</td>
       <td style="${C}">${inp('deal','full',m.deal.full)}</td>
-      <td style="${R}">${fmt(c.tour)}</td>
-      <td style="${R}">${c.bonus?fmt(c.bonus):'—'}</td>
-      <td style="${R}"><b>${fmt(c.gross)}</b></td>
-      <td style="${R};color:var(--expense)">${c.ded?('−'+fmt(c.ded)):'—'}</td>
-      <td style="${R}"><b>${fmt(c.net)}</b></td>
-      <td style="white-space:nowrap"><button class="btn sm ghost" onclick="mktMore('${rp.code}')">หัก/โบนัส…</button> <button class="btn sm ghost" onclick="mktSlip('${rp.code}')" title="Payslip">🧾</button></td>
+      <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':fmt(c.tour)}</td>
+      <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':(c.bonus?fmt(c.bonus):'—')}</td>
+      <td style="${R}">${isMgr?'<span class="mini" style="opacity:.6" title="รับผ่าน Manager override">override</span>':'<b>'+fmt(c.gross)+'</b>'}</td>
+      <td style="${R};color:var(--expense)">${isMgr?'—':(c.ded?('−'+fmt(c.ded)):'—')}</td>
+      <td style="${R}">${isMgr?'—':'<b>'+fmt(c.net)+'</b>'}</td>
+      <td style="white-space:nowrap">${isMgr?'':'<button class="btn sm ghost" onclick="mktMore(\''+rp.code+'\')">หัก/โบนัส…</button> <button class="btn sm ghost" onclick="mktSlip(\''+rp.code+'\')" title="Payslip">🧾</button>'}</td>
     </tr>`; });
   const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line)">${t}</th>`;
   const head=`<tr>${th('พนักงาน')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack<br>5y',C)}${th('Full<br>10/20y',C)}${th('ค่าทัวร์',R)}${th('โบนัส',R)}${th('รวม',R)}${th('หัก',R)}${th('สุทธิ',R)}${th('')}</tr>`;
@@ -506,7 +509,7 @@ async function mktSave(){ const p=mktPeriod(); const reps=DB.mktReps||[];
     days:m.days, deal:m.deal, extra:m.extra, ded:m.ded, updated_at:new Date().toISOString() }; });
   try{ await upsert('mkt_dgr',rows);
     // sync to accounting (Cashflow/P&L) — weekly payroll expense
-    const total=reps.reduce((s,rp)=>s+mktCalc(S.mktData[rp.code]).net,0)+mktOverrideForWeek(reps.map(rp=>Object.assign({team:rp.team,role:rp.role},S.mktData[rp.code])));
+    const total=reps.reduce((s,rp)=>s+(rp.role==='manager'?0:mktCalc(S.mktData[rp.code]).net),0)+mktOverrideForWeek(reps.map(rp=>Object.assign({team:rp.team,role:rp.role},S.mktData[rp.code])));
     const fri=new Date(p.startISO+'T00:00:00'); fri.setDate(fri.getDate()+5);
     await syncWageLine(p.year,p.week,total,iso(fri)); await reloadEL();
     toast('บันทึก + ลงบัญชีแล้ว (สัปดาห์ '+p.week+', '+reps.length+' คน)');
@@ -647,7 +650,7 @@ function mktPaintHistory(){ const body=g('mktbody'); if(!body) return; const row
   if(!rows.length){ body.innerHTML='<div class="emptyc"><div class="big">📊</div>ยังไม่มีข้อมูลย้อนหลัง</div>'; return; }
   const weeks=[...new Set(rows.map(r=>r.week))].sort((a,b)=>a-b);
   const byRep={}, wStaff={}, wMgr={};
-  rows.forEach(r=>{ const c=mktCalc(r); (byRep[r.rep_code]=byRep[r.rep_code]||{})[r.week]=c.net; wStaff[r.week]=(wStaff[r.week]||0)+c.net; });
+  rows.forEach(r=>{ const net=r.role==='manager'?0:mktCalc(r).net; (byRep[r.rep_code]=byRep[r.rep_code]||{})[r.week]=net; wStaff[r.week]=(wStaff[r.week]||0)+net; });
   weeks.forEach(w=>{ wMgr[w]=mktOverrideForWeek(rows.filter(r=>r.week===w)); });
   const wTot={}; weeks.forEach(w=>wTot[w]=(wStaff[w]||0)+(wMgr[w]||0));
   const grand=weeks.reduce((s,w)=>s+wTot[w],0);
