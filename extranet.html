@@ -455,9 +455,10 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
   const dayChips=[0,1,2,3,4,5,6].map(i=>{ const dt=new Date(p.startISO+'T00:00:00'); dt.setDate(dt.getDate()+i); const on=i===S.mktDay;
     return `<button class="btn sm ${on?'pri':'ghost'}" onclick="S.mktDay=${i};mktPaint()">${DOW[i]} ${dt.getDate()}/${dt.getMonth()+1}</button>`; }).join(' ');
   const dayBar=`<div class="card pad" style="margin-bottom:12px"><div class="mini" style="margin-bottom:6px">📅 กรอกรายวัน (DGR) — เลือกวัน แล้วกรอก Q/Q+/CT/ดีล ของวันนั้น · ยอดสัปดาห์ + ค่าจ้างรวมให้อัตโนมัติ · จ่ายเป็นสัปดาห์</div><div style="display:flex;gap:6px;flex-wrap:wrap">${dayChips}</div></div>`;
-  // team aggregation → per-manager override (จากลูกทีมเท่านั้น ไม่รวมตัวผู้จัดการ)
+  // team aggregation → per-manager override: ทัวร์+ดีลของลูกทีม + "ดีลของ ผจก.เอง" (ไม่รวมทัวร์ ผจก.เอง)
   const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; const tm=(teams[t]=teams[t]||{q:0,qp:0,ct:0,pack:0,full:0,mgr:null});
-    if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; tm.pack+=c.pack; tm.full+=c.full; } if(rp.role==='manager') tm.mgr=rp; });
+    if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; tm.pack+=c.pack; tm.full+=c.full; }
+    else { tm.mgr=rp; tm.pack+=c.pack; tm.full+=c.full; } });   // manager's OWN deals count toward override (tours do not)
   const mgrOv={}; Object.values(teams).forEach(tm=>{ if(tm.mgr) mgrOv[tm.mgr.code]=tm.q*MKT_MGR.q+tm.qp*MKT_MGR.qp+tm.ct*MKT_MGR.ct+tm.pack*MKT_MGR.pack+tm.full*MKT_MGR.full; });
   const tot={q:0,qp:0,ct:0,pack:0,full:0,tour:0,bonus:0,gross:0,ded:0,net:0}; let rows='';
   reps.forEach(rp=>{ const m=S.mktData[rp.code]; const c=mktCalc(m); Object.keys(tot).forEach(k=>tot[k]+=c[k]);
@@ -486,7 +487,7 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
   let mgr='',mgrTot=0; Object.keys(teams).sort().forEach(t=>{ const tm=teams[t]; if(!tm.mgr) return;
     const ov=mgrOv[tm.mgr.code]||0; mgrTot+=ov;
     mgr+=`<tr><td style="white-space:nowrap">${esc(tm.mgr.name)} <span class="mini">(ทีม ${esc(t)})</span></td><td style="${C}">${tm.q}</td><td style="${C}">${tm.qp}</td><td style="${C}">${tm.ct}</td><td style="${C}">${tm.pack}</td><td style="${C}">${tm.full}</td><td style="${R}"><b>${fB(ov)}</b></td></tr>`; });
-  const mgrHtml=mgr?`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="pad" style="padding-bottom:0"><h2 style="margin:0 0 4px">Manager override</h2><p class="mini" style="margin:0 0 8px">override จากลูกทีมเท่านั้น: Q ${MKT_MGR.q} · Q+ ${MKT_MGR.qp} · CT ${MKT_MGR.ct} · Pack ${MKT_MGR.pack} · Full ${MKT_MGR.full} · (ผู้จัดการรับค่าจ้างงานตัวเองในตารางบนเหมือนพนักงาน)</p></div>
+  const mgrHtml=mgr?`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="pad" style="padding-bottom:0"><h2 style="margin:0 0 4px">Manager override</h2><p class="mini" style="margin:0 0 8px">ทัวร์+ดีลของลูกทีม + ดีลของ ผจก.เอง (ไม่รวมทัวร์ ผจก.): Q ${MKT_MGR.q} · Q+ ${MKT_MGR.qp} · CT ${MKT_MGR.ct} · Pack ${MKT_MGR.pack} · Full ${MKT_MGR.full} · (ค่าจ้างงานตัวเองของ ผจก. อยู่ตารางบนเหมือนพนักงาน)</p></div>
      <table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${`<tr>${th('ผู้จัดการ')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack',C)}${th('Full',C)}${th('Override',R)}</tr>`}</thead><tbody>${mgr}
      <tr style="border-top:2px solid var(--line);font-weight:700"><td>รวม override</td><td colspan="5"></td><td style="${R}">${fB(mgrTot)}</td></tr></tbody></table></div>`:'';
   const payroll=tot.net+mgrTot;
@@ -659,8 +660,9 @@ function rMktHistory(){
    <div id="mktbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
   mktLoadHistory().then(mktPaintHistory).catch(e=>{ const b=g('mktbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
 function mktOverrideForWeek(rows){ const teams={}; rows.forEach(r=>{ const c=mktCalc(r); const t=r.team||'-'; const tm=(teams[t]=teams[t]||{amt:0,mgr:false});
-    if(r.role!=='manager') tm.amt+=c.q*MKT_MGR.q+c.qp*MKT_MGR.qp+c.ct*MKT_MGR.ct+c.pack*MKT_MGR.pack+c.full*MKT_MGR.full;  // override จากลูกทีมเท่านั้น
-    if(r.role==='manager') tm.mgr=true; });
+    if(r.role!=='manager') tm.amt+=c.q*MKT_MGR.q+c.qp*MKT_MGR.qp+c.ct*MKT_MGR.ct+c.pack*MKT_MGR.pack+c.full*MKT_MGR.full;  // ลูกทีม: ทัวร์+ดีล
+    else { tm.mgr=true; tm.amt+=c.pack*MKT_MGR.pack+c.full*MKT_MGR.full; }  // ผจก.: ดีลของตัวเองเท่านั้น (ทัวร์ไม่ได้)
+  });
   let ov=0; Object.values(teams).forEach(tm=>{ if(tm.mgr) ov+=tm.amt; }); return ov; }
 function mktSpark(vals,w,h){ if(!vals.length) return ''; const mx=Math.max(...vals,1); const dx=vals.length>1?w/(vals.length-1):0;
   const pts=vals.map((v,i)=>[i*dx, h-(v/mx)*(h-4)-2]); const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
