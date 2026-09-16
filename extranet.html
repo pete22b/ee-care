@@ -201,7 +201,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <div class="navgrp">
       <div class="navlbl">Member Service</div>
       <button data-t="bookings">Bookings</button>
-      <button data-t="stays">Stays</button>
+      <button data-t="stays">Member Benefits</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">Marketing</div>
@@ -2011,7 +2011,7 @@ function rStays(){
   const groups=membershipContracts().filter(g=>!(g.meta&&g.meta.subscription));
   let blocked=0, eligible=0, upsell=0;
   groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; const u=upsellInfo(g); if(u&&u.upsell) upsell++; });
-  const head=`<div class="head"><div><h1>Stays &amp; Eligibility</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div></div>`;
+  const head=`<div class="head"><div><h1>Member Benefits</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div></div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
     <div class="kpi"><div class="v" style="color:var(--income)">${eligible}</div><div class="l">Eligible to stay</div></div>
