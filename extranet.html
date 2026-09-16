@@ -1832,7 +1832,7 @@ function rBookings(){
       <td class="mini">${esc(b.requests||'')}</td>
       <td>${elig}${roomPill}</td>
       <td>${pill}</td>
-      <td style="white-space:nowrap">${act} <button class="btn link" onclick="openBooking('${esc(b.id)}')">details</button></td></tr>`;
+      <td style="white-space:nowrap">${act}${(st==='confirmed'&&cno&&!(el&&el.blocked))?` <button class="btn link" onclick="bookingToStay('${esc(b.id)}')">→ log stay</button>`:''} <button class="btn link" onclick="openBooking('${esc(b.id)}')">details</button></td></tr>`;
   }).join('');
   const body= list.length===0
     ? `<div class="card"><div class="emptyc"><div class="big">📩</div><h2 style="margin:10px 0 4px">No booking requests yet</h2><p class="mini" style="max-width:460px;margin:0 auto">When a member submits "Book Your Stay" on the website, it appears here automatically (via Formspree webhook).</p></div></div>`
@@ -1869,6 +1869,14 @@ async function saveNewBooking(){
   try{ await api('cf_bookings',{method:'POST',prefer:'return=minimal',body:JSON.stringify([row])});
     closeModal(); toast('บันทึก booking แล้ว'); await loadAll(); S.tab='bookings'; render();
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); if(btn){ btn.disabled=false; btn.textContent='บันทึก booking'; } }
+}
+function bookingToStay(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return;
+  const cno=bookingContract(b); if(!cno){ toast('booking นี้ยังไม่ผูกเลขสัญญา — ใส่เลขสัญญาก่อน'); return openBooking(id); }
+  if(!canTab('stays')){ toast('ไม่มีสิทธิ์เข้าหน้า Member Benefits'); return; }
+  const el=eligibility(cno);
+  if(el.blocked && !confirm('⚠ '+cno+' ค้างค่าบริหาร (MFEE) — ปกติพักไม่ได้จนกว่าจะจ่าย\nไปหน้า log stay ต่อไหม?')) return;
+  const yr=Number((b.check_in||TODAY).slice(0,4));
+  goto('stays'); setTimeout(()=>{ try{ openStay(cno,yr); }catch(e){ toast('เปิด log stay ไม่ได้: '+e.message); } },140);
 }
 async function setBooking(id,status){ try{ await patchRow('cf_bookings',id,{status,updated_by:USER&&USER.email}); toast('Updated'); await loadAll(); S.tab='bookings'; render(); }catch(e){ toast('Failed: '+e.message); } }
 async function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b);
