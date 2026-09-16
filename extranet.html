@@ -155,6 +155,26 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   .sidecard button{padding:8px 12px;font-size:12px;border-radius:9px}
   .top{top:0}}
 [hidden]{display:none!important}
+/* ---- Contract payment history ---- */
+.chgrid{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
+.chside{position:sticky;top:calc(var(--top-h,64px) + 12px);max-height:calc(100vh - var(--top-h,64px) - 40px);display:flex;flex-direction:column}
+.chlist{overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
+.chrow{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 11px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font:inherit;color:inherit;transition:border-color .15s,background .15s}
+.chrow:hover{border-color:var(--brand,#1f5fa0)}
+.chrow.on{background:var(--navy,#123453);border-color:transparent;color:#fff}
+.chrow.on .mini,.chrow.on b{color:#fff}
+.chrow-top{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.chrow-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.chbar{background:var(--line2,#eee);border-radius:6px;height:5px;overflow:hidden}
+.chrow.on .chbar{background:rgba(255,255,255,.22)}
+.chbar-fill{height:100%;background:var(--income,#2f7d5b);border-radius:6px}
+.chtl{position:relative;display:flex;flex-direction:column;gap:2px}
+.chtl-item{display:grid;grid-template-columns:16px 1fr;gap:10px;padding:8px 0;position:relative}
+.chtl-item:not(:last-child)::before{content:"";position:absolute;left:7px;top:18px;bottom:-8px;width:2px;background:var(--line)}
+.chtl-dot{width:12px;height:12px;border-radius:50%;margin-top:4px;z-index:1;box-shadow:0 0 0 3px var(--surface)}
+.chtl-row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.chtl-amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:820px){ .chgrid{grid-template-columns:1fr} .chside{position:static;max-height:none} .chlist{max-height:300px} }
 </style>
 </head>
 <body>
@@ -192,6 +212,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="income">รับเงิน · สลิป</button>
       <button data-t="receipts">Receipts</button>
       <button data-t="ar">AR · ยอดค้างรับ</button>
+      <button data-t="chist">ประวัติจ่ายรายสัญญา</button>
       <button data-t="ap">AP · ต้องจ่าย</button>
     </div>
     <div class="navgrp">
@@ -339,7 +360,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',chist:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -884,6 +905,7 @@ function render(){
   if(S.tab==='income') return rIncome();
   if(S.tab==='receipts') return rReceipts();
   if(S.tab==='ar') return rAR();
+  if(S.tab==='chist') return rContractHistory();
   if(S.tab==='ap') return rAP();
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
@@ -1476,6 +1498,90 @@ function openSlipView(id){ const r=(DB.incomeSlips||[]).find(x=>x.id===id); if(!
    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${['สัญญา','ประเภท','ช่องทาง','จำนวน'].map(h=>`<th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--ink3);padding:6px">${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml||'<tr><td colspan=4 class=mini>—</td></tr>'}</tbody></table></div>
    ${r.doc_path?`<div style="margin-top:10px">📎 <a href="#" onclick="openFile('cf-receipts','${esc(r.doc_path)}');return false">${esc(r.doc_name||'เอกสาร')}</a></div>`:''}
    <div class="right" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn" onclick="closeModal();goto('receipts')">ไปที่ Receipts</button></div>`);
+}
+
+/* ============ Contract payment history — one contract, all its slips/instalments on a timeline ============ */
+const CH_TYPE={deposit:'มัดจำ',installment:'งวดผ่อน',admin:'ค่าธรรมเนียม',mfee:'ค่าบริหารรายปี',booking:'ค่าจอง',
+  ii_fee:'Interval',ii_renewal:'Interval ต่ออายุ',ii_exchange:'Interval แลกสัปดาห์'};
+function chTypeLabel(t){ return CH_TYPE[t]||t||'อื่นๆ'; }
+function chData(){
+  const g={};
+  allLines().forEach(({l,e})=>{ if(e.kind!=='income') return;
+    const cat=e.category||('entry:'+e.id);
+    const o=(g[cat]=g[cat]||{cat,cno:e.category||null,name:'',ptype:'',lines:[],tot:0,paid:0,out:0,n:0,paidN:0,ents:{}});
+    o.ents[e.id]=e;
+    if(e.description&&!o.name) o.name=(e.description||'').replace(/\n/g,' & ');
+    if(e.meta&&e.meta.product_type&&!o.ptype) o.ptype=e.meta.product_type;
+    const a=Number(l.amount||0); o.lines.push({l,e}); o.n++; o.tot+=a;
+    if(l.paid){ o.paid+=Number(l.paid_amount!=null?l.paid_amount:a); o.paidN++; } else o.out+=a;
+  });
+  return Object.values(g).sort((a,b)=>(a.cat<b.cat?-1:1));
+}
+function chSelect(cat){ S.chSel=cat; render(); setTimeout(()=>{ const d=g('ch_detail'); if(d) d.scrollIntoView({behavior:'smooth',block:'start'}); },60); }
+function chSearch(v){ S.chQ=v; const list=g('ch_list'); if(list) list.innerHTML=chListHtml(); }
+function chListHtml(){
+  const q=(S.chQ||'').trim().toLowerCase();
+  let data=chData();
+  if(q) data=data.filter(o=>(o.cat+' '+o.name).toLowerCase().indexOf(q)>=0);
+  if(!data.length) return '<div class="emptyc" style="padding:20px">ไม่พบสัญญา</div>';
+  return data.map(o=>{ const pct=o.tot>0?Math.min(100,o.paid/o.tot*100):0; const done=o.out<=0&&o.paidN>0; const on=S.chSel===o.cat;
+    return `<button class="chrow${on?' on':''}" onclick="chSelect('${esc(o.cat)}')">
+      <div class="chrow-top"><b>${esc(o.cat)}</b>${done?'<span class="pill inc" style="font-size:9.5px">ครบ</span>':(o.out>0?'<span class="mini" style="color:var(--ink3)">'+o.paidN+'/'+o.n+'</span>':'')}</div>
+      <div class="mini chrow-name">${esc(o.name||'—')}</div>
+      <div class="chbar"><div class="chbar-fill" style="width:${pct.toFixed(0)}%"></div></div>
+    </button>`; }).join('');
+}
+function rContractHistory(){
+  const data=chData();
+  if(S.chSel && !data.some(o=>o.cat===S.chSel)) S.chSel=null;
+  const head=`<div class="head"><div><h1>ประวัติจ่ายรายสัญญา</h1><p class="mini">เลือกสัญญา แล้วดูทุกงวด/ทุกสลิปที่จ่ายเข้ามา รวมไว้ในไทม์ไลน์เดียว · ยอดจ่ายแล้ว / คงเหลือ</p></div></div>`;
+  const panel=`<div class="chgrid">
+    <div class="card pad chside">
+      <input id="ch_search" placeholder="ค้นหาสัญญา / ชื่อลูกค้า…" value="${esc(S.chQ||'')}" oninput="chSearch(this.value)" style="width:100%;margin-bottom:10px">
+      <div id="ch_list" class="chlist">${chListHtml()}</div>
+    </div>
+    <div id="ch_detail" class="chdetail">${chDetailHtml(S.chSel)}</div>
+  </div>`;
+  g('main').innerHTML=head+panel;
+}
+function chDetailHtml(cat){
+  if(!cat) return `<div class="card"><div class="emptyc" style="padding:40px"><div class="big">👈</div>เลือกสัญญาทางซ้ายเพื่อดูประวัติการจ่าย</div></div>`;
+  const o=chData().find(x=>x.cat===cat); if(!o) return '';
+  const rows=o.lines.slice().sort((a,b)=>{ const da=a.l.paid?(a.l.paid_date||a.l.txn_date):a.l.txn_date, db=b.l.paid?(b.l.paid_date||b.l.txn_date):b.l.txn_date; return da<db?-1:(da>db?1:0); });
+  const mainE=Object.values(o.ents)[0]||{};
+  const cp=o.cno?contractPathFor(o.cno):{path:null};
+  const scan=cp.path?` · 📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">สัญญา PDF</a>`:'';
+  const pct=o.tot>0?Math.min(100,o.paid/o.tot*100):0;
+  const kpis=`<div class="kpis" style="margin-bottom:14px">
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(o.paid)}</div><div class="l">จ่ายแล้ว (${o.paidN}/${o.n} งวด)</div></div>
+    <div class="kpi"><div class="v" style="color:${o.out>0?'var(--expense)':'var(--ink)'}">${fmt(o.out)}</div><div class="l">คงเหลือ</div></div>
+    <div class="kpi"><div class="v">${fmt(o.tot)}</div><div class="l">มูลค่ารวมตามสัญญา</div></div></div>`;
+  const bar=`<div class="chbar" style="height:8px;margin:0 0 16px"><div class="chbar-fill" style="width:${pct.toFixed(0)}%"></div></div>`;
+  const tl=rows.map(({l,e})=>{
+    const paid=!!l.paid; const dt=paid?(l.paid_date||l.txn_date):l.txn_date;
+    const overdue=!paid && l.txn_date<TODAY;
+    const dot=paid?'var(--income)':(overdue?'var(--expense)':'var(--ink3)');
+    const proof=l.proof_path?` · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 สลิป</a>`:'';
+    const method=paid?(esc(methodLabel(l.method))+cardTag(l)):'';
+    const stpill=paid?'<span class="pill inc">✓ จ่ายแล้ว</span>':(overdue?'<span class="pill exp">เกินกำหนด</span>':'<span class="pill off">รอจ่าย</span>');
+    const note=l.paid_note?`<div class="mini" style="color:var(--ink3);margin-top:2px">${esc(l.paid_note)}</div>`:'';
+    return `<div class="chtl-item">
+      <div class="chtl-dot" style="background:${dot}"></div>
+      <div class="chtl-body">
+        <div class="chtl-row"><div><b>${chTypeLabel(l.line_type)}</b> <span class="mini" style="color:var(--ink3)">${esc(l.memo||'')}</span></div><div class="chtl-amt">${fmt(l.paid_amount!=null&&paid?l.paid_amount:l.amount)}</div></div>
+        <div class="mini" style="color:var(--ink2)">${fmtDate(dt)} ${stpill} ${method?'· '+method:''}${proof}</div>
+        ${note}
+      </div></div>`;
+  }).join('');
+  return `<div class="card">
+    <div class="pad" style="border-bottom:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+        <div><h2 style="margin:0;font-size:22px">${esc(o.cat)}</h2><div class="mini" style="color:var(--ink2);margin-top:2px">${esc(o.name||'—')}${o.ptype?' · '+esc(o.ptype):''}${scan}</div></div>
+        ${o.out<=0&&o.paidN>0?'<span class="pill inc">ชำระครบ</span>':''}
+      </div>
+    </div>
+    <div class="pad">${kpis}${bar}<div class="chtl">${tl}</div></div>
+  </div>`;
 }
 
 function rReceipts(){
