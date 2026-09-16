@@ -459,12 +459,12 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
     <td style="${C}">${tot.pack}</td><td style="${C}">${tot.full}</td><td style="${R}">${fmt(tot.tour)}</td><td style="${R}">${fmt(tot.bonus)}</td>
     <td style="${R}">${fmt(tot.gross)}</td><td style="${R};color:var(--expense)">−${fmt(tot.ded)}</td><td style="${R}">${fmt(tot.net)}</td><td></td></tr>`;
   // manager override
-  const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; teams[t]=teams[t]||{agg:{q:0,qp:0,ct:0,pack:0,full:0},mgr:null};
-    ['q','qp','ct','pack','full'].forEach(k=>teams[t].agg[k]+=c[k]); if(rp.role==='manager') teams[t].mgr=rp; });
+  const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; const tm=(teams[t]=teams[t]||{q:0,qp:0,ct:0,pack:0,full:0,mgr:null});
+    tm.pack+=c.pack; tm.full+=c.full; if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; } if(rp.role==='manager') tm.mgr=rp; });
   let mgr='',mgrTot=0; Object.keys(teams).sort().forEach(t=>{ const tm=teams[t]; if(!tm.mgr) return;
-    const a=tm.agg, ov=a.q*MKT_MGR.q+a.qp*MKT_MGR.qp+a.ct*MKT_MGR.ct+a.pack*MKT_MGR.pack+a.full*MKT_MGR.full; mgrTot+=ov;
-    mgr+=`<tr><td style="white-space:nowrap">${esc(tm.mgr.name)} <span class="mini">(ทีม ${esc(t)})</span></td><td style="${C}">${a.q}</td><td style="${C}">${a.qp}</td><td style="${C}">${a.ct}</td><td style="${C}">${a.pack}</td><td style="${C}">${a.full}</td><td style="${R}"><b>${fmt(ov)}</b></td></tr>`; });
-  const mgrHtml=mgr?`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="pad" style="padding-bottom:0"><h2 style="margin:0 0 4px">Manager override</h2><p class="mini" style="margin:0 0 8px">โอเวอร์ไรด์ผู้จัดการจากยอดทีม (Q ${MKT_MGR.q} · Q+ ${MKT_MGR.qp} · CT ${MKT_MGR.ct} · Pack ${MKT_MGR.pack} · Full ${MKT_MGR.full})</p></div>
+    const ov=tm.q*MKT_MGR.q+tm.qp*MKT_MGR.qp+tm.ct*MKT_MGR.ct+tm.pack*MKT_MGR.pack+tm.full*MKT_MGR.full; mgrTot+=ov;
+    mgr+=`<tr><td style="white-space:nowrap">${esc(tm.mgr.name)} <span class="mini">(ทีม ${esc(t)})</span></td><td style="${C}">${tm.q}</td><td style="${C}">${tm.qp}</td><td style="${C}">${tm.ct}</td><td style="${C}">${tm.pack}</td><td style="${C}">${tm.full}</td><td style="${R}"><b>${fmt(ov)}</b></td></tr>`; });
+  const mgrHtml=mgr?`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="pad" style="padding-bottom:0"><h2 style="margin:0 0 4px">Manager override</h2><p class="mini" style="margin:0 0 8px">Q ${MKT_MGR.q} · Q+ ${MKT_MGR.qp} · CT ${MKT_MGR.ct} (เฉพาะทัวร์ลูกทีม ไม่รวมทัวร์ผู้จัดการเอง) · ดีล Pack ${MKT_MGR.pack} · Full ${MKT_MGR.full} (รวมดีลของผู้จัดการด้วย)</p></div>
      <table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${`<tr>${th('ผู้จัดการ')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack',C)}${th('Full',C)}${th('Override',R)}</tr>`}</thead><tbody>${mgr}
      <tr style="border-top:2px solid var(--line);font-weight:700"><td>รวม override</td><td colspan="5"></td><td style="${R}">${fmt(mgrTot)}</td></tr></tbody></table></div>`:'';
   const payroll=tot.net+mgrTot;
@@ -634,8 +634,11 @@ function rMktHistory(){
   g('main').innerHTML=`<div class="head"><div><h1>OPC Wages · สรุปย้อนหลัง</h1><p class="mini">ค่าจ้างสุทธิรายสัปดาห์ต่อคน · ปี 2026</p></div></div>${mktSeg()}
    <div id="mktbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
   mktLoadHistory().then(mktPaintHistory).catch(e=>{ const b=g('mktbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
-function mktOverrideForWeek(rows){ const teams={}; rows.forEach(r=>{ const c=mktCalc(r); const t=r.team||'-'; teams[t]=teams[t]||{a:{q:0,qp:0,ct:0,pack:0,full:0},mgr:false}; ['q','qp','ct','pack','full'].forEach(k=>teams[t].a[k]+=c[k]); if(r.role==='manager') teams[t].mgr=true; });
-  let ov=0; Object.values(teams).forEach(tm=>{ if(tm.mgr){ const a=tm.a; ov+=a.q*MKT_MGR.q+a.qp*MKT_MGR.qp+a.ct*MKT_MGR.ct+a.pack*MKT_MGR.pack+a.full*MKT_MGR.full; } }); return ov; }
+function mktOverrideForWeek(rows){ const teams={}; rows.forEach(r=>{ const c=mktCalc(r); const t=r.team||'-'; const tm=(teams[t]=teams[t]||{tour:0,deal:0,mgr:false});
+    tm.deal+=c.pack*MKT_MGR.pack+c.full*MKT_MGR.full;                                   // deal bonus: whole team incl manager
+    if(r.role!=='manager') tm.tour+=c.q*MKT_MGR.q+c.qp*MKT_MGR.qp+c.ct*MKT_MGR.ct;      // tour override: exclude manager's own tours
+    if(r.role==='manager') tm.mgr=true; });
+  let ov=0; Object.values(teams).forEach(tm=>{ if(tm.mgr) ov+=tm.tour+tm.deal; }); return ov; }
 function mktSpark(vals,w,h){ if(!vals.length) return ''; const mx=Math.max(...vals,1); const dx=vals.length>1?w/(vals.length-1):0;
   const pts=vals.map((v,i)=>[i*dx, h-(v/mx)*(h-4)-2]); const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   const last=pts[pts.length-1];
