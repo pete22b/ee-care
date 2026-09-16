@@ -469,8 +469,8 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
       <td style="${C}">${dinp('pack')}</td>
       <td style="${C}">${dinp('full')}</td>
       <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':fB(c.tour)}</td>
-      <td style="${R}">${isMgr?(ov?fB(ov):'—')+'<br><span class="mini" style="opacity:.6">override</span>':(c.bonus?fB(c.bonus):'—')}</td>
-      <td style="${R}"><b>${isMgr?fB(mGross):fB(c.gross)}</b></td>
+      <td style="${R}">${isMgr?(raw.extra?fB(raw.extra):'—'):(c.bonus?fB(c.bonus):'—')}</td>
+      <td style="${R}"><b>${isMgr?fB(mGross):fB(c.gross)}</b>${isMgr?'<br><span class="mini" style="opacity:.6">override'+(raw.extra?'+โบนัส':'')+'</span>':''}</td>
       <td style="${R};color:var(--expense)">${isMgr?(mDed?('−'+fB(mDed)):'—'):(c.ded?('−'+fB(c.ded)):'—')}</td>
       <td style="${R}"><b>${isMgr?fB(mNet):fB(c.net)}</b></td>
       <td style="white-space:nowrap"><button class="btn sm ghost" onclick="mktMore('${rp.code}')">หัก/โบนัส…</button> <button class="btn sm ghost" onclick="mktSlip('${rp.code}')" title="Payslip">🧾</button></td>
