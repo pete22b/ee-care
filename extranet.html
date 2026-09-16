@@ -205,7 +205,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="navgrp">
       <div class="navlbl">Marketing</div>
-      <button data-t="guests">Daily Guest Register (DGR)</button>
+      <button data-t="guests">Daily Guest Register</button>
       <button data-t="mktwages">OPC Wages</button>
     </div>
     <div class="navgrp">
@@ -1808,7 +1808,7 @@ function rBookings(){
   const cnt=k=>list.filter(b=>(b.status||'new')===k).length;
   const upcoming=list.filter(b=>b.check_in && b.check_in>=TODAY && (b.status||'new')!=='declined').length;
   let rows=list.slice(); if(f!=='all') rows=rows.filter(b=>(b.status||'new')===f);
-  const head=`<div class="head"><div><h1>Bookings</h1><p class="mini">Concierge stay requests from the website (Formspree). Email still goes to the team; every request is also recorded here — with a Management-Fee eligibility check.</p></div></div>`;
+  const head=`<div class="head"><div><h1>Bookings</h1><p class="mini">Stay requests from the website (Formspree) — plus phone / walk-in bookings entered here. Every request gets a Management-Fee eligibility check.</p></div><button class="btn pri" onclick="openNewBooking()">+ New booking (phone / walk-in)</button></div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v" style="color:var(--brand)">${cnt('new')}</div><div class="l">New requests</div></div>
     <div class="kpi"><div class="v">${cnt('confirmed')}</div><div class="l">Confirmed</div></div>
@@ -1838,6 +1838,37 @@ function rBookings(){
     ? `<div class="card"><div class="emptyc"><div class="big">📩</div><h2 style="margin:10px 0 4px">No booking requests yet</h2><p class="mini" style="max-width:460px;margin:0 auto">When a member submits "Book Your Stay" on the website, it appears here automatically (via Formspree webhook).</p></div></div>`
     : `<div class="scroll"><table><thead><tr><th>Received</th><th>Member</th><th>Email</th><th>Stay</th><th>Requests</th><th>Eligibility</th><th>Status</th><th></th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="8" style="opacity:.5;padding:16px">None in this filter.</td></tr>'}</tbody></table></div>`;
   g('main').innerHTML=head+kpis+seg+body;
+}
+function openNewBooking(){
+  openModal(`<h2>New booking · phone / walk-in</h2>
+   <div class="mini" style="margin-bottom:10px">บันทึกคำขอเข้าพักที่รับทางโทร/หน้างานเอง — จะเข้าคิวเดียวกับที่มาจากเว็บ + ตรวจสิทธิ์ MFEE ให้อัตโนมัติ</div>
+   <div class="grid2">
+     <div><label>ช่องทาง</label><select id="nb_source"><option value="phone">โทรศัพท์</option><option value="walkin">Walk-in</option><option value="email">Email</option><option value="other">อื่นๆ</option></select></div>
+     <div><label>เลขสัญญา / สมาชิก</label><input id="nb_member" placeholder="EST/1009/5/AH/T1"></div>
+     <div class="full"><label>ชื่อสมาชิก</label><input id="nb_name" placeholder="Mr. ..."></div>
+     <div><label>อีเมล</label><input id="nb_email" type="email" placeholder="(ถ้ามี)"></div>
+     <div><label>โทรศัพท์</label><input id="nb_phone" placeholder="(ถ้ามี)"></div>
+     <div><label>Check-in</label><input id="nb_in" type="date"></div>
+     <div><label>Check-out</label><input id="nb_out" type="date"></div>
+     <div><label>จำนวนผู้เข้าพัก</label><input id="nb_guests" type="number" min="1" value="2"></div>
+     <div class="full"><label>คำขอ / หมายเหตุ</label><input id="nb_req" placeholder="เช่น ห้องวิวทะเล, รับที่สนามบิน"></div>
+   </div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nb_save" onclick="saveNewBooking()">บันทึก booking</button></div>`);
+}
+async function saveNewBooking(){
+  const name=(g('nb_name').value||'').trim(); const mem=(g('nb_member').value||'').trim();
+  if(!name && !mem){ toast('กรอกชื่อสมาชิกหรือเลขสัญญาอย่างน้อย 1 อย่าง'); return; }
+  const btn=g('nb_save'); if(btn){ btn.disabled=true; btn.textContent='กำลังบันทึก…'; }
+  const ci=g('nb_in').value||null, co=g('nb_out').value||null;
+  const row={ id:uid('bk'), member_name:name||null, membership_no:mem||null, contract:mem||null,
+    email:(g('nb_email').value||'').trim()||null, guests:parseInt(g('nb_guests').value)||null,
+    check_in:ci, check_out:co, requests:(g('nb_req').value||'').trim()||null,
+    status:'new', source:g('nb_source').value||'phone',
+    raw:{phone:(g('nb_phone').value||'').trim()||null, entered_by:(USER&&USER.email)||null, manual:true},
+    note:'บันทึกเอง ('+(g('nb_source').value||'phone')+')', updated_by:(USER&&USER.email)||null, created_at:new Date().toISOString() };
+  try{ await api('cf_bookings',{method:'POST',prefer:'return=minimal',body:JSON.stringify([row])});
+    closeModal(); toast('บันทึก booking แล้ว'); await loadAll(); S.tab='bookings'; render();
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); if(btn){ btn.disabled=false; btn.textContent='บันทึก booking'; } }
 }
 async function setBooking(id,status){ try{ await patchRow('cf_bookings',id,{status,updated_by:USER&&USER.email}); toast('Updated'); await loadAll(); S.tab='bookings'; render(); }catch(e){ toast('Failed: '+e.message); } }
 async function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id); if(!b) return; const cno=bookingContract(b);
