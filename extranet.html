@@ -604,11 +604,12 @@ function rAR(tgt){ const data=arData();
   data.forEach(o=>{ T.out+=o.out;T.over+=o.over;T.cur+=o.cur;T.b1+=o.b1;T.b2+=o.b2;T.b3+=o.b3;T.b4+=o.b4; });
   const R='text-align:right', C='text-align:center';
   const head=`<div class="head"><div><h1>AR · ยอดค้างรับ (Aging)</h1><p class="mini">ยอดค้างรับจากสมาชิกรายสัญญา · แยกช่วงอายุหนี้ · กดตัดจ่ายที่ Receipts</p></div></div>`;
-  const kpis=`<div class="kpis" style="margin-bottom:16px">
-    <div class="kpi"><div class="v">${fmt(T.out)}</div><div class="l">ยอดค้างรับรวม (${data.length} สัญญา)</div></div>
-    <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(T.over)}</div><div class="l">เกินกำหนดชำระ</div></div>
-    <div class="kpi"><div class="v">${fmt(T.cur)}</div><div class="l">ยังไม่ถึงกำหนด</div></div>
-    <div class="kpi"><div class="v" style="color:${T.b4>0?'var(--expense)':'var(--ink)'}">${fmt(T.b4)}</div><div class="l">ค้างเกิน 90 วัน</div></div></div>`;
+  const kpis=`<div class="kpis" style="margin-bottom:6px">
+    <div class="kpi" style="border-left:3px solid var(--expense)"><div class="v" style="color:var(--expense)">${fmt(T.over)}</div><div class="l">🔴 เกินกำหนด · ต้องตามเก็บ</div></div>
+    <div class="kpi"><div class="v" style="color:var(--income)">${fmt(T.cur)}</div><div class="l">🟢 ยังไม่ถึงกำหนด (งวด/MFEE อนาคต)</div></div>
+    <div class="kpi"><div class="v">${fmt(T.out)}</div><div class="l">มูลค่าคงเหลือรวม (${data.length} สัญญา)</div></div>
+    <div class="kpi"><div class="v" style="color:${T.b4>0?'var(--expense)':'var(--ink)'}">${fmt(T.b4)}</div><div class="l">ค้างเกิน 90 วัน</div></div></div>
+  <p class="mini" style="margin:0 0 14px;color:var(--ink2)">ยอด <b>เกินกำหนด</b> คือที่ต้องตามเก็บจริง · <b>มูลค่าคงเหลือรวม</b> รวมงวดผ่อนอนาคต + MFEE ปีถัดไป (ยังไม่ถึงเวลาเก็บ)</p>`;
   // aging summary bar
   const buckets=[['ยังไม่ถึงกำหนด',T.cur,'#2f7d5b'],['1–30 วัน',T.b1,'#a9812a'],['31–60',T.b2,'#c67b1e'],['61–90',T.b3,'#d8583c'],['90+',T.b4,'#b0201a']];
   const bmax=Math.max(...buckets.map(b=>b[1]),1);
