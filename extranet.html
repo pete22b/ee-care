@@ -1612,6 +1612,74 @@ function chDetailHtml(cat){
   </div>`;
 }
 
+/* ============ New Contract — Member Service creates a sale; auto-generates deposit + instalments + MFEE ============ */
+function canAddContract(){ return !!(USER&&USER.is_admin) || hasCat('sales') || hasCat('finance'); }
+const NC_PRODUCTS=['EST','ESG','ESP','EX','CUG','EVIP','TCU','VIP','KUD'];
+function ncPrefill(){ /* recompute total + per-instalment preview */
+  const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0, n=parseInt(g('nc_ninst').value)||0;
+  const tot=net+adm; const rem=Math.max(0,tot-dep); const per=n>0?Math.round(rem/n*100)/100:0;
+  const box=g('nc_preview'); if(box) box.innerHTML=`รวม <b>${curSym()}${tot.toLocaleString('en-US')}</b> · มัดจำ ${curSym()}${dep.toLocaleString('en-US')} · คงเหลือ ${curSym()}${rem.toLocaleString('en-US')}${n>0?' → '+n+' งวด × ~'+curSym()+per.toLocaleString('en-US'):''}`;
+}
+function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิทธิ์เพิ่มสัญญา'); return; }
+  const nextMonth=addMonthsISO(TODAY.slice(0,7)+'-01',1).slice(0,10);
+  openModal(`<h2>New Contract · สัญญาใหม่</h2>
+   <div class="mini" style="margin-bottom:10px">Member Service กรอกตอนปิดดีล + ออกเลขสัญญา → ระบบสร้างตารางมัดจำ/งวด/MFEE ให้อัตโนมัติ</div>
+   <div class="grid2">
+     <div><label>เลขสัญญา *</label><input id="nc_cno" placeholder="EST/1013/5/AH/T1"></div>
+     <div><label>ประเภทสินค้า</label><select id="nc_product">${NC_PRODUCTS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+     <div class="full"><label>ชื่อสมาชิก (บรรทัดละคน)</label><input id="nc_name" placeholder="John Smith &amp; Jane Smith"></div>
+     <div><label>สัญชาติ</label><input id="nc_nat" placeholder="Australian"></div>
+     <div><label>อีเมล</label><input id="nc_email" type="email"></div>
+     <div><label>โทรศัพท์</label><input id="nc_phone"></div>
+     <div><label>วันเซ็น / วันมัดจำ</label><input id="nc_signdate" type="date" value="${TODAY}"></div>
+     <div><label>Net price (USD)</label><input type="number" id="nc_net" value="0" oninput="ncPrefill()"></div>
+     <div><label>Admin fee (USD)</label><input type="number" id="nc_admin" value="0" oninput="ncPrefill()"></div>
+     <div><label>มัดจำ Deposit (USD)</label><input type="number" id="nc_dep" value="0" oninput="ncPrefill()"></div>
+     <div><label>จำนวนงวด (หลังมัดจำ)</label><input type="number" id="nc_ninst" value="12" oninput="ncPrefill()"></div>
+     <div><label>งวดแรก (วันที่)</label><input id="nc_inst1" type="date" value="${nextMonth}"></div>
+   </div>
+   <div class="mini" id="nc_preview" style="margin:8px 2px;padding:8px 10px;background:var(--surface2,#faf8f3);border:1px solid var(--line);border-radius:8px"></div>
+   <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">MFEE / ค่าบริหารรายปี (timeshare — เว้นว่างถ้าไม่มี)</div>
+   <div class="grid2">
+     <div><label>MFEE ต่อปี (USD)</label><input type="number" id="nc_mfee" value="0"></div>
+     <div><label>จำนวนปี MFEE</label><input type="number" id="nc_mfeeyrs" value="0"></div>
+     <div><label>ปีแรกที่เก็บ MFEE</label><input type="number" id="nc_mfeey1" placeholder="2028"></div>
+     <div><label>ปีเข้าพักแรก (FYO)</label><input type="number" id="nc_fyo" placeholder="2027"></div>
+   </div></div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nc_save" onclick="saveNewContract()">สร้างสัญญา</button></div>`);
+  ncPrefill();
+}
+async function saveNewContract(){
+  const cno=(g('nc_cno').value||'').trim(); if(!cno){ toast('กรอกเลขสัญญา'); return; }
+  const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0;
+  const tot=net+adm; if(tot<=0){ toast('กรอกราคา (Net/Admin)'); return; }
+  if(dep>tot){ toast('มัดจำมากกว่ายอดรวม'); return; }
+  if((DB.entries||[]).some(e=>e.category===cno)){ toast('มีเลขสัญญานี้อยู่แล้ว'); return; }
+  const btn=g('nc_save'); if(btn){ btn.disabled=true; btn.textContent='กำลังสร้าง…'; }
+  try{
+    const n=parseInt(g('nc_ninst').value)||0; const inst1=g('nc_inst1').value||addMonthsISO(TODAY.slice(0,7)+'-01',1).slice(0,10);
+    const signd=g('nc_signdate').value||TODAY; const product=g('nc_product').value;
+    const fyo=parseInt(g('nc_fyo').value)||null;
+    const eid=uid('en'); const nameV=(g('nc_name').value||'').trim();
+    const meta={product_type:product, net_price:net, admin_fee:adm, total_price:tot, source:'new-contract', created_by:(USER&&USER.email)||null};
+    if(fyo) meta.fyo=fyo;
+    const mv=(k,id2)=>{ const el=g(id2); if(el&&el.value.trim()) meta[k]=el.value.trim(); };
+    mv('nationality','nc_nat'); mv('email','nc_email'); mv('phone','nc_phone');
+    await upsert('cf_entries',[{id:eid,kind:'income',title:'Sales - '+product+' '+cno,category:cno,account:(primaryAccount()||{}).id||null,active:true,description:nameV||null,meta}]);
+    const lines=[];
+    lines.push({id:eid+'_l0',entry_id:eid,amount:dep,txn_date:signd,repeat:'never',line_type:'deposit',memo:'มัดจำ'});
+    const rem=Math.max(0,tot-dep);
+    if(n>0 && rem>0){ const per=Math.round(rem/n*100)/100; let acc=0;
+      for(let i=0;i<n;i++){ let amt=(i===n-1)?Math.round((rem-acc)*100)/100:per; acc+=per; lines.push({id:eid+'_l'+(i+1),entry_id:eid,amount:amt,txn_date:addMonthsISO(inst1,i),repeat:'never',line_type:'installment',memo:'งวด '+(i+1)+'/'+n}); }
+    }
+    const mfee=parseFloat(g('nc_mfee').value)||0, myrs=parseInt(g('nc_mfeeyrs').value)||0, my1=parseInt(g('nc_mfeey1').value)||0;
+    if(mfee>0 && myrs>0 && my1>0){ const md=signd.slice(4); for(let i=0;i<myrs;i++){ const y=my1+i; lines.push({id:eid+'_mfee_'+y,entry_id:eid,amount:mfee,txn_date:y+md,repeat:'never',line_type:'mfee',memo:'MFEE '+y}); } }
+    await upsert('cf_lines',lines);
+    await reloadEL();
+    closeModal(); toast('สร้างสัญญา '+cno+' แล้ว · '+lines.length+' รายการ'); S.tab='stays'; render();
+  }catch(e){ toast('สร้างไม่สำเร็จ: '+e.message); if(btn){ btn.disabled=false; btn.textContent='สร้างสัญญา'; } }
+}
+
 function rReceipts(){
   // group by CONTRACT (category); entries with no category fall back to their own id
   const groups={}; const kindOf={};
@@ -2058,7 +2126,7 @@ function rStays(){
   const groups=membershipContracts().filter(g=>!(g.meta&&g.meta.subscription));
   let blocked=0, eligible=0, upsell=0;
   groups.forEach(g=>{ if(eligibility(g.cno).blocked) blocked++; else eligible++; const u=upsellInfo(g); if(u&&u.upsell) upsell++; });
-  const head=`<div class="head"><div><h1>Member Benefits</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div></div>`;
+  const head=`<div class="head"><div><h1>Member Benefits</h1><p class="mini">Members may not stay while a Management Fee (MFEE) is outstanding. Interval membership is tracked for renewal / upsell.</p></div>${canAddContract()?'<button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
     <div class="kpi"><div class="v" style="color:var(--income)">${eligible}</div><div class="l">Eligible to stay</div></div>
