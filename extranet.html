@@ -213,7 +213,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="receipts">Contracts &amp; Payments</button>
       <button data-t="bank">Cash &amp; Bank</button>
       <button data-t="cashflow">Cash Flow</button>
-      <button data-t="income">รับเงิน · สลิป</button>
+      <button data-t="income">Record Payment</button>
       <button data-t="ar">AR · ยอดค้างรับ</button>
       <button data-t="ap">AP · ต้องจ่าย</button>
     </div>
@@ -1403,7 +1403,7 @@ function ccToMethod(t){ t=(t||'').toLowerCase();
 function incomeCanEdit(){ return !!(USER&&USER.is_admin) || hasCat('finance') || hasCat('sales'); }
 async function loadIncomeSlips(){ let rows=[]; try{ rows=await api('cf_income_slips?select=*&order=slip_date.desc&limit=300')||[]; }catch(e){} DB.incomeSlips=rows; }
 function rIncome(){
-  g('main').innerHTML=`<div class="head"><div><h1>รับเงิน · สลิป (Income Slips)</h1><p class="mini">reception บันทึกสลิป/ฟอร์มรับเงิน (BBL EDC ฯลฯ) แนบเอกสาร → ตัดยอดค้างรับ (AR) อัตโนมัติ · ลงบัญชีที่ Receipts</p></div>
+  g('main').innerHTML=`<div class="head"><div><h1>Record Payment</h1><p class="mini">คีย์สลิป/ฟอร์มรับเงิน (BBL EDC ฯลฯ) แนบเอกสาร → ตัดยอดค้างรับ (AR) อัตโนมัติ · ลงบัญชีที่ Contracts &amp; Payments</p></div>
     ${incomeCanEdit()?'<button class="btn pri" onclick="openSlipModal()">+ บันทึกสลิปใหม่</button>':''}</div>
    <div id="incbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
   loadIncomeSlips().then(incomePaint).catch(e=>{ const b=g('incbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; });
