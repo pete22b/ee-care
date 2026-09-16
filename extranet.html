@@ -410,12 +410,20 @@ async function mktLoad(){ await loadMktBase(); const p=mktPeriod();
   (DB.mktReps||[]).forEach(rp=>{ const r=by[rp.code]||{};
     S.mktData[rp.code]={ days:Object.assign({q:0,qp:0,ct:0},r.days||{}), deal:Object.assign({pack:0,full:0},r.deal||{}),
       extra:Object.assign({sunday:0,double:0,backpay:0},r.extra||{}), ded:Object.assign({tax:0,ss:0,dac:0,chargeback:0,hold:0},r.ded||{}) }; }); }
-function mktCalc(m){ const w=m.days||{},dl=m.deal||{},ex=m.extra||{},de=m.ded||{};
-  const q=+w.q||0,qp=+w.qp||0,ct=+w.ct||0,pack=+dl.pack||0,full=+dl.full||0;
+/* weekly totals = sum of daily buckets (days["0".."6"]) + legacy top-level q/qp/ct + legacy deal{} */
+function mktWeek(m){ const d=(m&&m.days)||{}; let q=0,qp=0,ct=0,pack=0,full=0;
+  for(const k in d){ const x=d[k]; if(x&&typeof x==='object'){ q+=+x.q||0;qp+=+x.qp||0;ct+=+x.ct||0;pack+=+x.pack||0;full+=+x.full||0; } }
+  if(typeof d.q!=='object' && ('q' in d||'qp' in d||'ct' in d)){ q+=+d.q||0;qp+=+d.qp||0;ct+=+d.ct||0; }
+  if(m&&m.deal){ pack+=+m.deal.pack||0; full+=+m.deal.full||0; }
+  return {q,qp,ct,pack,full}; }
+function mktCalc(m){ const wk=mktWeek(m),ex=(m&&m.extra)||{},de=(m&&m.ded)||{};
+  const q=wk.q,qp=wk.qp,ct=wk.ct,pack=wk.pack,full=wk.full;
   const tour=q*MKT_RATE.q+qp*MKT_RATE.qp+ct*MKT_RATE.ct, bonus=pack*MKT_RATE.pack+full*MKT_RATE.full;
   const extra=(+ex.sunday||0)+(+ex.double||0)+(+ex.backpay||0), gross=tour+bonus+extra;
   const ded=(+de.tax||0)+(+de.ss||0)+(+de.dac||0)+(+de.chargeback||0)+(+de.hold||0);
   return {q,qp,ct,pack,full,tour,bonus,extra,gross,ded,net:gross-ded}; }
+function mktSetDay(code,field,val){ const m=S.mktData&&S.mktData[code]; if(!m) return; m.days=m.days||{}; const d=String(S.mktDay==null?0:S.mktDay); m.days[d]=m.days[d]||{}; m.days[d][field]=parseFloat(val)||0; mktPaint(); }
+function mktDayVal(m,field){ const d=(m&&m.days&&m.days[String(S.mktDay==null?0:S.mktDay)])||{}; return d[field]||0; }
 function mktSeg(){ return `<div class="seg" style="margin-bottom:14px"><button class="${S.mktView==='history'?'':'on'}" onclick="S.mktView='entry';render()">กรอกรายสัปดาห์</button><button class="${S.mktView==='history'?'on':''}" onclick="S.mktView='history';render()">สรุปย้อนหลัง</button></div>`; }
 function rMktWages(){ if(S.mktView==='history') return rMktHistory(); const p=mktPeriod();
   g('main').innerHTML=`<div class="head"><div><h1>OPC Wages · DGR</h1><p class="mini">ค่าจ้างทีมการตลาด/OPC รายสัปดาห์ — คำนวณอัตโนมัติจาก Q/Q+/CT และโบนัสดีล</p></div></div>${mktSeg()}
@@ -436,6 +444,11 @@ function rMktWages(){ if(S.mktView==='history') return rMktHistory(); const p=mk
   mktLoad().then(mktPaint).catch(e=>{ const b=g('mktbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
 function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; const reps=DB.mktReps||[];
   const R='text-align:right', C='text-align:center';
+  const p=mktPeriod(); if(S.mktDay==null){ const wd=new Date().getDay(); S.mktDay=wd; }
+  const DOW=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const dayChips=[0,1,2,3,4,5,6].map(i=>{ const dt=new Date(p.startISO+'T00:00:00'); dt.setDate(dt.getDate()+i); const on=i===S.mktDay;
+    return `<button class="btn sm ${on?'pri':'ghost'}" onclick="S.mktDay=${i};mktPaint()">${DOW[i]} ${dt.getDate()}/${dt.getMonth()+1}</button>`; }).join(' ');
+  const dayBar=`<div class="card pad" style="margin-bottom:12px"><div class="mini" style="margin-bottom:6px">📅 กรอกรายวัน (DGR) — เลือกวัน แล้วกรอก Q/Q+/CT/ดีล ของวันนั้น · ยอดสัปดาห์ + ค่าจ้างรวมให้อัตโนมัติ · จ่ายเป็นสัปดาห์</div><div style="display:flex;gap:6px;flex-wrap:wrap">${dayChips}</div></div>`;
   // team aggregation → per-manager override (computed first so manager rows can show it live)
   const teams={}; reps.forEach(rp=>{ const c=mktCalc(S.mktData[rp.code]); const t=rp.team||'-'; const tm=(teams[t]=teams[t]||{q:0,qp:0,ct:0,pack:0,full:0,mgr:null});
     tm.pack+=c.pack; tm.full+=c.full; if(rp.role!=='manager'){ tm.q+=c.q; tm.qp+=c.qp; tm.ct+=c.ct; } if(rp.role==='manager') tm.mgr=rp; });
@@ -446,15 +459,15 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
     Object.keys(tot).forEach(k=>tot[k]+=c[k]);
     const ov = isMgr ? (mgrOv[rp.code]||0) : 0;
     const mGross = ov + raw.extra, mDed = raw.ded, mNet = mGross - mDed; if(isMgr) mgrNetTot += mNet;
-    const inp=(grp,sub,val)=>`<input type="number" min="0" value="${val||0}" onchange="mktSet('${rp.code}','${grp}','${sub}',this.value)" style="width:52px;${C};padding:5px;border:1px solid var(--line);border-radius:6px">`;
+    const dinp=(field)=>`<input type="number" min="0" value="${mktDayVal(m,field)}" onchange="mktSetDay('${rp.code}','${field}',this.value)" style="width:52px;${C};padding:5px;border:1px solid var(--line);border-radius:6px">`;
     const dim=`<td style="${C};opacity:.4;background:var(--bg)"><span class="mini" title="ผู้จัดการไม่รับค่าทัวร์ของตัวเอง">—</span></td>`;
     rows+=`<tr>
       <td style="white-space:nowrap"><b>${esc(rp.code)}</b> ${esc(rp.name)}${isMgr?' <span class="pill fc">Mgr</span>':''}</td>
-      ${isMgr?dim:`<td style="${C}">${inp('days','q',m.days.q)}</td>`}
-      ${isMgr?dim:`<td style="${C}">${inp('days','qp',m.days.qp)}</td>`}
-      ${isMgr?dim:`<td style="${C}">${inp('days','ct',m.days.ct)}</td>`}
-      <td style="${C}">${inp('deal','pack',m.deal.pack)}</td>
-      <td style="${C}">${inp('deal','full',m.deal.full)}</td>
+      ${isMgr?dim:`<td style="${C}">${dinp('q')}</td>`}
+      ${isMgr?dim:`<td style="${C}">${dinp('qp')}</td>`}
+      ${isMgr?dim:`<td style="${C}">${dinp('ct')}</td>`}
+      <td style="${C}">${dinp('pack')}</td>
+      <td style="${C}">${dinp('full')}</td>
       <td style="${R}${isMgr?';opacity:.4':''}">${isMgr?'—':fB(c.tour)}</td>
       <td style="${R}">${isMgr?(ov?fB(ov):'—')+'<br><span class="mini" style="opacity:.6">override</span>':(c.bonus?fB(c.bonus):'—')}</td>
       <td style="${R}"><b>${isMgr?fB(mGross):fB(c.gross)}</b></td>
@@ -463,9 +476,9 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
       <td style="white-space:nowrap"><button class="btn sm ghost" onclick="mktMore('${rp.code}')">หัก/โบนัส…</button> <button class="btn sm ghost" onclick="mktSlip('${rp.code}')" title="Payslip">🧾</button></td>
     </tr>`; });
   const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line)">${t}</th>`;
-  const head=`<tr>${th('พนักงาน')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack<br>5y',C)}${th('Full<br>10/20y',C)}${th('ค่าทัวร์',R)}${th('โบนัส',R)}${th('รวม',R)}${th('หัก',R)}${th('สุทธิ',R)}${th('')}</tr>`;
+  const head=`<tr>${th('พนักงาน')}${th('Q<br><span style=\'font-weight:400;text-transform:none;color:var(--ink3)\'>วัน</span>',C)}${th('Q+<br><span style=\'font-weight:400;text-transform:none;color:var(--ink3)\'>วัน</span>',C)}${th('CT<br><span style=\'font-weight:400;text-transform:none;color:var(--ink3)\'>วัน</span>',C)}${th('Pack<br>5y',C)}${th('Full<br>10/20y',C)}${th('ค่าทัวร์<br><span style=\'font-weight:400;text-transform:none;color:var(--ink3)\'>สัปดาห์</span>',R)}${th('โบนัส',R)}${th('รวม',R)}${th('หัก',R)}${th('สุทธิ',R)}${th('')}</tr>`;
   const totR=`<tr style="border-top:2px solid var(--line);font-weight:700">
-    <td>รวม (${reps.length} คน)</td><td style="${C}">${tot.q}</td><td style="${C}">${tot.qp}</td><td style="${C}">${tot.ct}</td>
+    <td>รวมสัปดาห์ (${reps.length} คน)</td><td style="${C}">${tot.q}</td><td style="${C}">${tot.qp}</td><td style="${C}">${tot.ct}</td>
     <td style="${C}">${tot.pack}</td><td style="${C}">${tot.full}</td><td style="${R}">${fB(tot.tour)}</td><td style="${R}">${fB(tot.bonus)}</td>
     <td style="${R}">${fB(tot.gross)}</td><td style="${R};color:var(--expense)">−${fB(tot.ded)}</td><td style="${R}">${fB(tot.net)}</td><td></td></tr>`;
   // manager override (reuse teams + mgrOv computed above)
@@ -476,7 +489,7 @@ function mktPaint(){ const body=g('mktbody'); if(!body||!S.mktData) return; cons
      <table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${`<tr>${th('ผู้จัดการ')}${th('Q',C)}${th('Q+',C)}${th('CT',C)}${th('Pack',C)}${th('Full',C)}${th('Override',R)}</tr>`}</thead><tbody>${mgr}
      <tr style="border-top:2px solid var(--line);font-weight:700"><td>รวม override</td><td colspan="5"></td><td style="${R}">${fB(mgrTot)}</td></tr></tbody></table></div>`:'';
   const payroll=tot.net+mgrNetTot;
-  body.innerHTML=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${head}</thead><tbody>${rows}${totR}</tbody></table></div>
+  body.innerHTML=dayBar+`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><thead>${head}</thead><tbody>${rows}${totR}</tbody></table></div>
    ${mgrHtml}
    <div class="card pad" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
      <div class="mini">ยอดจ่ายรวมสัปดาห์นี้ (พนักงานสุทธิ + manager override)</div>
