@@ -407,8 +407,14 @@ async function loadMktBase(){ if(!DB.mktReps){ try{ DB.mktReps=await api('mkt_re
 async function mktLoad(){ await loadMktBase(); const p=mktPeriod();
   let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.'+p.year+'&week=eq.'+p.week)||[]; }catch(e){}
   const by={}; rows.forEach(r=>by[r.rep_code]=r); S.mktData={};
-  (DB.mktReps||[]).forEach(rp=>{ const r=by[rp.code]||{};
-    S.mktData[rp.code]={ days:Object.assign({q:0,qp:0,ct:0},r.days||{}), deal:Object.assign({pack:0,full:0},r.deal||{}),
+  (DB.mktReps||[]).forEach(rp=>{ const r=by[rp.code]||{}; const rd=r.days||{};
+    // build day-keyed buckets 0..6; migrate any legacy weekly (top-level q/qp/ct + deal{}) into วันอาทิตย์ (day 0)
+    const days={}; for(let i=0;i<7;i++){ if(rd[i]&&typeof rd[i]==='object') days[String(i)]=Object.assign({},rd[i]); }
+    const hasLegacy = (typeof rd.q!=='object' && ((+rd.q||0)||(+rd.qp||0)||(+rd.ct||0))) || (r.deal && ((+r.deal.pack||0)||(+r.deal.full||0)));
+    if(hasLegacy){ const d0=days['0']=days['0']||{};
+      d0.q=(+d0.q||0)+(+rd.q||0); d0.qp=(+d0.qp||0)+(+rd.qp||0); d0.ct=(+d0.ct||0)+(+rd.ct||0);
+      if(r.deal){ d0.pack=(+d0.pack||0)+(+r.deal.pack||0); d0.full=(+d0.full||0)+(+r.deal.full||0); } }
+    S.mktData[rp.code]={ days, deal:{},
       extra:Object.assign({sunday:0,double:0,backpay:0},r.extra||{}), ded:Object.assign({tax:0,ss:0,dac:0,chargeback:0,hold:0},r.ded||{}) }; }); }
 /* weekly totals = sum of daily buckets (days["0".."6"]) + legacy top-level q/qp/ct + legacy deal{} */
 function mktWeek(m){ const d=(m&&m.days)||{}; let q=0,qp=0,ct=0,pack=0,full=0;
