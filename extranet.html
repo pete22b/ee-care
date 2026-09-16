@@ -199,13 +199,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="reports">Reports</button>
     </div>
     <div class="navgrp">
-      <div class="navlbl">Sales &amp; Guests</div>
+      <div class="navlbl">Member Service</div>
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Stays</button>
-      <button data-t="guests">ทะเบียนแขก (DGR)</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">Marketing</div>
+      <button data-t="guests">ทะเบียนแขก (DGR)</button>
       <button data-t="mktwages">OPC Wages</button>
     </div>
     <div class="navgrp">
@@ -368,7 +368,7 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',
+const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
@@ -579,6 +579,10 @@ async function taxiPost(row){ await ensureExpEntry('en_mkt_taxi','ค่าแ�
   const pm=row.deal?{deal:true,deal_contract:row.contract||null}:null;
   await upsert('cf_lines',[{id:'ln_taxi_'+row.id,entry_id:'en_mkt_taxi',amount:Number(row.amount||0),txn_date:row.tour_date||TODAY,repeat:'never',line_type:'taxi',memo:'ค่าแท็กซี่'+(row.guest_name?(' · '+row.guest_name):'')+(row.opc_code?(' · '+row.opc_code):'')+dealRef,paid:false,proof_path:row.doc_path||null,proof_name:row.doc_name||null,pay_meta:pm}]); }
 async function taxiUnpost(id){ try{ await api('cf_lines?id=eq.'+encodeURIComponent('ln_taxi_'+id),{method:'DELETE',prefer:'return=minimal'}); }catch(e){} }
+async function voucherPost(row){ await ensureExpEntry('en_mkt_voucher','เวาเชอร์อาหารเช้า (City Ledger)','Breakfast Voucher');
+  const dealRef=row.deal?(row.contract?(' · ดีล '+row.contract):' · ดีล (รอเลขสัญญา)'):'';
+  const pm=row.deal?{deal:true,deal_contract:row.contract||null}:null;
+  await upsert('cf_lines',[{id:'ln_vch_'+row.id,entry_id:'en_mkt_voucher',amount:Number(row.amount||0),txn_date:row.tour_date||TODAY,repeat:'never',line_type:'voucher',memo:'เวาเชอร์อาหารเช้า'+(row.note?(' '+row.note):'')+(row.guest_name?(' · '+row.guest_name):'')+dealRef,paid:false,proof_path:row.doc_path||null,proof_name:row.doc_name||null,pay_meta:pm}]); }
 
 /* ============ AR — receivables by customer + aging ============ */
 function arDaysOverdue(d){ return Math.round((Date.parse(TODAY)-Date.parse(d))/86400000); }
@@ -882,6 +886,9 @@ function openGuestModal(id){ const x=id?(DB.guests||[]).find(y=>y.id===id):null;
      <div><label>Manager</label><input id="g_manager" value="${x?esc(x.manager||''):''}"></div>
      <div><label>ค่าแท็กซี่ (฿)</label><input type="number" id="g_taxi" value="${x?(x.taxi||0):(S.taxiRate||0)}"></div>
      <div class="full"><label>หลักฐานค่าแท็กซี่ (สลิป/ใบเสร็จ — ส่งให้บัญชีจ่าย)</label><input type="file" id="g_taxidoc" accept="image/*,application/pdf">${x&&x.taxi_doc_path?'<div class="mini" style="margin-top:3px">แนบแล้ว: '+esc(x.taxi_doc_name||'ไฟล์')+' · <a href="#" onclick="openFile(\'cf-receipts\',\''+esc(x.taxi_doc_path)+'\');return false">ดู</a></div>':''}</div>
+     <div><label>เวาเชอร์อาหารเช้า (฿)</label><input type="number" id="g_voucher" value="${x?(x.voucher_amt||0):0}" placeholder="0"></div>
+     <div><label>หมายเหตุเวาเชอร์</label><input id="g_vouchernote" value="${x?esc(x.voucher_note||''):''}" placeholder="เช่น breakfast 2 ท่าน"></div>
+     <div class="full"><label>หลักฐานเวาเชอร์ (city ledger / บิลโรงแรม — ส่งให้บัญชีจ่าย)</label><input type="file" id="g_voucherdoc" accept="image/*,application/pdf">${x&&x.voucher_doc_path?'<div class="mini" style="margin-top:3px">แนบแล้ว: '+esc(x.voucher_doc_name||'ไฟล์')+' · <a href="#" onclick="openFile(\'cf-receipts\',\''+esc(x.voucher_doc_path)+'\');return false">ดู</a></div>':''}</div>
      <div><label>Gift 1</label><input id="g_gift1" value="${x?esc(x.gift1||''):''}"></div>
      <div><label>Gift 2</label><input id="g_gift2" value="${x?esc(x.gift2||''):''}"></div>
      <div><label>โรงแรม</label><input id="g_hotel" value="${x?esc(x.hotel||''):''}"></div>
@@ -895,7 +902,10 @@ async function saveGuest(id){ const gid=id||uid('g'); const prev=id?(DB.guests||
   let doc_path=prev?prev.taxi_doc_path:null, doc_name=prev?prev.taxi_doc_name:null;
   const file=g('g_taxidoc')&&g('g_taxidoc').files[0];
   if(file){ try{ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); const p='taxi/'+gid+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',p,file); doc_path=p; doc_name=file.name; }catch(e){ toast('อัปโหลดหลักฐานไม่สำเร็จ: '+e.message); return; } }
-  const row={ id:gid, tour_date:S.guestDate, line:g('g_line').value||null, guest_name:(g('g_name').value||'').trim()||null, nationality:(g('g_nat').value||'').trim()||null, marital:g('g_marital').value||null, time_in:g('g_tin').value||null, time_out:g('g_tout').value||null, program:g('g_program').value||null, source:g('g_source').value||null, qual:g('g_qual').value||null, closer:(g('g_closer').value||'').trim()||null, manager:(g('g_manager').value||'').trim()||null, taxi:parseFloat(g('g_taxi').value)||0, taxi_doc_path:doc_path, taxi_doc_name:doc_name, gift1:g('g_gift1').value||null, gift2:g('g_gift2').value||null, hotel:g('g_hotel').value||null, deal:!!g('g_deal').value, deal_term:g('g_term').value||null, contract_no:(g('g_contract').value||'').trim()||null, comments:(g('g_comments').value||'').trim()||null, recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() };
+  let vpath=prev?prev.voucher_doc_path:null, vname=prev?prev.voucher_doc_name:null;
+  const vfile=g('g_voucherdoc')&&g('g_voucherdoc').files[0];
+  if(vfile){ try{ const ext=(vfile.name.split('.').pop()||'bin').toLowerCase(); const p='voucher/'+gid+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',p,vfile); vpath=p; vname=vfile.name; }catch(e){ toast('อัปโหลดหลักฐานเวาเชอร์ไม่สำเร็จ: '+e.message); return; } }
+  const row={ id:gid, tour_date:S.guestDate, line:g('g_line').value||null, guest_name:(g('g_name').value||'').trim()||null, nationality:(g('g_nat').value||'').trim()||null, marital:g('g_marital').value||null, time_in:g('g_tin').value||null, time_out:g('g_tout').value||null, program:g('g_program').value||null, source:g('g_source').value||null, qual:g('g_qual').value||null, closer:(g('g_closer').value||'').trim()||null, manager:(g('g_manager').value||'').trim()||null, taxi:parseFloat(g('g_taxi').value)||0, taxi_doc_path:doc_path, taxi_doc_name:doc_name, voucher_amt:parseFloat(g('g_voucher').value)||0, voucher_note:(g('g_vouchernote').value||'').trim()||null, voucher_doc_path:vpath, voucher_doc_name:vname, gift1:g('g_gift1').value||null, gift2:g('g_gift2').value||null, hotel:g('g_hotel').value||null, deal:!!g('g_deal').value, deal_term:g('g_term').value||null, contract_no:(g('g_contract').value||'').trim()||null, comments:(g('g_comments').value||'').trim()||null, recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() };
   try{ await upsert('mkt_guests',[row]); closeModal(); toast('บันทึกแล้ว'); await loadGuests(); guestPaint(); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
 async function delGuest(id){ if(!confirm('ลบรายการแขกนี้?')) return; try{ await api('mkt_guests?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); closeModal(); await loadGuests(); guestPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
 async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไม่มีแขกให้สรุป'); return; }
@@ -910,8 +920,11 @@ async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไ�
       ups.push({ id:iw.year+'_'+iw.week+'_'+code, year:iw.year, week:iw.week, period_start:iso(sun), period_end:iso(pe), rep_code:code, rep_name:rp.name||code, team:rp.team||null, role:rp.role||'staff', days, deal:ex.deal||{}, extra:ex.extra||{}, ded:ex.ded||{}, updated_by:'guest-sync', updated_at:new Date().toISOString() }); });
     if(ups.length) await upsert('mkt_dgr',ups);
     const tx=gs.filter(x=>Number(x.taxi||0)>0).map(x=>({ id:'gtx_'+x.id, tour_date:x.tour_date, guest_name:x.guest_name, opc_code:x.source, amount:Number(x.taxi||0), note:'จากทะเบียนแขก', status:'approved', deal:!!x.deal, contract:(x.deal&&x.contract_no)?x.contract_no:null, doc_path:x.taxi_doc_path||null, doc_name:x.taxi_doc_name||null, recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() }));
-    if(tx.length){ await upsert('mkt_taxi',tx); for(const t of tx){ await taxiPost(t); } await reloadEL(); }
-    toast('สรุปเข้า OPC Wages ('+ups.length+' คน) + Taxi ค้างจ่าย ('+tx.length+' รายการ → จ่ายที่ Contracts & Payments)');
+    if(tx.length){ await upsert('mkt_taxi',tx); for(const t of tx){ await taxiPost(t); } }
+    const vc=gs.filter(x=>Number(x.voucher_amt||0)>0).map(x=>({ id:x.id, tour_date:x.tour_date, guest_name:x.guest_name, amount:Number(x.voucher_amt||0), note:x.voucher_note||'', deal:!!x.deal, contract:(x.deal&&x.contract_no)?x.contract_no:null, doc_path:x.voucher_doc_path||null, doc_name:x.voucher_doc_name||null }));
+    for(const v of vc){ await voucherPost(v); }
+    if(tx.length||vc.length) await reloadEL();
+    toast('สรุปเข้า OPC Wages ('+ups.length+' คน) · Taxi ('+tx.length+') · เวาเชอร์ ('+vc.length+') → ค้างจ่ายที่ Contracts & Payments');
   }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
 
 function render(){
