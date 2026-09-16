@@ -155,6 +155,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   .sidecard button{padding:8px 12px;font-size:12px;border-radius:9px}
   .top{top:0}}
 [hidden]{display:none!important}
+/* ---- proof/slip inline preview ---- */
+.proofview{margin-top:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface2,#faf8f3);min-height:60px;display:flex;align-items:center;justify-content:center}
+.proofview img{display:block;max-width:100%;height:auto}
+.proofview iframe{width:100%;height:460px;border:0;background:#fff}
 /* ---- Contract payment history ---- */
 .chgrid{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
 .chside{position:sticky;top:calc(var(--top-h,64px) + 12px);max-height:calc(100vh - var(--top-h,64px) - 40px);display:flex;flex-direction:column}
@@ -297,6 +301,14 @@ async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURICom
 /* ---- storage (payment slips + contract scans) ---- */
 async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
 async function openFile(bucket, path){ try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
+async function embedProof(bucket, path, name, elId){ const box=g(elId); if(!box) return;
+  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error;
+    const url=data.signedUrl; const ext=((name||path).split('.').pop()||'').toLowerCase();
+    if(['pdf'].includes(ext)) box.innerHTML=`<iframe src="${url}#toolbar=1" title="สลิป"></iframe>`;
+    else if(['png','jpg','jpeg','gif','webp','bmp'].includes(ext)) box.innerHTML=`<a href="${url}" target="_blank" title="คลิกเพื่อดูเต็มจอ"><img src="${url}" alt="สลิป"></a>`;
+    else box.innerHTML=`<a href="${url}" target="_blank">เปิดไฟล์หลักฐาน</a>`;
+  }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้ — กด “เปิดเต็มจอ” ด้านบน</span>'; }
+}
 function methodLabel(m){ return {transfer:'Transfer · credit advice',card:'Card slip',cash:'Cash',other:'Other'}[m]||m||''; }
 function cardTag(l){ const p=l&&l.pay_meta; if(!p||!(p.card_last4||p.card_brand)) return '';
   const tip=[p.card_brand,p.card_last4?'••'+p.card_last4:'',p.card_thb?'THB '+Number(p.card_thb).toLocaleString():'',p.card_ref?'ref '+p.card_ref:'',p.card_auth?'auth '+p.card_auth:''].filter(Boolean).join(' · ');
@@ -1674,10 +1686,12 @@ function openLockedView(l,e){
      <div><label>Reference / note</label><div>${esc(l.paid_note||'—')}</div></div>
    </div>
    ${(pm.card_last4||pm.card_brand)?`<div class="full" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">💳 Card slip</div><div class="mini">${[pm.card_brand,pm.card_last4?'••'+esc(pm.card_last4):'',pm.card_thb?'THB '+Number(pm.card_thb).toLocaleString():'',pm.card_ref?'ref '+esc(pm.card_ref):'',pm.card_auth?'auth '+esc(pm.card_auth):'',pm.card_term?esc(pm.card_term):''].filter(Boolean).join(' · ')}</div></div>`:''}
-   ${l.proof_path?`<div style="margin-top:10px">📎 หลักฐาน: <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">${esc(l.proof_name||'file')}</a></div>`:''}
+   ${l.proof_path?`<div style="margin-top:10px">📎 หลักฐาน (สลิป): <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">${esc(l.proof_name||'file')}</a> · <a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false">เปิดเต็มจอ</a></div>
+   <div id="lv_preview" class="proofview">กำลังโหลดสลิป…</div>`:'<div class="mini" style="margin-top:10px;opacity:.5">ไม่มีหลักฐานแนบ</div>'}
    <div style="margin-top:14px"><label>ประวัติการเปลี่ยนแปลง (audit)</label><div id="r_audit" style="margin-top:4px">กำลังโหลด…</div></div>
    <div class="right"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn" onclick="unlockPay('${esc(l.id)}')">🔓 Unlock to edit</button></div>`);
   loadPayAudit(l.id);
+  if(l.proof_path) embedProof('cf-receipts', l.proof_path, l.proof_name, 'lv_preview');
 }
 function markReceived(lineId){
   const l=DB.lines.find(x=>x.id===lineId); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
