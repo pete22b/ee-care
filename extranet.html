@@ -214,8 +214,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="bank">Cash &amp; Bank</button>
       <button data-t="cashflow">Cash Flow</button>
       <button data-t="income">Record Payment</button>
-      <button data-t="ar">AR · ยอดค้างรับ</button>
-      <button data-t="ap">AP · ต้องจ่าย</button>
+      <button data-t="arap">AR / AP</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">System</div>
@@ -370,7 +369,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',arap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -600,7 +599,7 @@ function arData(){
   });
   return Object.values(g).sort((a,b)=>b.over-a.over || b.out-a.out);
 }
-function rAR(){ const data=arData();
+function rAR(tgt){ const data=arData();
   const T={out:0,over:0,cur:0,b1:0,b2:0,b3:0,b4:0};
   data.forEach(o=>{ T.out+=o.out;T.over+=o.over;T.cur+=o.cur;T.b1+=o.b1;T.b2+=o.b2;T.b3+=o.b3;T.b4+=o.b4; });
   const R='text-align:right', C='text-align:center';
@@ -636,7 +635,7 @@ function rAR(){ const data=arData();
   const totR=`<tr style="border-top:2px solid var(--line);font-weight:700">
     <td>รวม</td><td style="${R}">${fmt(T.out)}</td><td style="${R}">${fmt(T.cur)}</td><td style="${R}">${fmt(T.b1)}</td><td style="${R}">${fmt(T.b2)}</td><td style="${R}">${fmt(T.b3)}</td><td style="${R}">${fmt(T.b4)}</td><td></td><td></td></tr>`;
   const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('สัญญา / ลูกค้า')}${th('ค้างรวม',R)}${th('ยังไม่ถึง',R)}${th('1–30',R)}${th('31–60',R)}${th('61–90',R)}${th('90+',R)}${th('สถานะ',C)}${th('',R)}</tr></thead><tbody>${trs}${data.length?totR:''}</tbody></table></div>`;
-  g('main').innerHTML=head+kpis+aging+table;
+  (tgt?g(tgt):g('main')).innerHTML=(tgt?'':head)+kpis+aging+table;
 }
 function arGo(cat){ goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
   setTimeout(()=>{ const el=g('rc_'+cssId(cat)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600); } },90); }
@@ -654,7 +653,7 @@ function apData(){
   });
   return Object.values(g).sort((a,b)=>b.over-a.over || b.out-a.out);
 }
-function rAP(){ const data=apData();
+function rAP(tgt){ const data=apData();
   const T={out:0,over:0,cur:0,soon:0,b1:0,b2:0,b3:0,b4:0};
   data.forEach(o=>{ T.out+=o.out;T.over+=o.over;T.cur+=o.cur;T.soon+=o.soon;T.b1+=o.b1;T.b2+=o.b2;T.b3+=o.b3;T.b4+=o.b4; });
   const R='text-align:right', C='text-align:center';
@@ -689,9 +688,20 @@ function rAP(){ const data=apData();
   const totR=`<tr style="border-top:2px solid var(--line);font-weight:700">
     <td>รวม</td><td style="${R};color:var(--expense)">${fmt(T.out)}</td><td style="${R}">${fmt(T.cur)}</td><td style="${R}">${fmt(T.b1)}</td><td style="${R}">${fmt(T.b2)}</td><td style="${R}">${fmt(T.b3)}</td><td style="${R}">${fmt(T.b4)}</td><td></td><td></td></tr>`;
   const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('เจ้าหนี้ / รายการ')}${th('ค้างจ่าย',R)}${th('ยังไม่ถึง',R)}${th('1–30',R)}${th('31–60',R)}${th('61–90',R)}${th('90+',R)}${th('สถานะ',C)}${th('',R)}</tr></thead><tbody>${trs}${data.length?totR:''}</tbody></table></div>`;
-  g('main').innerHTML=head+kpis+aging+table;
+  (tgt?g(tgt):g('main')).innerHTML=(tgt?'':head)+kpis+aging+table;
 }
 
+/* ---- AR + AP combined page ---- */
+function rARAP(){ const v=S.arapView||'ar';
+  const arT=arData().reduce((s,o)=>s+o.out,0), apT=apData().reduce((s,o)=>s+o.out,0);
+  g('main').innerHTML=`<div class="head"><div><h1>AR / AP · ลูกหนี้ &amp; เจ้าหนี้</h1><p class="mini">ยอดค้างรับ (AR) และยอดค้างจ่าย (AP) ในหน้าเดียว · สลับดูได้</p></div></div>
+   <div class="toolbar" style="margin-bottom:14px"><div class="seg">
+     <button class="${v==='ar'?'on':''}" onclick="S.arapView='ar';render()">📥 ยอดค้างรับ · AR (${fmt(arT)})</button>
+     <button class="${v==='ap'?'on':''}" onclick="S.arapView='ap';render()">📤 ต้องจ่าย · AP (${fmt(apT)})</button>
+   </div></div>
+   <div id="arap_body"></div>`;
+  if(v==='ap') rAP('arap_body'); else rAR('arap_body');
+}
 /* ---- OPC Wages history / trends ---- */
 async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
 function rMktHistory(){
@@ -936,6 +946,7 @@ function render(){
   if(S.tab==='receipts') return rReceipts();
   if(S.tab==='ar') return rAR();
   if(S.tab==='ap') return rAP();
+  if(S.tab==='arap') return rARAP();
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
   if(S.tab==='guests') return rGuests();
