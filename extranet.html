@@ -178,6 +178,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="navlbl">งานขาย &amp; แขก</div>
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Stays</button>
+      <button data-t="guests">ทะเบียนแขก (DGR)</button>
       <button data-t="taxi">Taxi (Reception)</button>
     </div>
     <div class="navgrp">
@@ -335,7 +336,7 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',taxi:['sales','finance'],
+const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
@@ -787,6 +788,93 @@ async function taxiReview(id,decision){ let note=null;
     await reloadEL(); await loadTaxi(); taxiPaint(); toast(decision==='approved'?'อนุมัติ → เข้า AP (ค้างจ่าย)':'ตีกลับแล้ว'); }catch(e){ toast('ไม่สำเร็จ: '+e.message); } }
 async function taxiDelete(id){ if(!confirm('ลบรายการค่าแท็กซี่นี้?')) return; try{ await api('mkt_taxi?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); await taxiUnpost(id); await reloadEL(); closeModal(); await loadTaxi(); taxiPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
 
+/* ============ Daily Guest Register (DGR source) ============ */
+const GLINES=['English 1','English 2','English 3','French','Finnish','Member','NQ'];
+async function loadGuests(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_guests?select=*&tour_date=eq.'+S.guestDate+'&order=created_at.asc')||[]; }catch(e){} DB.guests=rows; }
+function gnav(days){ const d=new Date((S.guestDate||iso(new Date()))+'T00:00:00'); d.setDate(d.getDate()+days); S.guestDate=iso(d); render(); }
+function rGuests(){ if(!S.guestDate) S.guestDate=iso(new Date());
+  g('main').innerHTML=`<div class="head"><div><h1>ทะเบียนแขกรายวัน (DGR)</h1><p class="mini">reception บันทึกทุกแขกที่เข้ามา → สรุปเข้า OPC Wages + Taxi อัตโนมัติ</p></div></div>
+   <div class="card pad" style="margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+     <button class="btn sm" onclick="gnav(-1)">‹ วันก่อน</button>
+     <div style="font-weight:700">${fmtDate(S.guestDate)}</div>
+     <button class="btn sm" onclick="gnav(1)">วันถัดไป ›</button>
+     <button class="btn sm ghost" onclick="S.guestDate='${iso(new Date())}';render()">วันนี้</button>
+     <span style="margin-left:auto"></span>
+     <button class="btn" onclick="guestSync()">📊 สรุปเข้า OPC Wages + Taxi</button>
+     <button class="btn pri" onclick="openGuestModal()">+ เพิ่มแขก</button>
+   </div>
+   <div id="gbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
+  loadGuests().then(guestPaint).catch(e=>{ const b=g('gbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; }); }
+function guestPaint(){ const body=g('gbody'); if(!body) return; const gs=DB.guests||[]; const R='text-align:right',C='text-align:center';
+  const cnt={q:0,qp:0,ct:0,nq:0,taxi:0,deal:0}; gs.forEach(x=>{ const ql=(x.qual||'').toUpperCase(); if(ql==='Q')cnt.q++; else if(ql==='Q+')cnt.qp++; else if(ql==='CT')cnt.ct++; else cnt.nq++; cnt.taxi+=Number(x.taxi||0); if(x.deal)cnt.deal++; });
+  const kpis=`<div class="kpis" style="margin-bottom:14px">
+    <div class="kpi"><div class="v">${gs.length}</div><div class="l">แขกวันนี้</div></div>
+    <div class="kpi"><div class="v">${cnt.q} / ${cnt.qp} / ${cnt.ct}</div><div class="l">Q / Q+ / CT (NQ ${cnt.nq})</div></div>
+    <div class="kpi"><div class="v">${fB(cnt.taxi)}</div><div class="l">ค่าแท็กซี่รวม</div></div>
+    <div class="kpi"><div class="v">${cnt.deal}</div><div class="l">ปิดดีล</div></div></div>`;
+  const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
+  let trs='';
+  gs.forEach((x,i)=>{ const ql=(x.qual||'').toUpperCase(); trs+=`<tr>
+    <td>${i+1}</td>
+    <td style="white-space:nowrap"><b>${esc(x.guest_name||'—')}</b>${x.nationality?'<br><span class="mini">'+esc(x.nationality)+'</span>':''}</td>
+    <td style="${C}">${esc(x.marital||'')}</td>
+    <td style="white-space:nowrap">${esc(x.time_in||'')}${x.time_out?' – '+esc(x.time_out):''}</td>
+    <td>${esc(x.program||'')}</td>
+    <td style="${C}"><b>${esc(x.source||'—')}</b></td>
+    <td style="${C}">${x.qual?'<span class="pill '+(ql==='CT'?'off':(ql==='NQ'?'exp':'inc'))+'">'+esc(x.qual)+'</span>':'—'}</td>
+    <td style="white-space:nowrap">${esc(x.closer||'')}${x.manager?' / '+esc(x.manager):''}</td>
+    <td style="${R}">${x.taxi?fB(x.taxi):'—'}</td>
+    <td>${x.deal?'<span class="pill inc">Deal '+(x.deal_term?x.deal_term+'y':'')+'</span>'+(x.contract_no?'<br><span class="mini">'+esc(x.contract_no)+'</span>':''):'—'}</td>
+    <td class="mini">${esc(x.hotel||'')}${x.comments?'<br>'+esc(x.comments):''}</td>
+    <td><button class="btn sm ghost" onclick="openGuestModal('${x.id}')">แก้</button></td>
+  </tr>`; });
+  if(!gs.length) trs='<tr><td colspan="12"><div class="emptyc" style="padding:24px">ยังไม่มีแขกวันนี้ — กด “เพิ่มแขก”</div></td></tr>';
+  const head=`<tr>${th('#')}${th('แขก / สัญชาติ')}${th('สถานะ',C)}${th('เวลา')}${th('Prog')}${th('OPC',C)}${th('Qual',C)}${th('Closer/Mgr')}${th('Taxi',R)}${th('Deal')}${th('โรงแรม/หมายเหตุ')}${th('')}</tr>`;
+  body.innerHTML=kpis+`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead>${head}</thead><tbody>${trs}</tbody></table></div>`; }
+function openGuestModal(id){ const x=id?(DB.guests||[]).find(y=>y.id===id):null; const reps=(DB.mktReps||[]);
+  const repOpts=(sel)=>reps.map(r=>`<option value="${esc(r.code)}" ${sel===r.code?'selected':''}>${esc(r.code)} ${esc(r.name)}</option>`).join('');
+  openModal(`<h2>${x?'แก้ไข':'เพิ่ม'}แขก — ${fmtDate(S.guestDate)}</h2>
+   <div class="grid2">
+     <div><label>สาย (Line)</label><input id="g_line" list="glines" value="${x?esc(x.line||''):'English 1'}"><datalist id="glines">${GLINES.map(l=>'<option value="'+l+'">').join('')}</datalist></div>
+     <div><label>สัญชาติ</label><input id="g_nat" value="${x?esc(x.nationality||''):''}"></div>
+     <div class="full"><label>ชื่อแขก</label><input id="g_name" value="${x?esc(x.guest_name||''):''}" placeholder="Mr. ..."></div>
+     <div><label>สถานะ (C/M)</label><input id="g_marital" value="${x?esc(x.marital||''):''}"></div>
+     <div><label>Program</label><select id="g_program"><option ${x&&x.program==='OPC'?'selected':''}>OPC</option><option ${x&&x.program==='TM'?'selected':''}>TM</option></select></div>
+     <div><label>เวลาเข้า</label><input id="g_tin" value="${x?esc(x.time_in||''):''}" placeholder="12:05"></div>
+     <div><label>เวลาออก</label><input id="g_tout" value="${x?esc(x.time_out||''):''}"></div>
+     <div><label>OPC ที่พามา (SOURCE)</label><select id="g_source"><option value="">—</option>${repOpts(x&&x.source)}</select></div>
+     <div><label>Qualify</label><select id="g_qual"><option value="">—</option>${['Q','Q+','CT','NQ'].map(o=>'<option '+(x&&x.qual===o?'selected':'')+'>'+o+'</option>').join('')}</select></div>
+     <div><label>Closer (To)</label><input id="g_closer" value="${x?esc(x.closer||''):''}"></div>
+     <div><label>Manager</label><input id="g_manager" value="${x?esc(x.manager||''):''}"></div>
+     <div><label>ค่าแท็กซี่ (฿)</label><input type="number" id="g_taxi" value="${x?(x.taxi||0):(S.taxiRate||0)}"></div>
+     <div><label>Gift 1</label><input id="g_gift1" value="${x?esc(x.gift1||''):''}"></div>
+     <div><label>Gift 2</label><input id="g_gift2" value="${x?esc(x.gift2||''):''}"></div>
+     <div><label>โรงแรม</label><input id="g_hotel" value="${x?esc(x.hotel||''):''}"></div>
+     <div><label>ปิดดีล?</label><select id="g_deal"><option value="">ไม่</option><option value="1" ${x&&x.deal?'selected':''}>ปิดดีล</option></select></div>
+     <div><label>อายุสัญญา (ปี)</label><select id="g_term"><option value="">—</option>${['5','10','20'].map(o=>'<option '+(x&&x.deal_term===o?'selected':'')+'>'+o+'</option>').join('')}</select></div>
+     <div><label>เลขสัญญา</label><input id="g_contract" value="${x?esc(x.contract_no||''):''}"></div>
+     <div class="full"><label>หมายเหตุ / Chargeback</label><input id="g_comments" value="${x?esc(x.comments||''):''}"></div>
+   </div>
+   <div class="right" style="margin-top:12px">${x?'<button class="btn ghost danger" onclick="delGuest(\''+x.id+'\')">ลบ</button> ':''}<button class="btn" onclick="closeModal()">ยกเลิก</button> <button class="btn pri" onclick="saveGuest('${x?x.id:''}')">บันทึก</button></div>`); }
+async function saveGuest(id){ const row={ id:id||uid('g'), tour_date:S.guestDate, line:g('g_line').value||null, guest_name:(g('g_name').value||'').trim()||null, nationality:(g('g_nat').value||'').trim()||null, marital:g('g_marital').value||null, time_in:g('g_tin').value||null, time_out:g('g_tout').value||null, program:g('g_program').value||null, source:g('g_source').value||null, qual:g('g_qual').value||null, closer:(g('g_closer').value||'').trim()||null, manager:(g('g_manager').value||'').trim()||null, taxi:parseFloat(g('g_taxi').value)||0, gift1:g('g_gift1').value||null, gift2:g('g_gift2').value||null, hotel:g('g_hotel').value||null, deal:!!g('g_deal').value, deal_term:g('g_term').value||null, contract_no:(g('g_contract').value||'').trim()||null, comments:(g('g_comments').value||'').trim()||null, recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() };
+  try{ await upsert('mkt_guests',[row]); closeModal(); toast('บันทึกแล้ว'); await loadGuests(); guestPaint(); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
+async function delGuest(id){ if(!confirm('ลบรายการแขกนี้?')) return; try{ await api('mkt_guests?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); closeModal(); await loadGuests(); guestPaint(); toast('ลบแล้ว'); }catch(e){ toast('ลบไม่สำเร็จ: '+e.message); } }
+async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไม่มีแขกให้สรุป'); return; }
+  const dt=new Date(S.guestDate+'T00:00:00'); const dayIdx=dt.getDay();
+  const thu=new Date(dt); thu.setDate(dt.getDate()+(4-dayIdx)); const iw=isoWeek(thu);
+  const sun=new Date(dt); sun.setDate(dt.getDate()-dayIdx); const pe=new Date(sun); pe.setDate(sun.getDate()+6);
+  const byRep={}; gs.forEach(x=>{ if(!x.source) return; const ql=(x.qual||'').toUpperCase(); const r=(byRep[x.source]=byRep[x.source]||{q:0,qp:0,ct:0,pack:0,full:0}); if(ql==='Q')r.q++; else if(ql==='Q+')r.qp++; else if(ql==='CT')r.ct++; if(x.deal){ if(x.deal_term==='5')r.pack++; else if(x.deal_term==='10'||x.deal_term==='20')r.full++; } });
+  try{
+    let rows=await api('mkt_dgr?select=*&year=eq.'+iw.year+'&week=eq.'+iw.week)||[]; const byCode={}; rows.forEach(r=>byCode[r.rep_code]=r);
+    const ups=[]; Object.keys(byRep).forEach(code=>{ const rp=(DB.mktReps||[]).find(z=>z.code===code)||{}; const ex=byCode[code]||{}; const days=Object.assign({},ex.days||{});
+      days[String(dayIdx)]={q:byRep[code].q,qp:byRep[code].qp,ct:byRep[code].ct,pack:byRep[code].pack,full:byRep[code].full};
+      ups.push({ id:iw.year+'_'+iw.week+'_'+code, year:iw.year, week:iw.week, period_start:iso(sun), period_end:iso(pe), rep_code:code, rep_name:rp.name||code, team:rp.team||null, role:rp.role||'staff', days, deal:ex.deal||{}, extra:ex.extra||{}, ded:ex.ded||{}, updated_by:'guest-sync', updated_at:new Date().toISOString() }); });
+    if(ups.length) await upsert('mkt_dgr',ups);
+    const tx=gs.filter(x=>Number(x.taxi||0)>0).map(x=>({ id:'gtx_'+x.id, tour_date:x.tour_date, guest_name:x.guest_name, opc_code:x.source, amount:Number(x.taxi||0), note:'จากทะเบียนแขก', status:'pending', recorded_by:(USER&&USER.email)||null, updated_at:new Date().toISOString() }));
+    if(tx.length) await upsert('mkt_taxi',tx);
+    toast('สรุปเข้า OPC Wages ('+ups.length+' คน) + Taxi ('+tx.length+' รายการ) แล้ว');
+  }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
+
 function render(){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='dashboard') return rDashboard();
@@ -797,6 +885,7 @@ function render(){
   if(S.tab==='ap') return rAP();
   if(S.tab==='stays') return rStays();
   if(S.tab==='bookings') return rBookings();
+  if(S.tab==='guests') return rGuests();
   if(S.tab==='taxi') return rTaxi();
   if(S.tab==='mktwages') return rMktWages();
   if(S.tab==='bank') return rBankCash();
