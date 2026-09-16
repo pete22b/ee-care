@@ -189,6 +189,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="navlbl">การเงิน</div>
       <button data-t="bank">Cash &amp; Bank</button>
       <button data-t="cashflow">Cash Flow</button>
+      <button data-t="income">รับเงิน · สลิป</button>
       <button data-t="receipts">Receipts</button>
       <button data-t="ar">AR · ยอดค้างรับ</button>
       <button data-t="ap">AP · ต้องจ่าย</button>
@@ -338,7 +339,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:'sales',taxi:['sales','finance'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:'finance',receipts:'finance',ar:'finance',ap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -880,6 +881,7 @@ function render(){
   if(S.tab==='dashboard') return rDashboard();
   if(S.tab==='cashflow') return rCashflow();
   if(S.tab==='reports') return rReports();
+  if(S.tab==='income') return rIncome();
   if(S.tab==='receipts') return rReceipts();
   if(S.tab==='ar') return rAR();
   if(S.tab==='ap') return rAP();
@@ -1334,6 +1336,148 @@ function rcKey(e){ return e.category||('entry:'+e.id); }
 function rcAll(open){ S.rcOpen={}; if(open) DB.entries.forEach(e=>S.rcOpen[rcKey(e)]=true); render(); }
 const RC_SECTIONS=[['Sale payments',['deposit','admin','installment']],['Management Fee (MFEE)',['mfee']],['Interval — we pay',['ii_fee','ii_renewal','ii_exchange']],['Other',null]];
 const RC_KNOWN=['deposit','admin','installment','mfee','ii_fee','ii_renewal','ii_exchange'];
+/* ============ Income Slips — reception records money-in slips → cf_lines (paid) → auto-cut AR ============
+   Mirrors the physical "BBL EDC Credit Card Payment Request Form": one attached slip/form + N rows
+   (contract / type / USD × rate / THB / card). Each row is matched to an outstanding income line
+   (reducing AR) or, if none matches, recorded as a new paid income line. Everything lands in Receipts (locked+audit). */
+const SLIP_TYPES={Deposit:'deposit',Balance:'installment',MFEE:'mfee','Admin fee':'admin','Booking fee':'booking'};
+const SLIP_CC=['Visa','Mastercard','Amex','JCB','UnionPay','Bank transfer','Cash','Other'];
+const SLIP_BANKS=['BBL — ธ.กรุงเทพ','SCB — ธ.ไทยพาณิชย์','Cash — เงินสด','Other'];
+function normCno(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,'').split('/').slice(0,2).join('/'); }
+function findIncomeEntryByCno(cno){ const n=normCno(cno); if(!n) return null;
+  return (DB.entries||[]).find(e=>e.kind==='income'&&e.category&&normCno(e.category)===n)||null; }
+function ccToMethod(t){ t=(t||'').toLowerCase();
+  if(['visa','master','mc','amex','jcb','union'].some(x=>t.includes(x))) return 'card';
+  if(t.includes('transfer')||t.includes('โอน')) return 'transfer';
+  if(t.includes('cash')||t.includes('สด')) return 'cash'; return 'other'; }
+function incomeCanEdit(){ return !!(USER&&USER.is_admin) || hasCat('finance') || hasCat('sales'); }
+async function loadIncomeSlips(){ let rows=[]; try{ rows=await api('cf_income_slips?select=*&order=slip_date.desc&limit=300')||[]; }catch(e){} DB.incomeSlips=rows; }
+function rIncome(){
+  g('main').innerHTML=`<div class="head"><div><h1>รับเงิน · สลิป (Income Slips)</h1><p class="mini">reception บันทึกสลิป/ฟอร์มรับเงิน (BBL EDC ฯลฯ) แนบเอกสาร → ตัดยอดค้างรับ (AR) อัตโนมัติ · ลงบัญชีที่ Receipts</p></div>
+    ${incomeCanEdit()?'<button class="btn pri" onclick="openSlipModal()">+ บันทึกสลิปใหม่</button>':''}</div>
+   <div id="incbody"><div class="emptyc"><div class="big">⏳</div>กำลังโหลด…</div></div>`;
+  loadIncomeSlips().then(incomePaint).catch(e=>{ const b=g('incbody'); if(b) b.innerHTML='<div class="emptyc">โหลดไม่สำเร็จ: '+esc(e.message)+'</div>'; });
+}
+function incomePaint(){ const body=g('incbody'); if(!body) return; const rows=DB.incomeSlips||[]; const mk=TODAY.slice(0,7); const R='text-align:right',C='text-align:center';
+  const mrows=rows.filter(r=>(r.slip_date||'').slice(0,7)===mk);
+  const sumThb=mrows.reduce((s,r)=>s+Number(r.total_thb||0),0);
+  const sumUsd=mrows.reduce((s,r)=>s+Number(r.total_usd||0),0);
+  const nMatched=mrows.reduce((s,r)=>s+Number((r.meta&&r.meta.matched)||0),0);
+  const nCreated=mrows.reduce((s,r)=>s+Number((r.meta&&r.meta.created)||0),0);
+  const byBank={}; mrows.forEach(r=>{ const k=(r.bank||'—').split(' ')[0]; byBank[k]=(byBank[k]||0)+Number(r.total_thb||0); });
+  const kpis=`<div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="v" style="color:var(--income)">฿${Math.round(sumThb).toLocaleString('en-US')}</div><div class="l">รับเข้าเดือนนี้ (${mrows.length} สลิป)</div></div>
+    <div class="kpi"><div class="v">$${Math.round(sumUsd).toLocaleString('en-US')}</div><div class="l">มูลค่า USD รวม</div></div>
+    <div class="kpi"><div class="v">${nMatched}</div><div class="l">ตัด AR (จับคู่บิลค้าง)</div></div>
+    <div class="kpi"><div class="v">${nCreated}</div><div class="l">บันทึกใหม่ (ไม่พบบิลค้าง)</div></div></div>`;
+  const bankChips=Object.keys(byBank).length?`<div class="card pad" style="margin-bottom:16px"><h2 style="margin:0 0 8px;font-size:16px">แยกตามธนาคาร (เดือนนี้)</h2>
+    ${Object.entries(byBank).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="pill fc" style="margin:2px 6px 2px 0">${esc(k)} · ฿${Math.round(v).toLocaleString('en-US')}</span>`).join('')}</div>`:'';
+  const th=(t,s)=>`<th style="${s||''};font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
+  let trs='';
+  rows.forEach(r=>{ const m=r.meta||{};
+    const proof= r.doc_path?`<a href="#" onclick="openFile('cf-receipts','${esc(r.doc_path)}');return false" title="${esc(r.doc_name||'')}">📎 เอกสาร</a>`:'<span class="mini" style="opacity:.4">—</span>';
+    trs+=`<tr>
+      <td style="white-space:nowrap"><b>${fmtDate(r.slip_date)}</b></td>
+      <td>${esc((r.bank||'').split(' ')[0]||'—')}</td>
+      <td>${esc(r.fu||'—')}</td>
+      <td style="${C}">${r.line_count||0}</td>
+      <td style="${R}">${r.total_usd?'$'+Number(r.total_usd).toLocaleString('en-US'):'—'}</td>
+      <td style="${R}"><b>฿${Number(r.total_thb||0).toLocaleString('en-US')}</b></td>
+      <td style="${C}">${m.matched?'<span class="pill inc">ตัด AR '+m.matched+'</span> ':''}${m.created?'<span class="pill off">ใหม่ '+m.created+'</span>':''}</td>
+      <td style="${C}">${proof}</td>
+      <td style="${R}"><button class="btn sm ghost" onclick="openSlipView('${esc(r.id)}')">ดู</button></td>
+    </tr>`; });
+  if(!rows.length) trs='<tr><td colspan="9"><div class="emptyc" style="padding:24px">ยังไม่มีสลิป — กด “+ บันทึกสลิปใหม่”</div></td></tr>';
+  const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('วันที่')}${th('ธนาคาร')}${th('ผู้รับผิดชอบ')}${th('บรรทัด',C)}${th('USD',R)}${th('THB',R)}${th('ผล',C)}${th('เอกสาร',C)}${th('',R)}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  body.innerHTML=kpis+bankChips+table;
+}
+/* ---- entry modal ---- */
+function slipRowHtml(r,i){ const opt=(arr,v)=>arr.map(o=>`<option ${String(v||'')===o?'selected':''}>${o}</option>`).join('');
+  return `<tr>
+    <td><input value="${esc(r.cno||'')}" oninput="window._slip.rows[${i}].cno=this.value" placeholder="EST/1003" style="width:120px"></td>
+    <td><select onchange="window._slip.rows[${i}].type=this.value" style="width:auto"><option value="">— ประเภท —</option>${Object.keys(SLIP_TYPES).map(k=>`<option ${r.type===k?'selected':''}>${k}</option>`).join('')}</select></td>
+    <td><select onchange="window._slip.rows[${i}].cctype=this.value" style="width:auto">${opt(SLIP_CC,r.cctype)}</select></td>
+    <td><input value="${esc(r.last4||'')}" maxlength="4" inputmode="numeric" oninput="window._slip.rows[${i}].last4=this.value" placeholder="6907" style="width:64px"></td>
+    <td><input type="number" step="any" value="${r.usd!=null?r.usd:''}" oninput="window._slip.rows[${i}].usd=this.value;slipAuto(${i})" placeholder="416" style="width:90px"></td>
+    <td><input type="number" step="any" value="${r.rate!=null?r.rate:''}" oninput="window._slip.rows[${i}].rate=this.value;slipAuto(${i})" placeholder="33.45" style="width:76px"></td>
+    <td><input type="number" step="any" id="slip_thb_${i}" value="${r.thb!=null?r.thb:''}" oninput="window._slip.rows[${i}].thb=this.value;window._slip.rows[${i}]._m=true;slipTotals()" placeholder="13915" style="width:100px"></td>
+    <td>${window._slip.rows.length>1?`<button class="btn link" onclick="window._slip.rows.splice(${i},1);slipRerender()">✕</button>`:''}</td></tr>`; }
+function slipRerender(){ const tb=g('slip_tbody'); if(tb) tb.innerHTML=window._slip.rows.map(slipRowHtml).join(''); slipTotals(); }
+function slipAuto(i){ const r=window._slip.rows[i]; if(!r) return; const usd=parseFloat(r.usd)||0, rate=parseFloat(r.rate)||0;
+  if(usd&&rate&&!r._m){ r.thb=Math.round(usd*rate*100)/100; const el=g('slip_thb_'+i); if(el) el.value=r.thb; } slipTotals(); }
+function slipTotals(){ const box=g('slip_tot'); if(!box) return; let u=0,t=0,n=0;
+  window._slip.rows.forEach(r=>{ const usd=parseFloat(r.usd)||0, thb=parseFloat(r.thb)||0; if((r.cno||'').trim()&&(usd||thb)){ n++; u+=usd; t+=thb; } });
+  box.innerHTML=`${n} บรรทัด · รวม $${u.toLocaleString('en-US')} · <b>฿${Math.round(t).toLocaleString('en-US')}</b>`; }
+function slipAddRow(){ window._slip.rows.push({cno:'',type:'',cctype:'Visa',usd:'',rate:window._slip.rate||'',thb:''}); slipRerender(); }
+function openSlipModal(){ if(!incomeCanEdit()){ toast('ไม่มีสิทธิ์บันทึก'); return; }
+  window._slip={rows:[{cno:'',type:'Deposit',cctype:'Visa',usd:'',rate:'',thb:''}]};
+  openModal(`<h2>บันทึกสลิปรับเงิน</h2>
+   <div class="mini" style="margin-bottom:10px">แนบสลิป/ฟอร์ม 1 ใบ แล้วคีย์รายการในใบนั้น · ระบบจะจับคู่ตัดยอดค้างรับให้อัตโนมัติ</div>
+   <div class="grid2">
+     <div><label>วันที่รับเงิน</label><input type="date" id="slip_date" value="${TODAY}"></div>
+     <div><label>ธนาคาร / ช่องทาง</label><select id="slip_bank">${SLIP_BANKS.map(b=>`<option>${b}</option>`).join('')}</select></div>
+     <div><label>ผู้รับผิดชอบ (FU)</label><input id="slip_fu" placeholder="เช่น Zineb"></div>
+     <div><label>หมายเหตุ</label><input id="slip_note" placeholder="เช่น Installment"></div>
+   </div>
+   <div style="margin-top:12px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+     <thead><tr>${['สัญญา','ประเภท','บัตร/ช่องทาง','เลข 4 ตัว','USD','เรท','THB',''].map(h=>`<th style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3);padding:4px 6px">${h}</th>`).join('')}</tr></thead>
+     <tbody id="slip_tbody">${window._slip.rows.map(slipRowHtml).join('')}</tbody></table></div>
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+     <button class="btn sm ghost" onclick="slipAddRow()">+ เพิ่มแถว</button>
+     <div class="mini" id="slip_tot"></div></div>
+   <div class="full" style="margin-top:12px"><label>แนบเอกสาร — สลิป/ฟอร์ม EDC (รูปหรือ PDF)</label><input type="file" id="slip_file" accept="image/*,application/pdf"></div>
+   <div class="right" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="slip_save" onclick="saveSlip()">บันทึก + ตัด AR</button></div>`);
+  slipTotals();
+}
+async function saveSlip(){
+  const btn=g('slip_save'); const rows=(window._slip.rows||[]).filter(r=>(r.cno||'').trim() && (parseFloat(r.usd)||parseFloat(r.thb)));
+  if(!rows.length){ toast('กรอกสัญญา + จำนวนเงินอย่างน้อย 1 บรรทัด'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='กำลังบันทึก…'; }
+  try{
+    const slipId=uid('sl'); const bank=g('slip_bank').value, fu=g('slip_fu').value.trim()||null, sdate=g('slip_date').value||TODAY, note=g('slip_note').value.trim()||null;
+    const file=g('slip_file').files[0]; let doc_path=null,doc_name=null;
+    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); doc_path='income/'+slipId+'.'+ext; await uploadTo('cf-receipts',doc_path,file); doc_name=file.name; }
+    let matched=0, created=0, totThb=0, totUsd=0; const lineIds=[]; const unresolved=[];
+    for(const r of rows){
+      const usd=parseFloat(r.usd)||0, thb=parseFloat(r.thb)||0, rate=parseFloat(r.rate)||null;
+      const amt = usd>0?usd:thb; totThb+=thb; totUsd+=usd;
+      const lt=SLIP_TYPES[r.type]||'deposit'; const method=ccToMethod(r.cctype);
+      const pm={slip_id:slipId}; if(method==='card'){ pm.card_brand=r.cctype; if(r.last4)pm.card_last4=String(r.last4); if(thb)pm.card_thb=thb; }
+      if(rate)pm.rate=rate; if(usd)pm.usd=usd;
+      const memo='สลิปรับเงิน · '+(r.type||'')+(r.cctype?(' · '+r.cctype):'')+(fu?(' · '+fu):'');
+      const ent=findIncomeEntryByCno(r.cno); let target=null;
+      if(ent){ const cand=DB.lines.filter(l=>l.entry_id===ent.id && !l.paid && (l.line_type||'')===lt);
+        target = cand.find(l=>Math.abs(Number(l.amount)-amt)<0.5) || cand.slice().sort((a,b)=>a.txn_date<b.txn_date?-1:1)[0] || null; }
+      if(target){
+        await patchRow('cf_lines',target.id,{paid:true,paid_date:sdate,paid_amount:amt,method,paid_note:note,paid_by:USER&&USER.email,proof_path:doc_path,proof_name:doc_name,pay_meta:pm});
+        await logPayAudit(target,'record',null,{slip:slipId,via:'income-slip'}); lineIds.push(target.id); matched++;
+      } else {
+        let entId=ent?ent.id:null;
+        if(!entId){ entId=uid('en'); await upsert('cf_entries',[{id:entId,kind:'income',title:normCno(r.cno),category:normCno(r.cno),active:true,meta:{source:'income-slip'}}]); unresolved.push(r.cno); }
+        const lid=uid('ln');
+        await upsert('cf_lines',[{id:lid,entry_id:entId,amount:amt,txn_date:sdate,repeat:'never',line_type:lt,memo,paid:true,paid_date:sdate,paid_amount:amt,method,paid_note:note,paid_by:USER&&USER.email,proof_path:doc_path,proof_name:doc_name,pay_meta:pm}]);
+        lineIds.push(lid); created++;
+      }
+    }
+    await upsert('cf_income_slips',[{id:slipId,slip_date:sdate,bank,method:null,fu,doc_path,doc_name,total_thb:Math.round(totThb),total_usd:Math.round(totUsd),line_count:rows.length,note,meta:{matched,created,line_ids:lineIds,new_contracts:unresolved},created_by:USER&&USER.email}]);
+    await reloadEL(); await loadIncomeSlips();
+    closeModal(); toast('บันทึกแล้ว · ตัด AR '+matched+' บิล · บันทึกใหม่ '+created+' บิล');
+    incomePaint();
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); if(btn){ btn.disabled=false; btn.textContent='บันทึก + ตัด AR'; } }
+}
+function openSlipView(id){ const r=(DB.incomeSlips||[]).find(x=>x.id===id); if(!r) return; const ids=(r.meta&&r.meta.line_ids)||[];
+  const rowsHtml=ids.map(lid=>{ const l=DB.lines.find(x=>x.id===lid); if(!l) return ''; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
+    return `<tr><td>${esc(e.category||e.title||'')}</td><td>${esc(l.line_type||'')}</td><td>${esc(methodLabel(l.method))}${cardTag(l)}</td><td style="text-align:right">${fmt(l.paid_amount!=null?l.paid_amount:l.amount)}</td></tr>`; }).join('');
+  openModal(`<h2>สลิปรับเงิน · ${fmtDate(r.slip_date)}</h2>
+   <div class="mini" style="margin-bottom:10px">${esc(r.bank||'')}${r.fu?(' · FU '+esc(r.fu)):''}${r.note?(' · '+esc(r.note)):''}</div>
+   <div class="kpis" style="margin-bottom:12px"><div class="kpi"><div class="v">฿${Number(r.total_thb||0).toLocaleString('en-US')}</div><div class="l">รวม THB</div></div>
+     <div class="kpi"><div class="v">$${Number(r.total_usd||0).toLocaleString('en-US')}</div><div class="l">รวม USD</div></div>
+     <div class="kpi"><div class="v">${(r.meta&&r.meta.matched)||0}/${(r.meta&&r.meta.created)||0}</div><div class="l">ตัด AR / ใหม่</div></div></div>
+   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${['สัญญา','ประเภท','ช่องทาง','จำนวน'].map(h=>`<th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--ink3);padding:6px">${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml||'<tr><td colspan=4 class=mini>—</td></tr>'}</tbody></table></div>
+   ${r.doc_path?`<div style="margin-top:10px">📎 <a href="#" onclick="openFile('cf-receipts','${esc(r.doc_path)}');return false">${esc(r.doc_name||'เอกสาร')}</a></div>`:''}
+   <div class="right" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn" onclick="closeModal();goto('receipts')">ไปที่ Receipts</button></div>`);
+}
+
 function rReceipts(){
   // group by CONTRACT (category); entries with no category fall back to their own id
   const groups={}; const kindOf={};
