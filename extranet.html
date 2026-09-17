@@ -188,6 +188,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <input id="gsq" type="search" placeholder="🔍  ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
     <div id="gsres" class="gsres hide"></div>
   </div>
+  <select id="coswitch" onchange="setCompany(this.value)" title="แยกตามบริษัท" style="margin:0 10px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:12.5px"></select>
   <div class="right" id="userbox"></div>
 </div></div>
 <aside class="side">
@@ -283,7 +284,12 @@ function occ(line, from, to){
   return out;
 }
 /* flatten all lines with parent entry */
-function allLines(){ const em=Object.fromEntries(DB.entries.map(e=>[e.id,e])); return DB.lines.map(l=>({l,e:em[l.entry_id]})).filter(x=>x.e); }
+function allLines(){ const em=Object.fromEntries(DB.entries.map(e=>[e.id,e])); const co=S&&S.company;
+  return DB.lines.map(l=>({l,e:em[l.entry_id]})).filter(x=>x.e && (!co || x.e.company===co || !x.e.company)); }
+function fillCoSwitch(){ const s=g('coswitch'); if(!s) return; const cos=(DB.companies||[]); const cur=(S&&S.company)||'';
+  s.innerHTML='<option value="">🏢 ทุกบริษัท</option>'+cos.map(c=>`<option value="${esc(c.name)}"${cur===c.name?' selected':''}>${esc(c.name)}</option>`).join('');
+  s.value=cur; }
+function setCompany(v){ S.company=v||''; render(); }
 
 /* ============ Supabase REST ============ */
 async function token(){ try{ const {data}=await SBC.auth.getSession(); return (data&&data.session)?data.session.access_token:SB_KEY; }catch(e){ return SB_KEY; } }
@@ -939,6 +945,7 @@ async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไ�
   }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
 
 function render(){
+  fillCoSwitch();
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='dashboard') return rDashboard();
   if(S.tab==='cashflow') return rCashflow();
@@ -1637,8 +1644,9 @@ function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิ�
   openModal(`<h2>New Contract · สัญญาใหม่</h2>
    <div class="mini" style="margin-bottom:10px">Member Service กรอกตอนปิดดีล + ออกเลขสัญญา → ระบบสร้างตารางมัดจำ/งวด/MFEE ให้อัตโนมัติ</div>
    <div class="grid2">
-     <div><label>เลขสัญญา *</label><input id="nc_cno" placeholder="EST/1013/5/AH/T1"></div>
+     <div><label>บริษัท</label><select id="nc_company">${(DB.companies||[]).map(c=>`<option>${esc(c.name)}</option>`).join('')||'<option>Elite Escapes</option>'}</select></div>
      <div><label>ประเภทสินค้า</label><select id="nc_product">${NC_PRODUCTS.map(p=>`<option>${p}</option>`).join('')}</select></div>
+     <div><label>เลขสัญญา *</label><input id="nc_cno" placeholder="EST/1013/5/AH/T1"></div>
      <div class="full"><label>ชื่อสมาชิก (บรรทัดละคน)</label><input id="nc_name" placeholder="John Smith &amp; Jane Smith"></div>
      <div><label>สัญชาติ</label><input id="nc_nat" placeholder="Australian"></div>
      <div><label>อีเมล</label><input id="nc_email" type="email"></div>
@@ -1677,7 +1685,8 @@ async function saveNewContract(){
     if(fyo) meta.fyo=fyo;
     const mv=(k,id2)=>{ const el=g(id2); if(el&&el.value.trim()) meta[k]=el.value.trim(); };
     mv('nationality','nc_nat'); mv('email','nc_email'); mv('phone','nc_phone');
-    await upsert('cf_entries',[{id:eid,kind:'income',title:'Sales - '+product+' '+cno,category:cno,account:(primaryAccount()||{}).id||null,active:true,description:nameV||null,meta}]);
+    const company=(g('nc_company')&&g('nc_company').value)||null;
+    await upsert('cf_entries',[{id:eid,kind:'income',title:'Sales - '+product+' '+cno,category:cno,company,account:(primaryAccount()||{}).id||null,active:true,description:nameV||null,meta}]);
     const lines=[];
     lines.push({id:eid+'_l0',entry_id:eid,amount:dep,txn_date:signd,repeat:'never',line_type:'deposit',memo:'มัดจำ'});
     const rem=Math.max(0,tot-dep);
