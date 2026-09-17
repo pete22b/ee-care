@@ -1639,6 +1639,10 @@ function ncPrefill(){ /* recompute total + per-instalment preview */
   const tot=net+adm; const rem=Math.max(0,tot-dep); const per=n>0?Math.round(rem/n*100)/100:0;
   const box=g('nc_preview'); if(box) box.innerHTML=`รวม <b>${curSym()}${tot.toLocaleString('en-US')}</b> · มัดจำ ${curSym()}${dep.toLocaleString('en-US')} · คงเหลือ ${curSym()}${rem.toLocaleString('en-US')}${n>0?' → '+n+' งวด × ~'+curSym()+per.toLocaleString('en-US'):''}`;
 }
+const CO_CUTOVER='2026-07-01'; /* Elite เริ่มทำสัญญา 1 ก.ค. 2026; ก่อนหน้า = Club Unique */
+function ncAutoCompany(){ const d=g('nc_signdate'), s=g('nc_company'); if(!d||!s) return;
+  const want=(d.value && d.value<CO_CUTOVER)?'Club Unique':'Elite Escapes';
+  if([...s.options].some(o=>o.value===want)) s.value=want; }
 function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิทธิ์เพิ่มสัญญา'); return; }
   const nextMonth=addMonthsISO(TODAY.slice(0,7)+'-01',1).slice(0,10);
   openModal(`<h2>New Contract · สัญญาใหม่</h2>
@@ -1651,7 +1655,7 @@ function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิ�
      <div><label>สัญชาติ</label><input id="nc_nat" placeholder="Australian"></div>
      <div><label>อีเมล</label><input id="nc_email" type="email"></div>
      <div><label>โทรศัพท์</label><input id="nc_phone"></div>
-     <div><label>วันเซ็น / วันมัดจำ</label><input id="nc_signdate" type="date" value="${TODAY}"></div>
+     <div><label>วันเซ็น / วันมัดจำ</label><input id="nc_signdate" type="date" value="${TODAY}" oninput="ncAutoCompany()"></div>
      <div><label>Net price (USD)</label><input type="number" id="nc_net" value="0" oninput="ncPrefill()"></div>
      <div><label>Admin fee (USD)</label><input type="number" id="nc_admin" value="0" oninput="ncPrefill()"></div>
      <div><label>มัดจำ Deposit (USD)</label><input type="number" id="nc_dep" value="0" oninput="ncPrefill()"></div>
@@ -1667,7 +1671,7 @@ function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิ�
      <div><label>ปีเข้าพักแรก (FYO)</label><input type="number" id="nc_fyo" placeholder="2027"></div>
    </div></div>
    <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nc_save" onclick="saveNewContract()">สร้างสัญญา</button></div>`);
-  ncPrefill();
+  ncPrefill(); ncAutoCompany();
 }
 async function saveNewContract(){
   const cno=(g('nc_cno').value||'').trim(); if(!cno){ toast('กรอกเลขสัญญา'); return; }
