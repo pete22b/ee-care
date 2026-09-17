@@ -159,6 +159,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .proofview{margin-top:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface2,#faf8f3);min-height:60px;display:flex;align-items:center;justify-content:center}
 .proofview img{display:block;max-width:100%;height:auto}
 .proofview iframe{width:100%;height:460px;border:0;background:#fff}
+.corow{cursor:pointer;transition:background .12s}
+.corow:hover{background:var(--surface2,#faf8f3)}
+.corow.on{background:var(--incomesoft,rgba(47,125,91,.12))}
+.corow.on b{color:var(--income,#2f7d5b)}
 /* ---- Contract payment history ---- */
 .chgrid{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
 .chside{position:sticky;top:calc(var(--top-h,64px) + 12px);max-height:calc(100vh - var(--top-h,64px) - 40px);display:flex;flex-direction:column}
@@ -188,7 +192,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <input id="gsq" type="search" placeholder="🔍  ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
     <div id="gsres" class="gsres hide"></div>
   </div>
-  <select id="coswitch" onchange="setCompany(this.value)" title="แยกตามบริษัท" style="margin:0 10px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:12.5px"></select>
   <div class="right" id="userbox"></div>
 </div></div>
 <aside class="side">
@@ -946,7 +949,6 @@ async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไ�
   }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
 
 function render(){
-  fillCoSwitch();
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='dashboard') return rDashboard();
   if(S.tab==='cashflow') return rCashflow();
@@ -2537,10 +2539,13 @@ async function runBankImport(){
 /* ============ Companies ============ */
 function rCompanies(){
   const cnt={}; DB.entries.forEach(e=>{ if(e.company) cnt[e.company]=(cnt[e.company]||0)+1; });
-  const head=`<div class="head"><div><h1>Companies</h1><p class="mini">Group entries by company — like Pulse projects</p></div><div class="sp"></div><button class="btn pri" onclick="openCompany()">＋ Add company</button></div>`;
-  const rows=DB.companies.length?DB.companies.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.note?'<br><span class="mini">'+esc(c.note)+'</span>':''}</td><td class="n">${cnt[c.name]||0} entries</td><td><button class="btn link" onclick="openCompany('${esc(c.id)}')">Edit</button></td></tr>`).join('')
+  const cur=(S&&S.company)||''; const tot=Object.values(cnt).reduce((a,b)=>a+b,0);
+  const head=`<div class="head"><div><h1>Companies</h1><p class="mini">คลิกบริษัทเพื่อกรองทั้งระบบให้เห็นเฉพาะบริษัทนั้น (ไม่ปนกัน) · คลิก “ทุกบริษัท” เพื่อดูรวม</p></div><div class="sp"></div><button class="btn pri" onclick="openCompany()">＋ Add company</button></div>`;
+  const badge=n=>cur===n?'<span class="pill inc">✓ กำลังดู</span>':'';
+  const allRow=`<tr class="corow${cur===''?' on':''}" onclick="setCompany('')"><td><b>🏢 ทุกบริษัท</b> <span class="mini">(ดูรวมทั้งหมด)</span></td><td class="n">${tot} entries</td><td>${badge('')}</td></tr>`;
+  const rows=DB.companies.length?DB.companies.map(c=>`<tr class="corow${cur===c.name?' on':''}" onclick="setCompany('${esc(c.name)}')"><td><b>${esc(c.name)}</b>${c.note?'<br><span class="mini">'+esc(c.note)+'</span>':''}</td><td class="n">${cnt[c.name]||0} entries</td><td style="white-space:nowrap">${badge(c.name)} <button class="btn link" onclick="event.stopPropagation();openCompany('${esc(c.id)}')">Edit</button></td></tr>`).join('')
     :'<tr><td colspan="3" style="opacity:.5;padding:20px">No companies yet.</td></tr>';
-  g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Company</th><th class="n">Entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Company</th><th class="n">Entries</th><th></th></tr></thead><tbody>${allRow}${rows}</tbody></table></div>`;
 }
 function openCompany(id){ const c=id?DB.companies.find(x=>x.id===id):null;
   openModal(`<h2>${id?'Edit':'Add'} company</h2><div class="grid2"><div class="full"><label>Name</label><input id="c_name" value="${esc(c?c.name:'')}"></div><div class="full"><label>Note</label><input id="c_note" value="${esc(c?c.note:'')}"></div></div>
