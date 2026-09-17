@@ -201,6 +201,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="navgrp">
       <div class="navlbl">Member Service</div>
+      <button data-t="registry">ทะเบียนสัญญา</button>
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Member Benefits</button>
     </div>
@@ -373,7 +374,7 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',bookings:'sales',stays:'sales',guests:['marketing','sales'],
+const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',arap:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
@@ -956,6 +957,7 @@ function render(){
   if(S.tab==='ap') return rAP();
   if(S.tab==='arap') return rARAP();
   if(S.tab==='stays') return rStays();
+  if(S.tab==='registry') return rRegistry();
   if(S.tab==='bookings') return rBookings();
   if(S.tab==='guests') return rGuests();
   if(S.tab==='mktwages') return rMktWages();
@@ -1633,6 +1635,54 @@ function chDetailHtml(cat){
 
 /* ============ New Contract — Member Service creates a sale; auto-generates deposit + instalments + MFEE ============ */
 function canAddContract(){ return !!(USER&&USER.is_admin) || hasCat('sales') || hasCat('finance'); }
+/* ---- Contract Registry (Bible) — every contract, financials or not ---- */
+function registryData(){ const co=(S&&S.company)||''; const m={};
+  DB.entries.forEach(e=>{ if(e.kind!=='income'||!e.category) return; if(co && e.company!==co) return;
+    const g=(m[e.category]=m[e.category]||{cno:e.category,company:e.company||'—',name:'',meta:{},active:true});
+    if(e.description&&!g.name) g.name=(e.description||'').replace(/\n/g,' & ');
+    if(e.meta) g.meta=Object.assign({},e.meta,g.meta);
+    if(e.active===false) g.active=false;
+    if(e.contract_path && !g.contract_path){ g.contract_path=e.contract_path; g.contract_name=e.contract_name; }
+  });
+  return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
+}
+function rRegistry(){
+  let data=registryData(); const q=(S.regQ||'').trim().toLowerCase();
+  if(q) data=data.filter(o=>((o.cno+' '+o.name+' '+(o.meta.nationality||'')+' '+(o.meta.customer_code||'')).toLowerCase().indexOf(q)>=0));
+  const st=S.regStatus||'all'; if(st!=='all') data=data.filter(o=>(o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st);
+  const tot=registryData().length;
+  const byCo={}; registryData().forEach(o=>byCo[o.company]=(byCo[o.company]||0)+1);
+  const R='text-align:right',C='text-align:center';
+  const head=`<div class="head"><div><h1>ทะเบียนสัญญา (Registry)</h1><p class="mini">รายชื่อสัญญาทั้งหมดในระบบ — มีหรือยังไม่มีข้อมูลการเงินก็แสดง · กรองบริษัทที่แถบบน</p></div>${canAddContract()?'<button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
+  const chips=Object.entries(byCo).map(([c,n])=>`<span class="pill fc" style="margin:2px 6px 2px 0">${esc(c)} · ${n}</span>`).join('');
+  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:12px">
+     <input id="regq" placeholder="ค้นหา ชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.regQ||'')}" oninput="S.regQ=this.value;clearTimeout(window._rt);window._rt=setTimeout(rRegistry,200)" style="flex:1;min-width:220px">
+     <select onchange="S.regStatus=this.value;rRegistry()"><option value="all"${st==='all'?' selected':''}>ทุกสถานะ</option><option value="completed"${st==='completed'?' selected':''}>Completed</option><option value="cancelled"${st==='cancelled'?' selected':''}>Cancelled</option><option value="upgraded"${st==='upgraded'?' selected':''}>Upgraded</option></select>
+   </div>`;
+  const th=(t,s)=>`<th style="${s||''};font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
+  const yn=v=>v==='✓'||v===true?'<span style="color:var(--income)">✓</span>':(v&&v!=='—'?esc(String(v)):'<span style="color:var(--ink3)">—</span>');
+  let trs=data.map(o=>{ const mt=o.meta; const term=termOf(o.cno); const use=(mt.fyo&&(mt.lyo||(term&&mt.fyo+term-1)))?(mt.fyo+'–'+(mt.lyo||mt.fyo+term-1)):'—';
+    const status=mt.status||(o.active?'Active':'Cancelled'); const stc=/cancel/i.test(status)?'off':(/upgrad/i.test(status)?'fc':'inc');
+    return `<tr>
+      <td style="white-space:nowrap"><b>${esc(o.cno)}</b>${o.contract_path?' 📎':''}</td>
+      <td><span class="pill fc" style="font-size:10px">${esc(o.company)}</span></td>
+      <td>${esc(o.name||'—')}</td>
+      <td class="mini">${esc(mt.nationality||'—')}</td>
+      <td class="${C}">${term?term+' ปี':'—'}</td>
+      <td class="${C}">${esc(mt.suite||'—')}</td>
+      <td class="${C} mini">${esc(mt.season||'—')}</td>
+      <td class="${C}"><span class="pill ${stc}" style="font-size:10px">${esc(status)}</span></td>
+      <td class="mini">${mt.sign_date?fmtDate(mt.sign_date):'—'}</td>
+      <td class="${C} mini">${use}</td>
+      <td class="${C}">${mt.ii_tier?'<span class="pill inc" style="font-size:10px">'+esc(mt.ii_tier)+'</span>':yn(mt.interval_raw&&mt.interval_raw.slice(0,3))}</td>
+      <td class="${C}">${yn(mt.holiday_plus)}</td>
+      <td class="${C}">${yn(mt.etd)}</td>
+      <td class="${C}">${yn(mt.udp)}</td>
+    </tr>`; }).join('');
+  if(!data.length) trs='<tr><td colspan="14"><div class="emptyc" style="padding:24px">ไม่พบสัญญา</div></td></tr>';
+  const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${th('สัญญา')}${th('แบรนด์')}${th('ลูกค้า')}${th('สัญชาติ')}${th('ระยะ',C)}${th('ห้อง',C)}${th('Season',C)}${th('สถานะ',C)}${th('ทำสัญญา')}${th('ใช้สิทธิ์',C)}${th('Interval',C)}${th('H.Plus',C)}${th('ETD',C)}${th('UDP',C)}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  g('main').innerHTML=head+`<div class="mini" style="margin:0 0 10px">${data.length} สัญญา${q||st!=='all'?' (กรองจาก '+tot+')':''} · ${chips}</div>`+bar+table;
+}
 const NC_PRODUCTS=['EST','ESG','ESP','EX','CUG','EVIP','TCU','VIP','KUD'];
 function ncPrefill(){ /* recompute total + per-instalment preview */
   const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0, n=parseInt(g('nc_ninst').value)||0;
