@@ -373,6 +373,8 @@ async function loadAll(){
     ]);
     DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[],
         bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[],stays:st||[],bookings:(bk||[])};
+    /* commission pay slips: staff roster + saved slips (optional — a miss must not block the app) */
+    try{ const [sf,cs]=await Promise.all([api('cf_staff?select=*&order=name.asc'),api('cf_comm_slips?select=*')]); DB.staff=sf||[]; DB.commSlips=cs||[]; }catch(e){ DB.staff=DB.staff||[]; DB.commSlips=DB.commSlips||[]; }
     if(!DB.accounts.length){ /* seed a Primary account like Pulse */
       const a={id:uid('ac'),name:'Pulse Cash Flow',opening_balance:0,opening_date:TODAY,currency:'THB',is_primary:true,sort:0};
       await upsert('cf_accounts',[a]); DB.accounts=[a];
@@ -774,8 +776,12 @@ function commData(pkey){ const P=commPeriod(pkey); const co=(S&&S.company)||'';
   rows.sort((a,b)=>a.cno<b.cno?-1:1);
   return {P,rows,nofin};
 }
+/* one person = one staff record: short names from sales forms ("Yan") map to the roster name ("Yan Rolland") via aliases */
+function staffOf(name){ const n=String(name||'').trim().toLowerCase(); if(!n) return null;
+  return (DB.staff||[]).find(s=>(s.name||'').toLowerCase()===n || (s.aliases||[]).some(a=>String(a).toLowerCase()===n)) || null; }
+function staffCanon(name){ const s=staffOf(name); return s?s.name:String(name||'').trim(); }
 function commPeople(rows){ const m={};
-  rows.forEach(r=>r.roles.forEach(x=>{ if(!x.due && !x.released) return; const p=(m[x.name]=m[x.name]||{name:x.name,due:0,n:0,paid:true,items:[]});
+  rows.forEach(r=>r.roles.forEach(x=>{ if(!x.due && !x.released) return; const nm=staffCanon(x.name); const p=(m[nm]=m[nm]||{name:nm,due:0,n:0,paid:true,items:[]});
     p.due=round2(p.due+x.due); if(x.due){ p.n++; if(!x.paid) p.paid=false; } p.items.push(Object.assign({cno:r.cno,cust:r.name},x)); }));
   return Object.values(m).filter(p=>p.due>0).sort((a,b)=>b.due-a.due);
 }
@@ -807,9 +813,11 @@ function rCommission(){
   const seg=`<div class="toolbar" style="margin-bottom:12px"><div class="seg">
      <button class="${v==='person'?'on':''}" onclick="S.commView='person';render()">👤 รายคน</button>
      <button class="${v==='contract'?'on':''}" onclick="S.commView='contract';render()">📄 รายสัญญา</button>
+     <button class="${v==='slip'?'on':''}" onclick="S.commView='slip';render()">🧾 Pay Slip</button>
    </div></div>`;
   let body='';
-  if(v==='person'){
+  if(v==='slip'){ body=slipTable(P,people,fx); }
+  else if(v==='person'){
     S._cpn=people.map(p=>p.name);
     const trs=people.map((p,i)=>`<tr><td><b>${esc(p.name)}</b></td><td class="mini">${p.n} รายการ</td><td class="n">${fmt2(p.due)}</td><td class="n">${fx?'฿'+Math.round(p.due*fx).toLocaleString('en-US'):'—'}</td><td>${p.paid?'<span class="pill inc">✓ จ่ายแล้ว</span>':'<span class="pill off">รอจ่าย</span>'}</td><td><button class="btn link" onclick="commStatement(S._cpn[${i}])">ใบสรุปคอม</button></td></tr>`).join('');
     body=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>พนักงาน</th><th></th><th class="n">To Pay (USD)</th><th class="n">THB</th><th>สถานะ</th><th></th></tr></thead><tbody>${trs||'<tr><td colspan="6"><div class="emptyc" style="padding:20px">ไม่มีคอมที่ต้องจ่ายในรอบนี้</div></td></tr>'}</tbody></table></div>`;
@@ -875,6 +883,114 @@ async function commUndo(){ const {P,rows}=commData(S.commP);
     toast('ยกเลิกการยืนยันรอบนี้แล้ว'); render();
   }catch(err){ toast('ยกเลิกไม่สำเร็จ: '+err.message); render(); }
 }
+/* ============ Commission Pay Slip — per person per period (same layout/fields as accounting's Excel "Pay Slip & Send Mail") ============
+   Commission comes from the calc; deductions (tax / SSO / visa & WP / overpayment / other) are keyed per period by accounting.
+   A slip marked "sent" is frozen (its numbers no longer follow the calc). Saved in cf_comm_slips. */
+const SLIP_CO={name:'Elite Escapes CO., LTD.',addr:'79 Hasibpee Road, T.Patong, Kathu, Phuket 83150'};
+function slipId(person){ return (S.company||'')+'|'+S.commP+'|'+person; }
+function slipGet(person){ return (DB.commSlips||[]).find(s=>s.id===slipId(person))||null; }
+function slipPayDay(P){ const o=(S.commPayDay||{})[P.key]; if(o) return o; const mk=P.key.slice(0,7);
+  return P.key.endsWith('-1') ? mk+'-25' : addMonthsISO(mk+'-01',1).slice(0,7)+'-10'; }
+function dmy(iso){ if(!iso) return ''; const [y,m,d]=String(iso).slice(0,10).split('-'); return d+'.'+m+'.'+y; }
+function slipCalc(person, due, fx){ const s=slipGet(person)||{}; const frozen=s.status==='sent';
+  const usd=frozen?Number(s.comm_usd)||0:round2(due), rate=frozen?(Number(s.fx)||0):fx;
+  const thb=frozen?Number(s.comm_thb)||0:round2(usd*rate);
+  const n=k=>Number(s[k])||0;
+  const income=round2(thb+n('back_pay')+n('other_income')), ded=round2(n('tax')+n('sso')+n('visa_wp')+n('overpay')+n('other_ded'));
+  return {s,frozen,usd,fx:rate,thb,back_pay:n('back_pay'),other_income:n('other_income'),tax:n('tax'),sso:n('sso'),visa_wp:n('visa_wp'),overpay:n('overpay'),other_ded:n('other_ded'),remark:s.remark||'',income,ded,net:round2(income-ded),status:s.status||'draft'}; }
+function slipPeople(people){ const m={}; people.forEach(p=>m[p.name]={name:p.name,due:p.due});
+  (DB.commSlips||[]).forEach(s=>{ if(s.company===(S.company||'')&&s.period===S.commP&&!m[s.person]) m[s.person]={name:s.person,due:0}; });
+  return Object.values(m).sort((a,b)=>a.name<b.name?-1:1); }
+function slipTable(P, people, fx){
+  const list=slipPeople(people); S._spn=list.map(x=>x.name); const pd=slipPayDay(P);
+  const b2=n=>n?Math.round(n).toLocaleString('en-US'):'—';
+  let T={usd:0,thb:0,ded:0,net:0};
+  const trs=list.map((x,i)=>{ const c=slipCalc(x.name,x.due,fx); const st=staffOf(x.name); T.usd+=c.usd; T.thb+=c.thb; T.ded+=c.ded; T.net+=c.net;
+    const stp=c.status==='sent'?`<span class="pill inc" title="${esc(c.s.sent_at||'')}">✓ ส่งแล้ว</span>`:(c.status==='final'?'<span class="pill fc">บันทึกแล้ว</span>':'<span class="pill off">ร่าง</span>');
+    return `<tr><td><b>${esc(x.name)}</b>${st?'':' <span class="pill exp" style="font-size:9px" title="ไม่พบในรายชื่อพนักงาน — เพิ่มที่ปุ่ม รายชื่อพนักงาน">ไม่มีในรายชื่อ</span>'}<br><span class="mini">${esc((st&&st.position)||'')}</span></td>
+      <td class="n">${fmt2(c.usd)}</td><td class="n">${b2(c.thb)}</td><td class="n">${b2(c.back_pay+c.other_income)}</td><td class="n">${b2(c.tax)}</td><td class="n">${b2(c.sso)}</td><td class="n">${b2(c.visa_wp)}</td><td class="n">${b2(c.overpay+c.other_ded)}</td><td class="n"><b>฿${Math.round(c.net).toLocaleString('en-US')}</b></td><td>${stp}</td>
+      <td style="white-space:nowrap">${commCanEdit()&&!c.frozen?`<button class="btn link" onclick="slipEdit(S._spn[${i}])">แก้ไข/หัก</button>`:''}<button class="btn link" onclick="slipPrint(S._spn[${i}])">🖨️ สลิป</button>${commCanEdit()?`<button class="btn link" onclick="slipMail(S._spn[${i}])">✉️ ส่งเมล</button>`:''}</td></tr>`; }).join('');
+  const head=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+     <label class="mini" style="display:flex;gap:6px;align-items:center">วันจ่าย (Pay day) <input type="date" value="${pd}" style="width:auto" onchange="S.commPayDay=S.commPayDay||{};S.commPayDay['${P.key}']=this.value;render()"></label>
+     ${!fx?'<span class="pill exp">ยังไม่ได้ใส่เรต USD→THB ด้านบน</span>':''}
+     <span class="sp" style="flex:1"></span>
+     ${commCanEdit()?'<button class="btn sm ghost" onclick="staffManage()">👥 รายชื่อพนักงาน</button>':''}</div>`;
+  return head+`<div class="card" style="overflow-x:auto"><table><thead><tr><th>พนักงาน</th><th class="n">คอม (USD)</th><th class="n">คอม (฿)</th><th class="n">+ รายได้อื่น</th><th class="n">ภาษี</th><th class="n">ประกันสังคม</th><th class="n">วีซ่า/WP</th><th class="n">หักอื่น</th><th class="n">โอนเข้าบัญชี</th><th>สถานะ</th><th></th></tr></thead>
+    <tbody>${trs||'<tr><td colspan="11"><div class="emptyc" style="padding:20px">ไม่มีคอมที่ต้องจ่ายในรอบนี้</div></td></tr>'}</tbody>
+    ${list.length?`<tfoot><tr><td><b>รวม</b></td><td class="n"><b>${fmt2(T.usd)}</b></td><td class="n"><b>${Math.round(T.thb).toLocaleString('en-US')}</b></td><td colspan="5" class="n mini">หักรวม ฿${Math.round(T.ded).toLocaleString('en-US')}</td><td class="n"><b>฿${Math.round(T.net).toLocaleString('en-US')}</b></td><td colspan="2"></td></tr></tfoot>`:''}</table></div>
+    <div class="mini" style="margin-top:8px;opacity:.85">คอมดึงจากการคำนวณรอบนี้อัตโนมัติ · รายการหักกรอกต่อรอบ (เหมือนไฟล์ Excel) · สลิปที่ “ส่งแล้ว” จะล็อกตัวเลขไว้ · ส่งเมลเปิดอีเมลร่างให้ แล้วแนบ PDF สลิปเองก่อนกดส่ง</div>`;
+}
+function slipEdit(person){ const {rows}=commData(S.commP); const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===person); const c=slipCalc(person,p?p.due:0,Number(S.commFx)||0);
+  const f=(id,l,v)=>`<div><label>${l}</label><input type="number" step="0.01" id="sl_${id}" value="${v||0}"></div>`;
+  openModal(`<h2>สลิปคอม · ${esc(person)}</h2><div class="mini" style="margin-bottom:10px">รอบ ${esc(commPeriod(S.commP).label)} · คอม ${fmt2(c.usd)} × ${c.fx||'—'} = ฿${Math.round(c.thb).toLocaleString('en-US')}</div>
+   <div style="font-weight:700;font-size:13px;margin:4px 0">รายได้เพิ่ม (฿)</div><div class="grid2">${f('back_pay','Back pay รอบก่อน',c.back_pay)}${f('other_income','รายได้อื่น',c.other_income)}</div>
+   <div style="font-weight:700;font-size:13px;margin:10px 0 4px">รายการหัก (฿)</div><div class="grid2">${f('tax','ภาษี (Tax)',c.tax)}${f('sso','ประกันสังคม (SSO)',c.sso)}${f('visa_wp','ค่าวีซ่า & WP',c.visa_wp)}${f('overpay','Overpayment รอบก่อน',c.overpay)}${f('other_ded','หักอื่นๆ',c.other_ded)}</div>
+   <div style="margin-top:8px"><label>หมายเหตุ</label><input id="sl_remark" value="${esc(c.remark)}"></div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="sl_save" onclick="slipSave(S._slipP)">บันทึก</button></div>`);
+  S._slipP=person;
+}
+async function slipSave(person, extra){ const {rows}=commData(S.commP); const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===person); const fx=Number(S.commFx)||0;
+  const old=slipGet(person)||{}; const v=id=>{ const el=g('sl_'+id); return el?(parseFloat(el.value)||0):(Number(old[id])||0); };
+  const usd=round2(p?p.due:(Number(old.comm_usd)||0)), thb=round2(usd*fx);
+  const row={id:slipId(person),company:S.company||'',period:S.commP,person,comm_usd:usd,fx:fx||null,comm_thb:thb,back_pay:v('back_pay'),other_income:v('other_income'),tax:v('tax'),sso:v('sso'),visa_wp:v('visa_wp'),overpay:v('overpay'),other_ded:v('other_ded'),
+    remark:(g('sl_remark')?g('sl_remark').value.trim():(old.remark||''))||null,pay_day:slipPayDay(commPeriod(S.commP)),status:old.status==='sent'?'sent':'final',sent_at:old.sent_at||null,sent_by:old.sent_by||null};
+  row.total_income=round2(row.comm_thb+row.back_pay+row.other_income); row.total_ded=round2(row.tax+row.sso+row.visa_wp+row.overpay+row.other_ded); row.net_thb=round2(row.total_income-row.total_ded);
+  Object.assign(row,extra||{});
+  try{ await upsert('cf_comm_slips',[row]); DB.commSlips=(DB.commSlips||[]).filter(s=>s.id!==row.id).concat([Object.assign({},row,{updated_by:USER&&USER.email})]); closeModal(); if(!extra) toast('บันทึกสลิปแล้ว'); render(); return true; }
+  catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); return false; }
+}
+function slipYTD(person, year){ const t={income:0,tax:0,sso:0,visa:0};
+  (DB.commSlips||[]).forEach(s=>{ if(s.company!==(S.company||'')||s.person!==person||!String(s.period).startsWith(year)||s.period>S.commP||s.id===slipId(person)) return;
+    t.income+=Number(s.total_income)||0; t.tax+=Number(s.tax)||0; t.sso+=Number(s.sso)||0; t.visa+=Number(s.visa_wp)||0; }); return t; }
+function slipHtml(person){ const {rows}=commData(S.commP); const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===person); const c=slipCalc(person,p?p.due:0,Number(S.commFx)||0);
+  const P=commPeriod(S.commP), st=staffOf(person)||{}, y=S.commP.slice(0,4), Y=slipYTD(person,y); const pd=(c.s&&c.s.pay_day)||slipPayDay(P);
+  const b=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const half=P.key.endsWith('-1')?'1st Half Comm.':'2nd Half Comm.';
+  return `<div style="border:2px solid #333;padding:18px 22px;max-width:760px;margin:auto;font-family:Tahoma,sans-serif;font-size:13px;color:#111">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #b8912e;padding-bottom:8px">
+     <div><div style="font-size:17px;font-weight:bold">${esc(SLIP_CO.name)}</div><div style="font-size:12px">${esc(SLIP_CO.addr)}</div></div>
+     <div style="text-align:right"><div style="font-size:18px;font-weight:bold">ใบรับเงิน / PAY SLIP</div><div style="font-size:12px">${half}</div></div></div>
+   <table style="width:100%;margin:10px 0;border-collapse:collapse;font-size:13px">
+     <tr><td style="width:24%">Period :</td><td><b>${esc(P.label)}</b></td><td style="width:24%">Pay Day :</td><td><b>${esc(pd?fmtDate(pd):'')}</b></td></tr>
+     <tr><td>Name :</td><td><b>${esc(st.full_name||person)}</b></td><td>Position :</td><td>${esc(st.position||'')}</td></tr>
+     <tr><td>Account Bank :</td><td>${esc(st.bank_account||'—')}</td><td>USD to THB Rate :</td><td>${c.fx||'—'}</td></tr>
+     <tr><td>Commission (US) :</td><td>$${b(c.usd)}</td><td>Commission (THB) :</td><td>฿${b(c.thb)}</td></tr></table>
+   <table style="width:100%;border-collapse:collapse;font-size:13px" border="1" cellpadding="6">
+     <tr style="background:#eee"><th style="text-align:left">Income</th><th style="text-align:right">THB</th><th style="text-align:left">Deduction</th><th style="text-align:right">THB</th></tr>
+     <tr><td>Commission</td><td style="text-align:right">${b(c.thb)}</td><td>Tax</td><td style="text-align:right">${b(c.tax)}</td></tr>
+     <tr><td>Back pay Last Period</td><td style="text-align:right">${b(c.back_pay)}</td><td>SSO</td><td style="text-align:right">${b(c.sso)}</td></tr>
+     <tr><td>Other Income</td><td style="text-align:right">${b(c.other_income)}</td><td>Overpayment Last Period</td><td style="text-align:right">${b(c.overpay)}</td></tr>
+     <tr><td></td><td></td><td>Visa &amp; WP fees</td><td style="text-align:right">${b(c.visa_wp)}</td></tr>
+     <tr><td></td><td></td><td>Other Deduction</td><td style="text-align:right">${b(c.other_ded)}</td></tr>
+     <tr style="font-weight:bold"><td>Total Income</td><td style="text-align:right">${b(c.income)}</td><td>Total Deduction</td><td style="text-align:right">${b(c.ded)}</td></tr>
+     <tr style="font-weight:bold;background:#f6efdc"><td colspan="3">TOTAL AMOUNT CREDIT YOUR ACCOUNT</td><td style="text-align:right">${b(c.net)}</td></tr></table>
+   <table style="width:100%;margin-top:10px;border-collapse:collapse;font-size:12px"><tr>
+     <td>Y-T-D Income: <b>${b(Y.income+c.income)}</b></td><td>Y-T-D Tax: <b>${b(Y.tax+c.tax)}</b></td><td>Y-T-D Social Security: <b>${b(Y.sso+c.sso)}</b></td><td>Y-T-D Visa &amp; WP: <b>${b(Y.visa+c.visa_wp)}</b></td></tr></table>
+   ${c.remark?`<div style="margin-top:8px">Remark : ${esc(c.remark)}</div>`:''}
+   <div style="margin-top:8px;font-size:11px;color:#666">Y-T-D นับจากสลิปที่บันทึกในระบบ (ปี ${y})</div></div>`; }
+function slipPrint(person){ const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Pay Slip · '+esc(person)+' · '+esc(commPeriod(S.commP).label)+'</title><style>body{padding:24px;background:#fff}@media print{body{padding:0}}</style></head><body>'+slipHtml(person)+'</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+async function slipMail(person){ const st=staffOf(person)||{}; if(!st.email){ toast('ยังไม่มีอีเมลของ '+person+' — เพิ่มที่ “รายชื่อพนักงาน”'); return; }
+  const P=commPeriod(S.commP), pd=slipPayDay(P), d1=P.start.slice(8,10).replace(/^0/,''); const {rows}=commData(S.commP);
+  const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===person); const c=slipCalc(person,p?p.due:0,Number(S.commFx)||0);
+  const cut=d1+' - '+dmy(P.end);
+  const subj='Sale Commission Cut Off '+cut+'./Pay day '+dmy(pd);
+  const body='Dear '+(st.full_name||person)+',\n\nPlease find as attached for you sales commission report Cut Off '+cut+'.\n\nCommission: USD '+c.usd.toFixed(2)+' x '+(c.fx||'-')+' = THB '+c.thb.toFixed(2)+'\nTotal deduction: THB '+c.ded.toFixed(2)+'\nTotal amount credit your account: THB '+c.net.toFixed(2)+'\n\nBest regards,\nAccounting';
+  location.href='mailto:'+encodeURIComponent(st.email)+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+  setTimeout(async()=>{ if(confirm('เปิดอีเมลร่างถึง '+st.email+' แล้ว\nแนบ PDF สลิป (ปุ่ม 🖨️ สลิป → บันทึกเป็น PDF) แล้วกดส่งในโปรแกรมอีเมล\n\nส่งเรียบร้อยแล้วใช่ไหม? (ระบบจะบันทึกว่า "ส่งแล้ว" และล็อกตัวเลขสลิปนี้)')){
+    const ok=await slipSave(person,{status:'sent',sent_at:new Date().toISOString(),sent_by:(USER&&USER.email)||null}); if(ok) toast('บันทึกว่าส่งแล้ว ✓'); } },600); }
+function staffManage(){ const L=(DB.staff||[]).slice().sort((a,b)=>a.name<b.name?-1:1);
+  openModal(`<h2>รายชื่อพนักงาน (สำหรับสลิปคอม)</h2><div class="mini" style="margin-bottom:8px">ชื่อที่ใช้ในคอม · ชื่อเต็มบนสลิป · ตำแหน่ง · เลขบัญชี · อีเมล · ชื่อย่อจากฟอร์มขาย (คั่นด้วย ,)</div>
+   <div style="max-height:55vh;overflow:auto"><table style="width:100%;font-size:12px"><thead><tr><th>ชื่อในคอม</th><th>ชื่อเต็ม</th><th>ตำแหน่ง</th><th>เลขบัญชี</th><th>อีเมล</th><th>ชื่อย่อ</th><th></th></tr></thead><tbody>
+   ${L.map((s,i)=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.full_name||'')}</td><td>${esc(s.position||'')}</td><td>${esc(s.bank_account||'—')}</td><td>${esc(s.email||'—')}</td><td>${esc((s.aliases||[]).join(', '))}</td><td><button class="btn link" onclick="staffEdit('${esc(s.id)}')">แก้</button></td></tr>`).join('')}</tbody></table></div>
+   <div class="right" style="margin-top:10px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn pri" onclick="staffEdit('')">＋ เพิ่มพนักงาน</button></div>`); }
+function staffEdit(id){ const s=id?(DB.staff||[]).find(x=>x.id===id):{}; const f=(k,l,v)=>`<div><label>${l}</label><input id="sf_${k}" value="${esc(v||'')}"></div>`;
+  openModal(`<h2>${id?'แก้ไข':'เพิ่ม'}พนักงาน</h2><div class="grid2">${f('name','ชื่อที่ใช้ในคอม *',s.name)}${f('full_name','ชื่อเต็มบนสลิป',s.full_name)}${f('position','ตำแหน่ง',s.position)}${f('bank_account','เลขบัญชี',s.bank_account)}${f('email','อีเมล',s.email)}${f('aliases','ชื่อย่อ (คั่นด้วย ,)',(s.aliases||[]).join(', '))}</div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="staffManage()">กลับ</button><button class="btn pri" onclick="staffSave('${esc(id||'')}')">บันทึก</button></div>`); }
+async function staffSave(id){ const v=k=>(g('sf_'+k).value||'').trim(); const name=v('name'); if(!name){ toast('ใส่ชื่อ'); return; }
+  const row={id:id||('st_'+name.toLowerCase().replace(/[^a-z0-9]+/g,'_')),name,full_name:v('full_name')||null,position:v('position')||null,bank_account:v('bank_account')||null,email:v('email')||null,aliases:v('aliases')?v('aliases').split(',').map(x=>x.trim()).filter(Boolean):[]};
+  try{ await upsert('cf_staff',[row]); DB.staff=(DB.staff||[]).filter(x=>x.id!==row.id).concat([row]); toast('บันทึกแล้ว'); staffManage(); render(); }catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); } }
 function commStatement(name){ const {P,rows}=commData(S.commP); const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===name); if(!p) return; const fx=Number(S.commFx)||0;
   const trs=p.items.filter(x=>x.due>0).map(x=>`<tr><td>${esc(x.cno)}</td><td>${esc(x.cust||'')}</td><td>${esc(x.lab)}</td><td style="text-align:right">${x.pct}%</td><td style="text-align:right">${fmt2(x.total)}</td><td style="text-align:right">${fmt2(x.before)}</td><td style="text-align:right"><b>${fmt2(x.due)}</b></td></tr>`).join('');
   const html=`<h2>ใบสรุปคอม · ${esc(name)}</h2><div class="mini" style="margin-bottom:10px">รอบ ${esc(P.label)}${fx?' · เรต '+fx:''}</div>
