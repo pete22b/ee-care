@@ -220,6 +220,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-t="cashflow">Cash Flow</button>
       <button data-t="income">Record Payment</button>
       <button data-t="arap">AR / AP</button>
+      <button data-t="commission">Commission</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">System</div>
@@ -379,7 +380,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',arap:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -713,6 +714,164 @@ function rARAP(){ const v=S.arapView||'ar';
    <div id="arap_body"></div>`;
   if(v==='ap') rAP('arap_body'); else rAR('arap_body');
 }
+/* ============ Commission — sales commission released by cash-in (deposit / installment / balance), paid 1–15 & 16–end ============
+   Per contract: total per role = Deal Nett × % (Overprice roles use Overprice). Released = total × Cash-in % (received ÷ purchase).
+   To Pay this period = released at period end − already paid (opening + confirmed payouts). Setup + payouts live in main entry meta.comm. */
+const COMM_ROLES=[['director','Director',3],['gm','GM',1],['rep','Sales Rep',12],['rep_op','Sales Rep Overprice',0],['to','T/O',2],['to_op','T/O Overprice',0],['support','Support',0],['lm','Line Manager',3],['bu','Button-Up',1],['fu','Follow-Up',1]];
+const COMM_SALE_TYPES=['deposit','admin','installment','balance'];
+const round2=x=>Math.round((Number(x)||0)*100)/100;
+function fmt2(n){ return curSym()+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function commCanEdit(){ return payCanVerify(); }
+function commPeriodOf(d){ return d.slice(0,7)+'-'+(Number(d.slice(8,10))<=15?'1':'2'); }
+function commPeriod(key){ const [y,m,h]=key.split('-'); const mk=y+'-'+m; const L=MON[Number(m)-1]+' '+y;
+  return h==='1'?{key,start:mk+'-01',end:mk+'-15',label:'1–15 '+L}:{key,start:mk+'-16',end:lastDayOfMonth(mk),label:'16–'+lastDayOfMonth(mk).slice(8)+' '+L}; }
+function commShift(key,n){ let [y,m,h]=key.split('-').map(Number); const i=(y*12+m-1)*2+(h-1)+n; y=Math.floor(i/24); const r=i%24;
+  return y+'-'+String(Math.floor(r/2)+1).padStart(2,'0')+'-'+(r%2+1); }
+function commLastFx(){ let best=null; DB.entries.forEach(e=>{ ((e.meta&&e.meta.comm&&e.meta.comm.payouts)||[]).forEach(p=>{ if(p.fx&&(!best||p.at>best.at)) best=p; }); }); return best?best.fx:''; }
+function commData(pkey){ const P=commPeriod(pkey); const co=(S&&S.company)||'';
+  const byE={}; DB.lines.forEach(l=>{ if(COMM_SALE_TYPES.includes(l.line_type)) (byE[l.entry_id]=byE[l.entry_id]||[]).push(l); });
+  const m={};
+  DB.entries.forEach(e=>{ if(e.kind!=='income'||!e.category) return; if(co&&e.company!==co) return;
+    const gp=(m[e.category]=m[e.category]||{cno:e.category,company:e.company||'',name:'',active:true,lines:[],main:null});
+    if(e.description&&!gp.name) gp.name=e.description.replace(/\n/g,' & ');
+    if(e.active===false) gp.active=false;
+    const ls=byE[e.id]; if(ls&&ls.length){ gp.lines.push(...ls); if(!gp.main) gp.main=e; } });
+  const okPaid=l=>l.paid && l.paid_date && !(l.pay_meta&&l.pay_meta.verified===false);
+  const amt=l=>Number(l.paid_amount!=null?l.paid_amount:l.amount)||0;
+  const rows=[], nofin=[];
+  Object.values(m).forEach(gp=>{ if(!gp.main){ nofin.push(gp); return; } if(!gp.active) return;
+    const c=(gp.main.meta||{}).comm||null;
+    const purchase=gp.lines.reduce((s,l)=>s+(Number(l.amount)||0),0);
+    const recvEnd=gp.lines.filter(l=>okPaid(l)&&l.paid_date<=P.end).reduce((s,l)=>s+amt(l),0);
+    const recvIn=gp.lines.filter(l=>okPaid(l)&&l.paid_date>=P.start&&l.paid_date<=P.end).reduce((s,l)=>s+amt(l),0);
+    const pending=gp.lines.filter(l=>l.paid&&l.pay_meta&&l.pay_meta.verified===false&&(l.paid_date||'')<=P.end).reduce((s,l)=>s+amt(l),0);
+    const cashIn=purchase>0?Math.min(1,recvEnd/purchase):0;
+    const r={cno:gp.cno,company:gp.company,name:gp.name,main:gp.main,purchase,recvEnd,recvIn,pending,cashIn,setup:!!c,roles:[],toPay:0,paid:false};
+    if(c){ const base=Number(c.deal_nett)||0, op=Number(c.overprice)||0;
+      COMM_ROLES.forEach(([k,lab])=>{ const rc=(c.roles||{})[k]; if(!rc||!rc.name) return; const pct=Number(rc.pct)||0;
+        const total=round2(((k==='rep_op'||k==='to_op')?op:base)*pct/100);
+        const pays=(c.payouts||[]).filter(p=>p.role===k);
+        const before=round2(pays.filter(p=>p.period<pkey).reduce((s,p)=>s+Number(p.amount||0),0)+(Number(rc.opening)||0));
+        const thisP=pays.filter(p=>p.period===pkey);
+        const released=round2(total*cashIn);
+        const due=thisP.length?round2(thisP.reduce((s,p)=>s+Number(p.amount||0),0)):Math.max(0,round2(released-before));
+        r.roles.push({k,lab,name:rc.name,pct,total,before,released,due,paid:thisP.length>0});
+        r.toPay=round2(r.toPay+due); if(thisP.length) r.paid=true; }); }
+    rows.push(r); });
+  rows.sort((a,b)=>a.cno<b.cno?-1:1);
+  return {P,rows,nofin};
+}
+function commPeople(rows){ const m={};
+  rows.forEach(r=>r.roles.forEach(x=>{ if(!x.due && !x.released) return; const p=(m[x.name]=m[x.name]||{name:x.name,due:0,n:0,paid:true,items:[]});
+    p.due=round2(p.due+x.due); if(x.due){ p.n++; if(!x.paid) p.paid=false; } p.items.push(Object.assign({cno:r.cno,cust:r.name},x)); }));
+  return Object.values(m).filter(p=>p.due>0).sort((a,b)=>b.due-a.due);
+}
+function rCommission(){
+  if(!S.commP) S.commP=commPeriodOf(TODAY);
+  if(S.commFx==null) S.commFx=commLastFx()||'';
+  const {P,rows,nofin}=commData(S.commP); const v=S.commView||'person'; const fx=Number(S.commFx)||0;
+  const set=rows.filter(r=>r.setup), unset=rows.filter(r=>!r.setup);
+  const tot=round2(set.reduce((s,r)=>s+r.toPay,0)); const people=commPeople(set);
+  const unpaidTot=round2(set.reduce((s,r)=>s+r.roles.filter(x=>!x.paid).reduce((a,x)=>a+x.due,0),0));
+  const recvIn=rows.reduce((s,r)=>s+r.recvIn,0); const pend=rows.reduce((s,r)=>s+r.pending,0);
+  const open=P.end>=TODAY; const R='text-align:right';
+  const head=`<div class="head"><div><h1>Commission · ค่าคอมมิชชั่น</h1><p class="mini">คอมปล่อยตามเงินที่ลูกค้าจ่ายเข้าจริง (deposit / installment / balance ที่บัญชียืนยันแล้ว) · จ่ายเดือนละ 2 รอบ: 1–15 และ 16–สิ้นเดือน${S.company?' · บริษัท: <b>'+esc(S.company)+'</b>':''}</p></div></div>`;
+  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+     <button class="btn sm ghost" onclick="S.commP=commShift(S.commP,-1);render()">◀</button>
+     <b style="min-width:150px;text-align:center">รอบ ${esc(P.label)}</b>
+     <button class="btn sm ghost" onclick="S.commP=commShift(S.commP,1);render()">▶</button>
+     ${open?'<span class="pill off">รอบนี้ยังไม่จบ</span>':''}
+     <span class="sp" style="flex:1"></span>
+     <label class="mini" style="display:flex;gap:6px;align-items:center">USD→THB <input type="number" step="0.01" value="${esc(S.commFx)}" style="width:80px" onchange="S.commFx=this.value;render()"></label>
+     ${commCanEdit()&&unpaidTot>0?`<button class="btn pri" onclick="commConfirm()">✓ ยืนยันจ่ายรอบนี้ (${fmt2(unpaidTot)})</button>`:''}
+     ${commCanEdit()&&set.some(r=>r.paid)?`<button class="btn sm ghost" onclick="commUndo()">↩ ยกเลิกยืนยันรอบนี้</button>`:''}
+   </div>`;
+  const kpis=`<div class="kpis">
+     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt2(tot)}</div><div class="l">คอมรอบนี้${fx?' · ฿'+Math.round(tot*fx).toLocaleString('en-US'):''}</div></div>
+     <div class="kpi"><div class="v">${people.length}</div><div class="l">คนที่ได้คอมรอบนี้</div></div>
+     <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recvIn)}</div><div class="l">เงินเข้าในรอบนี้${pend?' · <span style="color:var(--expense)">รอยืนยัน '+fmt(pend)+'</span>':''}</div></div>
+     <div class="kpi"><div class="v">${unset.length}</div><div class="l">สัญญายังไม่ตั้งค่าคอม</div></div></div>`;
+  const seg=`<div class="toolbar" style="margin-bottom:12px"><div class="seg">
+     <button class="${v==='person'?'on':''}" onclick="S.commView='person';render()">👤 รายคน</button>
+     <button class="${v==='contract'?'on':''}" onclick="S.commView='contract';render()">📄 รายสัญญา</button>
+   </div></div>`;
+  let body='';
+  if(v==='person'){
+    S._cpn=people.map(p=>p.name);
+    const trs=people.map((p,i)=>`<tr><td><b>${esc(p.name)}</b></td><td class="mini">${p.n} รายการ</td><td class="n">${fmt2(p.due)}</td><td class="n">${fx?'฿'+Math.round(p.due*fx).toLocaleString('en-US'):'—'}</td><td>${p.paid?'<span class="pill inc">✓ จ่ายแล้ว</span>':'<span class="pill off">รอจ่าย</span>'}</td><td><button class="btn link" onclick="commStatement(S._cpn[${i}])">ใบสรุปคอม</button></td></tr>`).join('');
+    body=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>พนักงาน</th><th></th><th class="n">To Pay (USD)</th><th class="n">THB</th><th>สถานะ</th><th></th></tr></thead><tbody>${trs||'<tr><td colspan="6"><div class="emptyc" style="padding:20px">ไม่มีคอมที่ต้องจ่ายในรอบนี้</div></td></tr>'}</tbody></table></div>`;
+  } else {
+    S.commOpen=S.commOpen||{};
+    const trs=rows.map(r=>{ const o=!!S.commOpen[r.cno];
+      const st=!r.setup?'<span class="pill exp">ยังไม่ตั้งค่า</span>':(r.paid?'<span class="pill inc">✓ จ่ายแล้ว</span>':(r.toPay>0?'<span class="pill off">รอจ่าย</span>':'<span class="mini" style="opacity:.5">—</span>'));
+      let det='';
+      if(o&&r.setup) det=`<tr><td colspan="8" style="background:var(--line2);padding:6px 10px"><table style="width:100%;font-size:12px"><thead><tr><th>ตำแหน่ง</th><th>ชื่อ</th><th class="n">%</th><th class="n">คอมทั้งสัญญา</th><th class="n">ปล่อยแล้วถึงสิ้นรอบ</th><th class="n">จ่ายไปก่อนหน้า</th><th class="n">To Pay</th></tr></thead><tbody>${r.roles.map(x=>`<tr><td>${esc(x.lab)}</td><td>${esc(x.name)}</td><td class="n">${x.pct}%</td><td class="n">${fmt2(x.total)}</td><td class="n">${fmt2(x.released)}</td><td class="n">${fmt2(x.before)}</td><td class="n"><b>${fmt2(x.due)}</b>${x.paid?' ✓':''}</td></tr>`).join('')||'<tr><td colspan="7" class="mini">ยังไม่ได้ใส่ชื่อคนได้คอม</td></tr>'}</tbody></table></td></tr>`;
+      return `<tr style="cursor:pointer" onclick="S.commOpen['${esc(r.cno)}']=!S.commOpen['${esc(r.cno)}'];render()"><td style="white-space:nowrap"><b>${r.setup?(o?'▾ ':'▸ '):''}${esc(r.cno)}</b></td><td class="mini">${esc(r.name||'—')}</td><td class="n">${fmt(r.purchase)}</td><td class="n">${fmt(r.recvEnd)} <span class="mini">(${Math.round(r.cashIn*100)}%)</span></td><td class="n">${r.recvIn?fmt(r.recvIn):'—'}</td><td class="n"><b>${r.setup?fmt2(r.toPay):'—'}</b></td><td>${st}</td><td onclick="event.stopPropagation()">${commCanEdit()?`<button class="btn link" onclick="commSetup('${esc(r.cno)}')">${r.setup?'แก้ไข':'ตั้งค่าคอม'}</button>`:''}</td></tr>`+det; }).join('');
+    body=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th class="n">ราคาซื้อ</th><th class="n">รับแล้วถึงสิ้นรอบ</th><th class="n">รับในรอบนี้</th><th class="n">To Pay</th><th>สถานะ</th><th></th></tr></thead><tbody>${trs||'<tr><td colspan="8"><div class="emptyc" style="padding:20px">ไม่มีสัญญาที่มีข้อมูลการเงิน</div></td></tr>'}</tbody></table></div>`;
+  }
+  const notes=[];
+  if(unset.length) notes.push(`⚠ ${unset.length} สัญญายังไม่ตั้งค่าคอม (ใส่ Deal Nett + ชื่อคนได้คอม) — ดูที่แท็บ “รายสัญญา”`);
+  if(nofin.length) notes.push(`ℹ ${nofin.length} สัญญายังไม่มีข้อมูลการเงิน (ราคา/งวด) จึงยังคิดคอมไม่ได้`);
+  notes.push('Button-Up / Follow-Up ใช้สูตร Deal Nett × % เหมือนตำแหน่งอื่นไปก่อน — ยอดในไฟล์ Excel ไม่ตรงสูตรนี้ รอบัญชียืนยันฐานการคิด');
+  g('main').innerHTML=head+bar+kpis+seg+body+`<div class="mini" style="margin-top:12px;line-height:1.8;opacity:.85">${notes.join('<br>')}</div>`;
+}
+function commSetup(cno){ if(!commCanEdit()){ toast('ไม่มีสิทธิ์'); return; }
+  const r=commData(S.commP).rows.find(x=>x.cno===cno); if(!r) return; const mt=r.main.meta||{}; const c=mt.comm||{}; const sl=mt.sales||{};
+  const dn=c.deal_nett!=null?c.deal_nett:(mt.net_price!=null?Number(mt.net_price):round2(r.purchase-(Number(mt.admin_fee)||0)));
+  const pre={rep:sl.consultant||'',to:sl.to||sl.consultant||'',lm:sl.man||''};
+  const rowsH=COMM_ROLES.map(([k,lab,def])=>{ const rc=(c.roles||{})[k]||{}; const nm=rc.name!=null?rc.name:(pre[k]||'');
+    return `<tr><td>${esc(lab)}</td><td><input id="cm_n_${k}" value="${esc(nm)}" style="width:100%"></td><td><input id="cm_p_${k}" type="number" step="0.01" value="${rc.pct!=null?rc.pct:def}" style="width:70px"></td><td><input id="cm_o_${k}" type="number" step="0.01" value="${rc.opening||0}" style="width:90px"></td></tr>`; }).join('');
+  openModal(`<h2>ตั้งค่าคอม · ${esc(cno)}</h2>
+   <div class="mini" style="margin-bottom:10px">${esc(r.name||'')} · ราคาซื้อ ${fmt(r.purchase)} · รับแล้ว ${fmt(r.recvEnd)} (${Math.round(r.cashIn*100)}%)</div>
+   <div class="grid2">
+     <div><label>Deal Nett (USD) — ฐานคิดคอม</label><input id="cm_dn" type="number" step="0.01" value="${dn}"></div>
+     <div><label>Overprice (USD) — ขายเกินราคาตั้ง</label><input id="cm_op" type="number" step="0.01" value="${c.overprice||0}"></div>
+   </div>
+   <div class="mini" style="margin:6px 0 10px">Deal Nett = ราคาซื้อ − Admin − Gift − Trade-in − Refund · ชื่อที่เติมไว้ให้ดึงมาจากฟอร์มขาย (Consultant / TO / MAN) แก้ได้ · เว้นชื่อว่าง = ตำแหน่งนั้นไม่มีคนได้คอม</div>
+   <div style="overflow-x:auto"><table style="width:100%;font-size:12.5px"><thead><tr><th>ตำแหน่ง</th><th>ชื่อ</th><th>%</th><th>จ่ายไปแล้วก่อนเข้าระบบ (USD)</th></tr></thead><tbody>${rowsH}</tbody></table></div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="cm_save" onclick="commSaveSetup('${esc(cno)}')">บันทึก</button></div>`);
+}
+async function commSaveSetup(cno){ const r=commData(S.commP).rows.find(x=>x.cno===cno); if(!r) return; const e=r.main;
+  const old=(e.meta&&e.meta.comm)||{}; const roles={};
+  COMM_ROLES.forEach(([k])=>{ const nm=(g('cm_n_'+k).value||'').trim(); if(!nm) return; roles[k]={name:nm,pct:parseFloat(g('cm_p_'+k).value)||0,opening:parseFloat(g('cm_o_'+k).value)||0}; });
+  const comm=Object.assign({},old,{deal_nett:parseFloat(g('cm_dn').value)||0,overprice:parseFloat(g('cm_op').value)||0,roles,payouts:old.payouts||[],updated_by:(USER&&USER.email)||null,updated_at:new Date().toISOString()});
+  const meta=Object.assign({},e.meta||{},{comm}); const b=g('cm_save'); if(b){ b.disabled=true; b.textContent='กำลังบันทึก…'; }
+  try{ await patchRow('cf_entries',e.id,{meta}); e.meta=meta; closeModal(); toast('บันทึกการตั้งค่าคอมแล้ว'); render(); }
+  catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); if(b){ b.disabled=false; b.textContent='บันทึก'; } }
+}
+async function commConfirm(){ const {P,rows}=commData(S.commP); const fx=Number(S.commFx)||0;
+  const todo=rows.filter(r=>r.setup&&r.roles.some(x=>!x.paid&&x.due>0));
+  const sum=round2(todo.reduce((s,r)=>s+r.roles.filter(x=>!x.paid).reduce((a,x)=>a+x.due,0),0));
+  if(!fx && !confirm('ยังไม่ได้ใส่เรต USD→THB — ยืนยันต่อโดยไม่มีเรต?')) return;
+  if(!confirm(`ยืนยันจ่ายคอมรอบ ${P.label}\nรวม ${fmt2(sum)} · ${todo.length} สัญญา${P.end>=TODAY?'\n\n⚠ รอบนี้ยังไม่จบ — เงินที่เข้าหลังจากนี้จะไปอยู่รอบถัดไป':''}`)) return;
+  const at=new Date().toISOString(), by=(USER&&USER.email)||null; let n=0;
+  try{ for(const r of todo){ const e=r.main; const c=Object.assign({},e.meta.comm); const pays=(c.payouts||[]).slice();
+      r.roles.filter(x=>!x.paid&&x.due>0).forEach(x=>pays.push({period:P.key,role:x.k,person:x.name,amount:x.due,fx:fx||null,at,by}));
+      c.payouts=pays; const meta=Object.assign({},e.meta,{comm:c}); await patchRow('cf_entries',e.id,{meta}); e.meta=meta; n++; }
+    toast('ยืนยันจ่ายแล้ว '+n+' สัญญา · '+fmt2(sum)); render();
+  }catch(err){ toast('ยืนยันไม่ครบ ('+n+'/'+todo.length+'): '+err.message); render(); }
+}
+async function commUndo(){ const {P,rows}=commData(S.commP);
+  const reason=prompt('ยกเลิกการยืนยันจ่ายคอมรอบ '+P.label+'\nใส่เหตุผล (บันทึกไว้):'); if(reason===null) return; if(!reason.trim()){ toast('ต้องใส่เหตุผล'); return; }
+  const at=new Date().toISOString(), by=(USER&&USER.email)||null;
+  try{ for(const r of rows.filter(x=>x.paid)){ const e=r.main; const c=Object.assign({},e.meta.comm); const pays=c.payouts||[];
+      const gone=pays.filter(p=>p.period===P.key); c.payouts=pays.filter(p=>p.period!==P.key);
+      c.voided=(c.voided||[]).concat(gone.map(p=>Object.assign({},p,{voided_at:at,voided_by:by,reason:reason.trim()})));
+      const meta=Object.assign({},e.meta,{comm:c}); await patchRow('cf_entries',e.id,{meta}); e.meta=meta; }
+    toast('ยกเลิกการยืนยันรอบนี้แล้ว'); render();
+  }catch(err){ toast('ยกเลิกไม่สำเร็จ: '+err.message); render(); }
+}
+function commStatement(name){ const {P,rows}=commData(S.commP); const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===name); if(!p) return; const fx=Number(S.commFx)||0;
+  const trs=p.items.filter(x=>x.due>0).map(x=>`<tr><td>${esc(x.cno)}</td><td>${esc(x.cust||'')}</td><td>${esc(x.lab)}</td><td style="text-align:right">${x.pct}%</td><td style="text-align:right">${fmt2(x.total)}</td><td style="text-align:right">${fmt2(x.before)}</td><td style="text-align:right"><b>${fmt2(x.due)}</b></td></tr>`).join('');
+  const html=`<h2>ใบสรุปคอม · ${esc(name)}</h2><div class="mini" style="margin-bottom:10px">รอบ ${esc(P.label)}${fx?' · เรต '+fx:''}</div>
+   <div style="overflow-x:auto"><table style="width:100%;font-size:12.5px"><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th>ตำแหน่ง</th><th style="text-align:right">%</th><th style="text-align:right">คอมทั้งสัญญา</th><th style="text-align:right">จ่ายไปก่อนหน้า</th><th style="text-align:right">รอบนี้</th></tr></thead><tbody>${trs}</tbody>
+   <tfoot><tr><td colspan="6" style="text-align:right"><b>รวมรอบนี้</b></td><td style="text-align:right"><b>${fmt2(p.due)}</b>${fx?'<br>฿'+(p.due*fx).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}</td></tr></tfoot></table></div>`;
+  S._commPrint=html;
+  openModal(html+`<div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn pri" onclick="commPrint()">🖨️ พิมพ์</button></div>`);
+}
+function commPrint(){ const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Commission Statement</title><style>body{font-family:Tahoma,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 7px;font-size:12px}th{background:#eee}.mini{color:#555;font-size:12px}h2{margin:0 0 4px}</style></head><body>'+S._commPrint+'</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
 /* ---- OPC Wages history / trends ---- */
 async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
 function rMktHistory(){
@@ -958,6 +1117,7 @@ function render(){
   if(S.tab==='ar') return rAR();
   if(S.tab==='ap') return rAP();
   if(S.tab==='arap') return rARAP();
+  if(S.tab==='commission') return rCommission();
   if(S.tab==='stays') return rStays();
   if(S.tab==='registry') return rRegistry();
   if(S.tab==='bookings') return rBookings();
