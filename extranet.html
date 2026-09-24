@@ -72,7 +72,7 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
 .top-in .brand-tag{margin-left:14px;padding-left:14px;border-left:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#b8912e;line-height:28px}
 .top .right{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2);white-space:nowrap;flex:none}
 .gsearch{position:relative;flex:1 1 auto;max-width:680px;margin:0 auto}
-.gsearch input{width:100%;padding:11px 16px;border-radius:22px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.gsearch input{width:100%;padding:10px 14px;border-radius:10px;background:#fff;border:1px solid var(--line);font-size:13.5px}
 .gsearch input:focus{background:#fff;border-color:var(--brand);box-shadow:0 0 0 3px var(--brandsoft)}
 .gsres{position:absolute;top:calc(100% + 8px);right:0;width:380px;max-width:86vw;max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:60;padding:6px}
 .gsres.hide{display:none}
@@ -190,7 +190,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 <div class="top"><div class="top-in">
   <div class="brand"><img src="logo.png" alt="Elite Escapes" class="logo"><span class="brand-tag">Extranet</span></div>
   <div class="gsearch">
-    <input id="gsq" type="search" placeholder="🔍  ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
+    <input id="gsq" type="search" placeholder="ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
     <div id="gsres" class="gsres hide"></div>
   </div>
   <div class="right" id="userbox"></div>
