@@ -405,9 +405,9 @@ function cssId(s){ return String(s).replace(/[^a-z0-9]+/gi,'_'); }
 let _gs={list:[],hl:-1};
 function globalSearch(q){ q=(q||'').trim().toLowerCase(); if(q.length<2) return []; const res=[];
   try{ membershipContracts().forEach(gp=>{ const m=gp.meta||{}; const names=((gp.entries[0]&&gp.entries[0].description)||'').replace(/\n/g,' & ');
-    const hay=[gp.cno,names,m.unit,m.nationality,m.rep,m.channel,m.city].filter(Boolean).join(' ').toLowerCase();
-    if(hay.indexOf(q)>=0) res.push({type:'Contract',icon:'📄',tab:'stays',label:gp.cno,sub:[names,m.unit].filter(Boolean).join(' · '),
-      go:()=>{ goto('stays'); S.syOpen[gp.cno]=true; render(); setTimeout(()=>{ const el=g('sy_'+cssId(gp.cno)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600);} },90); }}); }); }catch(e){}
+    const hay=[gp.cno,names,m.unit,m.nationality,m.customer_code,m.rep,m.channel,m.city].filter(Boolean).join(' ').toLowerCase();
+    if(hay.indexOf(q)>=0) res.push({type:'Contract',icon:'📄',tab:'receipts',label:gp.cno,sub:[names,m.unit].filter(Boolean).join(' · '),
+      go:()=>{ S.regStatus='all'; arGo(gp.cno); }}); }); }catch(e){} /* Contracts & Payments is the center — open the contract's card there */
   (DB.bookings||[]).forEach(b=>{ const hay=[b.member_name,b.membership_no,b.email].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
     res.push({type:'Booking',icon:'📩',tab:'bookings',label:b.member_name||b.membership_no||'Booking',sub:[b.membership_no,b.check_in].filter(Boolean).join(' · '),go:()=>{ goto('bookings'); openBooking(b.id); }}); });
   (DB.bankAccounts||[]).forEach(a=>{ const hay=[a.name,a.bank,a.number,a.company].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
@@ -1950,18 +1950,16 @@ function rReceipts(){
     <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (to receive)</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(payOut)}</div><div class="l">Interval fees to pay</div></div></div>`;
-  const q=(S.regQ||'').trim().toLowerCase(), st=S.regStatus||'all';
+  const st=S.regStatus||'all';
   const allG=Object.values(groups);
-  let list=allG.filter(gp=>{ const o=reg[gp.cno]; const e0=Object.values(gp.entries)[0]||{};
-    if(q && ((gp.cno||'')+' '+((o&&o.name)||e0.description||e0.title||'')+' '+((o&&o.meta.nationality)||'')+' '+((o&&o.meta.customer_code)||'')).toLowerCase().indexOf(q)<0) return false;
+  let list=allG.filter(gp=>{ const o=reg[gp.cno];
     if(st==='nofin') return !gp.items.length;
     if(st!=='all'){ if(!o) return false; return (o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st; }
     return true; }).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
   const nofinN=allG.filter(gp=>!gp.items.length).length;
   const opt=(v,l)=>`<option value="${v}"${st===v?' selected':''}>${l}</option>`;
-  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
-     <input id="rcq" placeholder="ค้นหา ชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.regQ||'')}" oninput="S.regQ=this.value;clearTimeout(window._rt);window._rt=setTimeout(()=>{render();const i=g('rcq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},250)" style="flex:1;min-width:220px">
-     <select onchange="S.regStatus=this.value;render()">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}</select>
+  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+     <select onchange="S.regStatus=this.value;render()" style="width:auto;min-width:180px">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}</select>
      <button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button>
      <span class="mini">${list.length} สัญญา${list.length!==allG.length?' (จาก '+allG.length+')':''}</span></div>`;
   const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
