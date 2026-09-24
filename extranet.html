@@ -746,7 +746,7 @@ function commData(pkey){ const P=commPeriod(pkey); const co=(S&&S.company)||'';
     const recvIn=gp.lines.filter(l=>okPaid(l)&&l.paid_date>=P.start&&l.paid_date<=P.end).reduce((s,l)=>s+amt(l),0);
     const pending=gp.lines.filter(l=>l.paid&&l.pay_meta&&l.pay_meta.verified===false&&(l.paid_date||'')<=P.end).reduce((s,l)=>s+amt(l),0);
     const cashIn=purchase>0?Math.min(1,recvEnd/purchase):0;
-    const r={cno:gp.cno,company:gp.company,name:gp.name,main:gp.main,purchase,recvEnd,recvIn,pending,cashIn,setup:!!c,roles:[],toPay:0,paid:false};
+    const r={cno:gp.cno,company:gp.company,name:gp.name,main:gp.main,purchase,recvEnd,recvIn,pending,cashIn,setup:!!c,check:(c&&c.check)||'',roles:[],toPay:0,paid:false};
     if(c){ const base=Number(c.deal_nett)||0, op=Number(c.overprice)||0;
       COMM_ROLES.forEach(([k,lab])=>{ const rc=(c.roles||{})[k]; if(!rc||!rc.name) return; const pct=Number(rc.pct)||0;
         const total=round2(((k==='rep_op'||k==='to_op')?op:base)*pct/100);
@@ -806,7 +806,7 @@ function rCommission(){
       const st=!r.setup?'<span class="pill exp">ยังไม่ตั้งค่า</span>':(r.paid?'<span class="pill inc">✓ จ่ายแล้ว</span>':(r.toPay>0?'<span class="pill off">รอจ่าย</span>':'<span class="mini" style="opacity:.5">—</span>'));
       let det='';
       if(o&&r.setup) det=`<tr><td colspan="8" style="background:var(--line2);padding:6px 10px"><table style="width:100%;font-size:12px"><thead><tr><th>ตำแหน่ง</th><th>ชื่อ</th><th class="n">%</th><th class="n">คอมทั้งสัญญา</th><th class="n">ปล่อยแล้วถึงสิ้นรอบ</th><th class="n">จ่ายไปก่อนหน้า</th><th class="n">To Pay</th></tr></thead><tbody>${r.roles.map(x=>`<tr><td>${esc(x.lab)}</td><td>${esc(x.name)}</td><td class="n">${x.pct}%</td><td class="n">${fmt2(x.total)}</td><td class="n">${fmt2(x.released)}</td><td class="n">${fmt2(x.before)}</td><td class="n"><b>${fmt2(x.due)}</b>${x.paid?' ✓':''}</td></tr>`).join('')||'<tr><td colspan="7" class="mini">ยังไม่ได้ใส่ชื่อคนได้คอม</td></tr>'}</tbody></table></td></tr>`;
-      return `<tr style="cursor:pointer" onclick="S.commOpen['${esc(r.cno)}']=!S.commOpen['${esc(r.cno)}'];render()"><td style="white-space:nowrap"><b>${r.setup?(o?'▾ ':'▸ '):''}${esc(r.cno)}</b></td><td class="mini">${esc(r.name||'—')}</td><td class="n">${fmt(r.purchase)}</td><td class="n">${fmt(r.recvEnd)} <span class="mini">(${Math.round(r.cashIn*100)}%)</span></td><td class="n">${r.recvIn?fmt(r.recvIn):'—'}</td><td class="n"><b>${r.setup?fmt2(r.toPay):'—'}</b></td><td>${st}</td><td onclick="event.stopPropagation()">${commCanEdit()?`<button class="btn link" onclick="commSetup('${esc(r.cno)}')">${r.setup?'แก้ไข':'ตั้งค่าคอม'}</button>`:''}</td></tr>`+det; }).join('');
+      return `<tr style="cursor:pointer" onclick="S.commOpen['${esc(r.cno)}']=!S.commOpen['${esc(r.cno)}'];render()"><td style="white-space:nowrap"><b>${r.setup?(o?'▾ ':'▸ '):''}${esc(r.cno)}</b>${r.check?` <span class="pill exp" style="font-size:9px" title="${esc(r.check)}">⚠ ตรวจ</span>`:''}</td><td class="mini">${esc(r.name||'—')}</td><td class="n">${fmt(r.purchase)}</td><td class="n">${fmt(r.recvEnd)} <span class="mini">(${Math.round(r.cashIn*100)}%)</span></td><td class="n">${r.recvIn?fmt(r.recvIn):'—'}</td><td class="n"><b>${r.setup?fmt2(r.toPay):'—'}</b></td><td>${st}</td><td onclick="event.stopPropagation()">${commCanEdit()?`<button class="btn link" onclick="commSetup('${esc(r.cno)}')">${r.setup?'แก้ไข':'ตั้งค่าคอม'}</button>`:''}</td></tr>`+det; }).join('');
     body=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>สัญญา</th><th>ลูกค้า</th><th class="n">ราคาซื้อ</th><th class="n">รับแล้วถึงสิ้นรอบ</th><th class="n">รับในรอบนี้</th><th class="n">To Pay</th><th>สถานะ</th><th></th></tr></thead><tbody>${trs||'<tr><td colspan="8"><div class="emptyc" style="padding:20px">ไม่มีสัญญาที่มีข้อมูลการเงิน</div></td></tr>'}</tbody></table></div>`;
   }
   const notes=[];
@@ -818,11 +818,12 @@ function rCommission(){
 function commSetup(cno){ if(!commCanEdit()){ toast('ไม่มีสิทธิ์'); return; }
   const r=commData(S.commP).rows.find(x=>x.cno===cno); if(!r) return; const mt=r.main.meta||{}; const c=mt.comm||{}; const sl=mt.sales||{};
   const dn=c.deal_nett!=null?c.deal_nett:(mt.net_price!=null?Number(mt.net_price):round2(r.purchase-(Number(mt.admin_fee)||0)));
-  const pre={rep:sl.consultant||'',to:sl.to||sl.consultant||'',lm:sl.man||''};
+  const pre={rep:sl.consultant||'',to:sl.to||'',lm:sl.man||'',fu:mt.fu||''};
   const rowsH=COMM_ROLES.map(([k,lab,def])=>{ const rc=(c.roles||{})[k]||{}; const nm=rc.name!=null?rc.name:(pre[k]||'');
     return `<tr><td>${esc(lab)}</td><td><input id="cm_n_${k}" value="${esc(nm)}" style="width:100%"></td><td><input id="cm_p_${k}" type="number" step="0.01" value="${rc.pct!=null?rc.pct:def}" style="width:70px"></td><td><input id="cm_o_${k}" type="number" step="0.01" value="${rc.opening||0}" style="width:90px"></td></tr>`; }).join('');
   openModal(`<h2>ตั้งค่าคอม · ${esc(cno)}</h2>
    <div class="mini" style="margin-bottom:10px">${esc(r.name||'')} · ราคาซื้อ ${fmt(r.purchase)} · รับแล้ว ${fmt(r.recvEnd)} (${Math.round(r.cashIn*100)}%)</div>
+   ${c.check?`<div style="border:1px solid var(--expense);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12.5px">⚠ <b>ต้องตรวจ:</b> ${esc(c.check)}<br><span class="mini">กดบันทึกหลังตรวจแล้ว ป้ายนี้จะหายไป</span></div>`:''}
    <div class="grid2">
      <div><label>Deal Nett (USD) — ฐานคิดคอม</label><input id="cm_dn" type="number" step="0.01" value="${dn}"></div>
      <div><label>Overprice (USD) — ขายเกินราคาตั้ง</label><input id="cm_op" type="number" step="0.01" value="${c.overprice||0}"></div>
@@ -834,7 +835,7 @@ function commSetup(cno){ if(!commCanEdit()){ toast('ไม่มีสิทธ�
 async function commSaveSetup(cno){ const r=commData(S.commP).rows.find(x=>x.cno===cno); if(!r) return; const e=r.main;
   const old=(e.meta&&e.meta.comm)||{}; const roles={};
   COMM_ROLES.forEach(([k])=>{ const nm=(g('cm_n_'+k).value||'').trim(); if(!nm) return; roles[k]={name:nm,pct:parseFloat(g('cm_p_'+k).value)||0,opening:parseFloat(g('cm_o_'+k).value)||0}; });
-  const comm=Object.assign({},old,{deal_nett:parseFloat(g('cm_dn').value)||0,overprice:parseFloat(g('cm_op').value)||0,roles,payouts:old.payouts||[],updated_by:(USER&&USER.email)||null,updated_at:new Date().toISOString()});
+  const comm=Object.assign({},old,{deal_nett:parseFloat(g('cm_dn').value)||0,overprice:parseFloat(g('cm_op').value)||0,roles,payouts:old.payouts||[],check:null,updated_by:(USER&&USER.email)||null,updated_at:new Date().toISOString()});
   const meta=Object.assign({},e.meta||{},{comm}); const b=g('cm_save'); if(b){ b.disabled=true; b.textContent='กำลังบันทึก…'; }
   try{ await patchRow('cf_entries',e.id,{meta}); e.meta=meta; closeModal(); toast('บันทึกการตั้งค่าคอมแล้ว'); render(); }
   catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); if(b){ b.disabled=false; b.textContent='บันทึก'; } }
