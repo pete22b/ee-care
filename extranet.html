@@ -204,7 +204,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="navgrp">
       <div class="navlbl">Member Service</div>
-      <button data-t="registry">ทะเบียนสัญญา</button>
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Member Benefits</button>
     </div>
@@ -385,7 +384,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:'finance',ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data',import:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -1126,7 +1125,7 @@ function render(){
   if(S.tab==='arap') return rARAP();
   if(S.tab==='commission') return rCommission();
   if(S.tab==='stays') return rStays();
-  if(S.tab==='registry') return rRegistry();
+  if(S.tab==='registry'){ S.tab='receipts'; return render(); } /* old Registry page merged into Contracts & Payments */
   if(S.tab==='bookings') return rBookings();
   if(S.tab==='guests') return rGuests();
   if(S.tab==='mktwages') return rMktWages();
@@ -1815,43 +1814,13 @@ function registryData(){ const co=(S&&S.company)||''; const m={};
   });
   return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
 }
-function rRegistry(){
-  let data=registryData(); const q=(S.regQ||'').trim().toLowerCase();
-  if(q) data=data.filter(o=>((o.cno+' '+o.name+' '+(o.meta.nationality||'')+' '+(o.meta.customer_code||'')).toLowerCase().indexOf(q)>=0));
-  const st=S.regStatus||'all'; if(st!=='all') data=data.filter(o=>(o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st);
-  const tot=registryData().length;
-  const byCo={}; registryData().forEach(o=>byCo[o.company]=(byCo[o.company]||0)+1);
-  const R='text-align:right',C='text-align:center';
-  const head=`<div class="head"><div><h1>ทะเบียนสัญญา (Registry)</h1><p class="mini">รายชื่อสัญญาทั้งหมดในระบบ — มีหรือยังไม่มีข้อมูลการเงินก็แสดง · บริษัท: <b>${esc(S.company||'')}</b> (เปลี่ยนที่หน้า Companies)</p></div>${canAddContract()?'<button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
-  const chips=Object.entries(byCo).map(([c,n])=>`<span class="pill fc" style="margin:2px 6px 2px 0">${esc(c)} · ${n}</span>`).join('');
-  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:12px">
-     <input id="regq" placeholder="ค้นหา ชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.regQ||'')}" oninput="S.regQ=this.value;clearTimeout(window._rt);window._rt=setTimeout(rRegistry,200)" style="flex:1;min-width:220px">
-     <select onchange="S.regStatus=this.value;rRegistry()"><option value="all"${st==='all'?' selected':''}>ทุกสถานะ</option><option value="completed"${st==='completed'?' selected':''}>Completed</option><option value="cancelled"${st==='cancelled'?' selected':''}>Cancelled</option><option value="upgraded"${st==='upgraded'?' selected':''}>Upgraded</option></select>
-   </div>`;
-  const th=(t,s)=>`<th style="${s||''};font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">${t}</th>`;
-  const yn=v=>v==='✓'||v===true?'<span style="color:var(--income)">✓</span>':(v&&v!=='—'?esc(String(v)):'<span style="color:var(--ink3)">—</span>');
-  let trs=data.map(o=>{ const mt=o.meta; const term=termOf(o.cno); const use=(mt.fyo&&(mt.lyo||(term&&mt.fyo+term-1)))?(mt.fyo+'–'+(mt.lyo||mt.fyo+term-1)):'—';
-    const status=mt.status||(o.active?'Active':'Cancelled'); const stc=/cancel/i.test(status)?'off':(/upgrad/i.test(status)?'fc':'inc');
-    return `<tr>
-      <td style="white-space:nowrap"><b>${esc(o.cno)}</b>${o.contract_path?' 📎':''}</td>
-      <td><span class="pill fc" style="font-size:10px">${esc(o.company)}</span></td>
-      <td>${esc(o.name||'—')}</td>
-      <td class="mini">${esc(mt.nationality||'—')}</td>
-      <td class="${C}">${term?term+' ปี':'—'}</td>
-      <td class="${C}">${esc(mt.suite||'—')}</td>
-      <td class="${C} mini">${esc(mt.season||'—')}</td>
-      <td class="${C}"><span class="pill ${stc}" style="font-size:10px">${esc(status)}</span></td>
-      <td class="mini">${mt.sign_date?fmtDate(mt.sign_date):'—'}</td>
-      <td class="${C} mini">${use}</td>
-      <td class="${C}">${mt.ii_tier?'<span class="pill inc" style="font-size:10px">'+esc(mt.ii_tier)+'</span>':yn(mt.interval_raw&&mt.interval_raw.slice(0,3))}</td>
-      <td class="${C}">${yn(mt.holiday_plus)}</td>
-      <td class="${C}">${yn(mt.etd)}</td>
-      <td class="${C}">${yn(mt.udp)}</td>
-    </tr>`; }).join('');
-  if(!data.length) trs='<tr><td colspan="14"><div class="emptyc" style="padding:24px">ไม่พบสัญญา</div></td></tr>';
-  const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${th('สัญญา')}${th('แบรนด์')}${th('ลูกค้า')}${th('สัญชาติ')}${th('ระยะ',C)}${th('ห้อง',C)}${th('Season',C)}${th('สถานะ',C)}${th('ทำสัญญา')}${th('ใช้สิทธิ์',C)}${th('Interval',C)}${th('H.Plus',C)}${th('ETD',C)}${th('UDP',C)}</tr></thead><tbody>${trs}</tbody></table></div>`;
-  g('main').innerHTML=head+`<div class="mini" style="margin:0 0 10px">${data.length} สัญญา${q||st!=='all'?' (กรองจาก '+tot+')':''} · ${chips}</div>`+bar+table;
-}
+/* contract facts shown on each Contracts & Payments card (term, suite, season, status, use years, Interval / H.Plus / ETD / UDP) */
+function regInfo(o){ if(!o) return null; const mt=o.meta||{}; const term=termOf(o.cno);
+  const use=(mt.fyo&&(mt.lyo||(term&&mt.fyo+term-1)))?(mt.fyo+'–'+(mt.lyo||mt.fyo+term-1)):'';
+  const flag=(v,l)=>(v===true||v==='✓')?l:((v&&v!=='—'&&v!=='-')?l+' '+v:'');
+  const status=mt.status||(o.active?'':'Cancelled');
+  const bits=[term?term+' ปี':'',mt.suite,mt.season,mt.sign_date?'ทำสัญญา '+fmtDate(mt.sign_date):'',use?'ใช้สิทธิ์ '+use:'',mt.ii_tier?'Interval '+mt.ii_tier:'',flag(mt.holiday_plus,'H.Plus'),flag(mt.etd,'ETD'),flag(mt.udp,'UDP')].filter(Boolean);
+  return {status,txt:bits.join(' · ')}; }
 const NC_PRODUCTS=['EST','ESG','ESP','EX','CUG','EVIP','TCU','VIP','KUD'];
 function ncPrefill(){ /* recompute total + per-instalment preview */
   const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0, n=parseInt(g('nc_ninst').value)||0;
@@ -1892,6 +1861,53 @@ function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิ�
    <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nc_save" onclick="saveNewContract()">สร้างสัญญา</button></div>`);
   ncPrefill(); ncAutoCompany();
 }
+/* deposit + N instalments + MFEE lines (read MFEE fields from the nc_ form) */
+function ncBuildLines(eid,signd,tot,dep,n,inst1){ const lines=[];
+  lines.push({id:eid+'_l0',entry_id:eid,amount:dep,txn_date:signd,repeat:'never',line_type:'deposit',memo:'มัดจำ'});
+  const rem=Math.max(0,tot-dep);
+  if(n>0 && rem>0){ const per=Math.round(rem/n*100)/100; let acc=0;
+    for(let i=0;i<n;i++){ let amt=(i===n-1)?Math.round((rem-acc)*100)/100:per; acc+=per; lines.push({id:eid+'_l'+(i+1),entry_id:eid,amount:amt,txn_date:addMonthsISO(inst1,i),repeat:'never',line_type:'installment',memo:'งวด '+(i+1)+'/'+n}); }
+  }
+  const mfee=parseFloat(g('nc_mfee').value)||0, myrs=parseInt(g('nc_mfeeyrs').value)||0, my1=parseInt(g('nc_mfeey1').value)||0;
+  if(mfee>0 && myrs>0 && my1>0){ const md=signd.slice(4); for(let i=0;i<myrs;i++){ const y=my1+i; lines.push({id:eid+'_mfee_'+y,entry_id:eid,amount:mfee,txn_date:y+md,repeat:'never',line_type:'mfee',memo:'MFEE '+y}); } }
+  return lines; }
+/* add the money side to a contract that is already in the system (e.g. Club Unique import) — same schedule logic as New Contract */
+function openAddFin(eid){ if(!canAddContract()){ toast('ไม่มีสิทธิ์'); return; } const e=DB.entries.find(x=>x.id===eid); if(!e) return; const mt=e.meta||{};
+  const signd=(mt.sign_date&&/^\d{4}-\d{2}-\d{2}$/.test(mt.sign_date))?mt.sign_date:TODAY;
+  openModal(`<h2>เพิ่มข้อมูลการเงิน · ${esc(e.category||'')}</h2>
+   <div class="mini" style="margin-bottom:10px">${esc((e.description||'').replace(/\n/g,' & '))} · ${esc(e.company||'')} — ใส่ตามสัญญาที่เซ็น ระบบแตกงวดให้อัตโนมัติ</div>
+   <div class="grid2">
+     <div><label>Net price (USD)</label><input type="number" id="nc_net" value="${mt.net_price||0}" oninput="ncPrefill()"></div>
+     <div><label>Admin fee (USD)</label><input type="number" id="nc_admin" value="${mt.admin_fee||0}" oninput="ncPrefill()"></div>
+     <div><label>มัดจำ Deposit (USD)</label><input type="number" id="nc_dep" value="0" oninput="ncPrefill()"></div>
+     <div><label>วันมัดจำ</label><input id="nc_signdate" type="date" value="${signd}"></div>
+     <div><label>จำนวนงวด (หลังมัดจำ)</label><input type="number" id="nc_ninst" value="0" oninput="ncPrefill()"></div>
+     <div><label>งวดแรก (วันที่)</label><input id="nc_inst1" type="date" value="${addMonthsISO(signd.slice(0,7)+'-01',1)}"></div>
+   </div>
+   <div class="mini" id="nc_preview" style="margin:8px 2px;padding:8px 10px;background:var(--surface2,#faf8f3);border:1px solid var(--line);border-radius:8px"></div>
+   <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">MFEE / ค่าบริหารรายปี (เว้นว่างถ้าไม่มี)</div>
+   <div class="grid2">
+     <div><label>MFEE ต่อปี (USD)</label><input type="number" id="nc_mfee" value="0"></div>
+     <div><label>จำนวนปี MFEE</label><input type="number" id="nc_mfeeyrs" value="0"></div>
+     <div><label>ปีแรกที่เก็บ MFEE</label><input type="number" id="nc_mfeey1" value="${mt.fyo||''}"></div>
+   </div></div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nc_save" onclick="saveAddFin('${esc(eid)}')">บันทึก</button></div>`);
+  ncPrefill();
+}
+async function saveAddFin(eid){ const e=DB.entries.find(x=>x.id===eid); if(!e) return;
+  if(DB.lines.some(l=>l.entry_id===eid && COMM_SALE_TYPES.includes(l.line_type))){ toast('สัญญานี้มีตารางเงินแล้ว'); return; }
+  const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0, tot=net+adm;
+  if(tot<=0){ toast('กรอกราคา (Net/Admin)'); return; } if(dep>tot){ toast('มัดจำมากกว่ายอดรวม'); return; }
+  const n=parseInt(g('nc_ninst').value)||0; const signd=g('nc_signdate').value||TODAY; const inst1=g('nc_inst1').value||addMonthsISO(signd.slice(0,7)+'-01',1);
+  if(dep<tot && n<=0 && !confirm('ยอดหลังมัดจำยังเหลือ แต่ไม่ได้ใส่จำนวนงวด — บันทึกแค่มัดจำ?')) return;
+  const btn=g('nc_save'); if(btn){ btn.disabled=true; btn.textContent='กำลังบันทึก…'; }
+  try{ const lines=ncBuildLines(eid,signd,tot,dep,n,inst1); await upsert('cf_lines',lines);
+    const meta=Object.assign({},mt0(e),{net_price:net,admin_fee:adm,total_price:tot,needs_financials:false,fin_added_by:(USER&&USER.email)||null,fin_added_at:new Date().toISOString()});
+    await patchRow('cf_entries',eid,{meta}); e.meta=meta; await reloadEL();
+    closeModal(); S.rcOpen[e.category]=true; toast('เพิ่มข้อมูลการเงินแล้ว · '+lines.length+' รายการ'); render();
+  }catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); if(btn){ btn.disabled=false; btn.textContent='บันทึก'; } }
+}
+function mt0(e){ return (e&&e.meta)||{}; }
 async function saveNewContract(){
   const cno=(g('nc_cno').value||'').trim(); if(!cno){ toast('กรอกเลขสัญญา'); return; }
   const net=parseFloat(g('nc_net').value)||0, adm=parseFloat(g('nc_admin').value)||0, dep=parseFloat(g('nc_dep').value)||0;
@@ -1910,17 +1926,10 @@ async function saveNewContract(){
     mv('nationality','nc_nat'); mv('email','nc_email'); mv('phone','nc_phone');
     const company=(g('nc_company')&&g('nc_company').value)||null;
     await upsert('cf_entries',[{id:eid,kind:'income',title:'Sales - '+product+' '+cno,category:cno,company,account:(primaryAccount()||{}).id||null,active:true,description:nameV||null,meta}]);
-    const lines=[];
-    lines.push({id:eid+'_l0',entry_id:eid,amount:dep,txn_date:signd,repeat:'never',line_type:'deposit',memo:'มัดจำ'});
-    const rem=Math.max(0,tot-dep);
-    if(n>0 && rem>0){ const per=Math.round(rem/n*100)/100; let acc=0;
-      for(let i=0;i<n;i++){ let amt=(i===n-1)?Math.round((rem-acc)*100)/100:per; acc+=per; lines.push({id:eid+'_l'+(i+1),entry_id:eid,amount:amt,txn_date:addMonthsISO(inst1,i),repeat:'never',line_type:'installment',memo:'งวด '+(i+1)+'/'+n}); }
-    }
-    const mfee=parseFloat(g('nc_mfee').value)||0, myrs=parseInt(g('nc_mfeeyrs').value)||0, my1=parseInt(g('nc_mfeey1').value)||0;
-    if(mfee>0 && myrs>0 && my1>0){ const md=signd.slice(4); for(let i=0;i<myrs;i++){ const y=my1+i; lines.push({id:eid+'_mfee_'+y,entry_id:eid,amount:mfee,txn_date:y+md,repeat:'never',line_type:'mfee',memo:'MFEE '+y}); } }
+    const lines=ncBuildLines(eid,signd,tot,dep,n,inst1);
     await upsert('cf_lines',lines);
     await reloadEL();
-    closeModal(); toast('สร้างสัญญา '+cno+' แล้ว · '+lines.length+' รายการ'); S.tab='stays'; render();
+    closeModal(); toast('สร้างสัญญา '+cno+' แล้ว · '+lines.length+' รายการ'); S.rcOpen[cno]=true; goto('receipts');
   }catch(e){ toast('สร้างไม่สำเร็จ: '+e.message); if(btn){ btn.disabled=false; btn.textContent='สร้างสัญญา'; } }
 }
 
@@ -1928,19 +1937,33 @@ function rReceipts(){
   // group by CONTRACT (category); entries with no category fall back to their own id
   const groups={}; const kindOf={};
   allLines().forEach(({l,e})=>{ const k=rcKey(e); const g=(groups[k]=groups[k]||{key:k,cno:e.category||null,entries:{},items:[]}); g.items.push({l,e}); g.entries[e.id]=e; kindOf[l.id]=e.kind; });
+  // every contract lives here — also those with no money lines yet (e.g. Club Unique imports); missing data is added from the card
+  const reg={}; registryData().forEach(o=>{ reg[o.cno]=o; if(!groups[o.cno]){ const ents={}; DB.entries.forEach(e=>{ if(e.category===o.cno && (!S.company||e.company===S.company||!e.company)) ents[e.id]=e; }); groups[o.cno]={key:o.cno,cno:o.cno,entries:ents,items:[]}; } });
   // KPIs cover INCOME only (money in). Expenses (we pay) are shown per contract but not counted as receipts.
   const soon=addDaysISO(TODAY,30); let recv=0,out=0,odue=0,odueN=0,dueSoon=0, payOut=0;
   allLines().forEach(({l,e})=>{ const a=Number(l.amount)||0;
     if(e.kind==='expense'){ if(!l.paid) payOut+=a; return; }
     if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
-  const head=`<div class="head"><div><h1>Contracts &amp; Payments</h1><p class="mini">One card per contract · money in (mark received) and Interval fees we pay (mark paid), each with its slip / credit advice · store the signed contract scan</p></div></div>`;
+  const head=`<div class="head"><div><h1>Contracts &amp; Payments</h1><p class="mini">ทุกสัญญาอยู่ที่นี่ที่เดียว · 1 การ์ดต่อสัญญา · รับเงิน (mark received) / ค่า Interval ที่เราจ่าย พร้อมสลิป · เก็บสัญญาที่เซ็น · บริษัท: <b>${esc(S.company||'')}</b></p></div>${canAddContract()?'<div class="sp"></div><button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recv)}</div><div class="l">Received to date</div></div>
     <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (to receive)</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(odue)}</div><div class="l">${odueN} instalment(s) overdue</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(payOut)}</div><div class="l">Interval fees to pay</div></div></div>`;
-  const list=Object.values(groups).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
-  const bar=`<div class="toolbar" style="margin-bottom:10px"><button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button></div>`;
+  const q=(S.regQ||'').trim().toLowerCase(), st=S.regStatus||'all';
+  const allG=Object.values(groups);
+  let list=allG.filter(gp=>{ const o=reg[gp.cno]; const e0=Object.values(gp.entries)[0]||{};
+    if(q && ((gp.cno||'')+' '+((o&&o.name)||e0.description||e0.title||'')+' '+((o&&o.meta.nationality)||'')+' '+((o&&o.meta.customer_code)||'')).toLowerCase().indexOf(q)<0) return false;
+    if(st==='nofin') return !gp.items.length;
+    if(st!=='all'){ if(!o) return false; return (o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st; }
+    return true; }).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
+  const nofinN=allG.filter(gp=>!gp.items.length).length;
+  const opt=(v,l)=>`<option value="${v}"${st===v?' selected':''}>${l}</option>`;
+  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
+     <input id="rcq" placeholder="ค้นหา ชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.regQ||'')}" oninput="S.regQ=this.value;clearTimeout(window._rt);window._rt=setTimeout(()=>{render();const i=g('rcq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},250)" style="flex:1;min-width:220px">
+     <select onchange="S.regStatus=this.value;render()">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}</select>
+     <button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button>
+     <span class="mini">${list.length} สัญญา${list.length!==allG.length?' (จาก '+allG.length+')':''}</span></div>`;
   const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
       const pill= st==='paid'?`<span class="pill inc">✓ ${exp?'Paid':'Received'}</span>`:(st==='overdue'?'<span class="pill exp">● Overdue</span>':`<span class="pill off">${exp?'To pay':'Due'}</span>`);
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
@@ -1970,12 +1993,17 @@ function rReceipts(){
       ? `📄 <a href="#" onclick="openFile('cf-contracts','${esc(cp.path)}');return false">${esc(cp.name||'Signed contract')}</a> · <button class="btn link" onclick="uploadContract('${esc(mainE.id)}')">replace</button>`
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(mainE.id)}')">📄 Upload signed contract</button>`);
     const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===incL.length&&incL.length?' <span class="pill inc">complete</span>':'');
+    const ri=regInfo(reg[gp.cno]); const nofin=!gp.items.length;
+    const stPill= ri&&ri.status ? ` <span class="pill ${/cancel/i.test(ri.status)?'off':(/upgrad/i.test(ri.status)?'fc':'inc')}" style="font-size:10px">${esc(ri.status)}</span>` : '';
+    const money= nofin
+      ? `<span class="pill off" style="font-size:10px">ยังไม่มีข้อมูลการเงิน</span>${canAddContract()?` <button class="btn link" onclick="event.stopPropagation();openAddFin('${esc(mainE.id)}')">＋ เพิ่มข้อมูลการเงิน</button>`:''}`
+      : `Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${incL.length} instalments${expTot?' · <span style="color:var(--expense)">Interval we pay '+fmt(expTot)+'</span>':''}`;
     return `<div class="card" id="rc_${cssId(gp.key)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
-      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}<br><span class="mini">Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${incL.length} instalments${expTot?' · <span style="color:var(--expense)">Interval we pay '+fmt(expTot)+'</span>':''}</span></div>
+      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${stPill}${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}${ri&&ri.txt?'<br><span class="mini" style="opacity:.85">'+esc(ri.txt)+'</span>':''}<br><span class="mini">${money}</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
-      ${open?`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
+      ${open?(nofin?`<div class="mini" style="border-top:1px solid var(--line);padding:12px 16px;opacity:.8">ยังไม่มีตารางเงินของสัญญานี้ — กด “＋ เพิ่มข้อมูลการเงิน” เพื่อใส่ราคา / มัดจำ / งวด / MFEE แล้วจะรับเงินและแนบสลิปได้เหมือนสัญญาอื่น</div>`:`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`):''}</div>`;
   }).join('');
-  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No contracts yet.</div></div>');
+  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">ไม่พบสัญญา</div></div>');
 }
 /* ===== Payment record locking + audit trail =====
    A payment that is paid AND has evidence attached is LOCKED (read-only). Unlocking to edit needs a reason and is logged.
@@ -2082,6 +2110,7 @@ async function saveReceipt(id){
       const term=gv('r_card_term'); if(term) pm.card_term=term;
       if(Object.keys(pm).length) pay_meta=pm;
     }
+    if(!payCanVerify()) pay_meta=Object.assign({},pay_meta||{},{verified:false}); /* Member Service keys it → accounting verifies */
     const patch={paid:true,paid_date:g('r_date').value||TODAY,paid_amount:parseFloat(g('r_amt').value)||Number(l.amount),method:method,paid_note:g('r_note').value.trim()||null,paid_by:USER&&USER.email,proof_path:path,proof_name:name,pay_meta:pay_meta};
     await patchRow('cf_lines',id,patch);
     // audit: what changed
