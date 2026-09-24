@@ -726,6 +726,8 @@ const COMM_SALE_TYPES=['deposit','admin','installment','balance'];
 const round2=x=>Math.round((Number(x)||0)*100)/100;
 function fmt2(n){ return curSym()+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function commCanEdit(){ return payCanVerify(); }
+function commStaffNames(){ const s=new Set(); (DB.staff||[]).forEach(x=>x.short_name&&s.add(x.short_name));
+  DB.entries.forEach(e=>{ const r=(e.meta&&e.meta.comm&&e.meta.comm.roles)||{}; Object.values(r).forEach(x=>x&&x.name&&s.add(x.name)); }); return [...s].sort(); }
 function commPeriodOf(d){ return d.slice(0,7)+'-'+(Number(d.slice(8,10))<=15?'1':'2'); }
 function commPeriod(key){ const [y,m,h]=key.split('-'); const mk=y+'-'+m; const L=MON[Number(m)-1]+' '+y;
   return h==='1'?{key,start:mk+'-01',end:mk+'-15',label:'1–15 '+L}:{key,start:mk+'-16',end:lastDayOfMonth(mk),label:'16–'+lastDayOfMonth(mk).slice(8)+' '+L}; }
@@ -750,14 +752,21 @@ function commData(pkey){ const P=commPeriod(pkey); const co=(S&&S.company)||'';
     const recvIn=gp.lines.filter(l=>okPaid(l)&&l.paid_date>=P.start&&l.paid_date<=P.end).reduce((s,l)=>s+amt(l),0);
     const pending=gp.lines.filter(l=>l.paid&&l.pay_meta&&l.pay_meta.verified===false&&(l.paid_date||'')<=P.end).reduce((s,l)=>s+amt(l),0);
     const cashIn=purchase>0?Math.min(1,recvEnd/purchase):0;
+    const depEnd=gp.lines.filter(l=>l.line_type==='deposit'&&okPaid(l)&&l.paid_date<=P.end).reduce((s,l)=>s+amt(l),0);
+    const instEnd=recvEnd-depEnd;
     const r={cno:gp.cno,company:gp.company,name:gp.name,main:gp.main,purchase,recvEnd,recvIn,pending,cashIn,setup:!!c,check:(c&&c.check)||'',roles:[],toPay:0,paid:false};
     if(c){ const base=Number(c.deal_nett)||0, op=Number(c.overprice)||0;
       COMM_ROLES.forEach(([k,lab])=>{ const rc=(c.roles||{})[k]; if(!rc||!rc.name) return; const pct=Number(rc.pct)||0;
-        const total=round2(((k==='rep_op'||k==='to_op')?op:base)*pct/100);
+        /* Button-Up + Follow-Up share one rate (as in accounting's Excel): BU gets the deposit share, paid in full once the deposit is in;
+           FU gets the rest, released by instalments received ÷ Deal Nett. Every other role: Deal Nett × % released by cash-in. */
+        const depShare=purchase>0?Math.min(1,depEnd/purchase):0;
+        let total, released;
+        if(k==='bu'){ total=round2(base*pct/100*depShare); released=total; }
+        else if(k==='fu'){ total=round2(base*pct/100*(1-depShare)); released=(purchase>0&&recvEnd>=purchase-0.005)?total:round2(total*(base>0?Math.min(1,instEnd/base):0)); } /* fully paid → FU released in full */
+        else { total=round2(((k==='rep_op'||k==='to_op')?op:base)*pct/100); released=round2(total*cashIn); }
         const pays=(c.payouts||[]).filter(p=>p.role===k);
         const before=round2(pays.filter(p=>p.period<pkey).reduce((s,p)=>s+Number(p.amount||0),0)+(Number(rc.opening)||0));
         const thisP=pays.filter(p=>p.period===pkey);
-        const released=round2(total*cashIn);
         const due=thisP.length?round2(thisP.reduce((s,p)=>s+Number(p.amount||0),0)):Math.max(0,round2(released-before));
         r.roles.push({k,lab,name:rc.name,pct,total,before,released,due,paid:thisP.length>0});
         r.toPay=round2(r.toPay+due); if(thisP.length) r.paid=true; }); }
@@ -816,7 +825,7 @@ function rCommission(){
   const notes=[];
   if(unset.length) notes.push(`⚠ ${unset.length} สัญญายังไม่ตั้งค่าคอม (ใส่ Deal Nett + ชื่อคนได้คอม) — ดูที่แท็บ “รายสัญญา”`);
   if(nofin.length) notes.push(`ℹ ${nofin.length} สัญญายังไม่มีข้อมูลการเงิน (ราคา/งวด) จึงยังคิดคอมไม่ได้`);
-  notes.push('Button-Up / Follow-Up ใช้สูตร Deal Nett × % เหมือนตำแหน่งอื่นไปก่อน — ยอดในไฟล์ Excel ไม่ตรงสูตรนี้ รอบัญชียืนยันฐานการคิด');
+  notes.push('สูตรเหมือนไฟล์ Excel ของบัญชี: ตำแหน่งหลัก = Deal Nett × % ปล่อยตามเงินเข้า · Button-Up + Follow-Up แบ่ง % เดียวกัน — BU ได้ส่วนมัดจำ (จ่ายครบเมื่อได้มัดจำ) · FU ได้ส่วนผ่อน (ปล่อยตามงวดที่รับ ÷ Deal Nett)');
   g('main').innerHTML=head+bar+kpis+seg+body+`<div class="mini" style="margin-top:12px;line-height:1.8;opacity:.85">${notes.join('<br>')}</div>`;
 }
 function commSetup(cno){ if(!commCanEdit()){ toast('ไม่มีสิทธิ์'); return; }
@@ -1858,6 +1867,19 @@ function openNewContract(){ if(!canAddContract()){ toast('ไม่มีสิ�
      <div><label>ปีแรกที่เก็บ MFEE</label><input type="number" id="nc_mfeey1" placeholder="2028"></div>
      <div><label>ปีเข้าพักแรก (FYO)</label><input type="number" id="nc_fyo" placeholder="2027"></div>
    </div></div>
+   <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">ทีมขาย (จากฟอร์มขาย) — ระบบตั้งค่าคอมให้อัตโนมัติ</div>
+   <datalist id="nc_staff">${commStaffNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+   <div class="grid2">
+     <div><label>Consultant / Sales Rep (12%)</label><input id="nc_rep" list="nc_staff"></div>
+     <div><label>T/O · Closer (2%)</label><input id="nc_to" list="nc_staff"></div>
+     <div><label>Line Manager · MAN (3%)</label><input id="nc_lm" list="nc_staff"></div>
+     <div><label>GM (1%)</label><input id="nc_gm" list="nc_staff" value="Yannick Emillien"></div>
+     <div><label>Button-Up (ส่วนมัดจำของ 1%)</label><input id="nc_bu" list="nc_staff"></div>
+     <div><label>Follow-Up (ส่วนผ่อนของ 1%)</label><input id="nc_fu" list="nc_staff"></div>
+     <div><label>Channel</label><select id="nc_chan">${['OPC','IH','TELE','SG','FB'].map(x=>`<option>${x}</option>`).join('')}</select></div>
+     <div><label>Gift (USD) — หักจาก Deal Nett</label><input type="number" id="nc_gift" value="0"></div>
+   </div>
+   <div class="mini" style="margin-top:4px">Deal Nett = Net price − Gift · เว้นชื่อว่าง = ตำแหน่งนั้นไม่มีคอม · แก้ทีหลังได้ที่หน้า Commission</div></div>
    <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="nc_save" onclick="saveNewContract()">สร้างสัญญา</button></div>`);
   ncPrefill(); ncAutoCompany();
 }
@@ -1924,6 +1946,11 @@ async function saveNewContract(){
     if(fyo) meta.fyo=fyo;
     const mv=(k,id2)=>{ const el=g(id2); if(el&&el.value.trim()) meta[k]=el.value.trim(); };
     mv('nationality','nc_nat'); mv('email','nc_email'); mv('phone','nc_phone');
+    /* sales team → meta.sales + commission setup (same rates/rules as accounting's Excel) */
+    const tv=id2=>((g(id2)&&g(id2).value)||'').trim(); const gift=parseFloat(g('nc_gift')&&g('nc_gift').value)||0;
+    meta.sales={consultant:tv('nc_rep'),to:tv('nc_to'),man:tv('nc_lm'),bu:tv('nc_bu'),fu:tv('nc_fu'),channel:tv('nc_chan')}; if(meta.sales.consultant) meta.rep=meta.sales.consultant; if(gift) meta.gift=gift;
+    const roles={}; [['gm','nc_gm',1],['rep','nc_rep',12],['to','nc_to',2],['lm','nc_lm',3],['bu','nc_bu',1],['fu','nc_fu',1]].forEach(([k,id2,p])=>{ const n=tv(id2); if(n) roles[k]={name:n,pct:p,opening:0}; });
+    if(Object.keys(roles).length) meta.comm={deal_nett:round2(net-gift),overprice:0,roles,payouts:[],source:'new-contract',updated_by:(USER&&USER.email)||null,updated_at:new Date().toISOString()};
     const company=(g('nc_company')&&g('nc_company').value)||null;
     await upsert('cf_entries',[{id:eid,kind:'income',title:'Sales - '+product+' '+cno,category:cno,company,account:(primaryAccount()||{}).id||null,active:true,description:nameV||null,meta}]);
     const lines=ncBuildLines(eid,signd,tot,dep,n,inst1);
@@ -1954,19 +1981,21 @@ function rReceipts(){
   const allG=Object.values(groups);
   let list=allG.filter(gp=>{ const o=reg[gp.cno];
     if(st==='nofin') return !gp.items.length;
+    if(st==='verify') return Object.values(gp.entries).some(e=>e.meta&&e.meta.verify&&e.meta.verify.needs);
     if(st!=='all'){ if(!o) return false; return (o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st; }
     return true; }).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
   const nofinN=allG.filter(gp=>!gp.items.length).length;
+  const verN=allG.filter(gp=>Object.values(gp.entries).some(e=>e.meta&&e.meta.verify&&e.meta.verify.needs)).length;
   const opt=(v,l)=>`<option value="${v}"${st===v?' selected':''}>${l}</option>`;
   const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-     <select onchange="S.regStatus=this.value;render()" style="width:auto;min-width:180px">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}</select>
+     <select onchange="S.regStatus=this.value;render()" style="width:auto;min-width:180px">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}${opt('verify','⚠ ต้องตรวจสอบ ('+verN+')')}</select>
      <button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button>
      <span class="mini">${list.length} สัญญา${list.length!==allG.length?' (จาก '+allG.length+')':''}</span></div>`;
   const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
       const pill= st==='paid'?`<span class="pill inc">✓ ${exp?'Paid':'Received'}</span>`:(st==='overdue'?'<span class="pill exp">● Overdue</span>':`<span class="pill off">${exp?'To pay':'Due'}</span>`);
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
       const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">${lineLocked(l)?'🔒 view':'edit'}</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
-      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method))+cardTag(l)+(l.pay_meta&&l.pay_meta.verified===false?' <span class="pill exp" style="font-size:9px">⏳ รอยืนยัน</span>':(l.pay_meta&&l.pay_meta.verified===true?' <span class="pill inc" style="font-size:9px">✓ ยืนยันแล้ว</span>':'')):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
+      return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method))+cardTag(l)+(l.pay_meta&&l.pay_meta.source==='excel-accounting'?' <span class="pill off" style="font-size:9px" title="ยอดยกมาจากไฟล์ Excel คอมของบัญชี — ยังไม่มีสลิปในระบบ">Excel · ไม่มีสลิป</span>':'')+(l.pay_meta&&l.pay_meta.verified===false?' <span class="pill exp" style="font-size:9px">⏳ รอยืนยัน</span>':(l.pay_meta&&l.pay_meta.verified===true?' <span class="pill inc" style="font-size:9px">✓ ยืนยันแล้ว</span>':'')):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
   const blocks=list.map(gp=>{
     const open=!!S.rcOpen[gp.key];
     const allL=gp.items.map(x=>x.l);
@@ -1992,12 +2021,14 @@ function rReceipts(){
       : `<button class="btn sm ghost" onclick="uploadContract('${esc(mainE.id)}')">📄 Upload signed contract</button>`);
     const badge= odN?` <span class="pill exp">${odN} overdue</span>`:(paidN===incL.length&&incL.length?' <span class="pill inc">complete</span>':'');
     const ri=regInfo(reg[gp.cno]); const nofin=!gp.items.length;
+    const vE=ents.find(e=>e.meta&&e.meta.verify&&e.meta.verify.needs); const vf=vE&&vE.meta.verify;
+    const vBadge= vf ? ` <span class="pill exp" style="font-size:10px" title="${esc(vf.note||'')}">⚠ ต้องตรวจสอบ · ${esc(vf.label||'ข้อมูลจาก Excel บัญชี')}</span>${payCanVerify()?` <button class="btn link" onclick="event.stopPropagation();verifyContract('${esc(vE.id)}')">✓ ตรวจแล้ว</button>`:''}` : '';
     const stPill= ri&&ri.status ? ` <span class="pill ${/cancel/i.test(ri.status)?'off':(/upgrad/i.test(ri.status)?'fc':'inc')}" style="font-size:10px">${esc(ri.status)}</span>` : '';
     const money= nofin
       ? `<span class="pill off" style="font-size:10px">ยังไม่มีข้อมูลการเงิน</span>${canAddContract()?` <button class="btn link" onclick="event.stopPropagation();openAddFin('${esc(mainE.id)}')">＋ เพิ่มข้อมูลการเงิน</button>`:''}`
       : `Received ${fmt(paidSum)} / ${fmt(totSum)} · ${paidN}/${incL.length} instalments${expTot?' · <span style="color:var(--expense)">Interval we pay '+fmt(expTot)+'</span>':''}`;
     return `<div class="card" id="rc_${cssId(gp.key)}" style="margin-bottom:10px;transition:box-shadow .3s"><div class="pad rc-head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;cursor:pointer" onclick="toggleRc('${esc(gp.key)}')">
-      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${stPill}${badge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}${ri&&ri.txt?'<br><span class="mini" style="opacity:.85">'+esc(ri.txt)+'</span>':''}<br><span class="mini">${money}</span></div>
+      <div><b>${open?'▾':'▸'} ${esc(gp.cno||mainE.title)}</b> <span class="mini">· ${esc((mainE.description||'').replace(/\n/g,' / '))}</span>${stPill}${badge}${vBadge}${metaLine(mainE)?'<br><span class="mini" style="opacity:.85">'+esc(metaLine(mainE))+'</span>':''}${ri&&ri.txt?'<br><span class="mini" style="opacity:.85">'+esc(ri.txt)+'</span>':''}<br><span class="mini">${money}</span></div>
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
       ${open?(nofin?`<div class="mini" style="border-top:1px solid var(--line);padding:12px 16px;opacity:.8">ยังไม่มีตารางเงินของสัญญานี้ — กด “＋ เพิ่มข้อมูลการเงิน” เพื่อใส่ราคา / มัดจำ / งวด / MFEE แล้วจะรับเงินและแนบสลิปได้เหมือนสัญญาอื่น</div>`:`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`):''}</div>`;
   }).join('');
@@ -2052,6 +2083,12 @@ function openLockedView(l,e){
   if(l.proof_path) embedProof('cf-receipts', l.proof_path, l.proof_name, 'lv_preview');
 }
 function payCanVerify(){ return !!(USER&&USER.is_admin) || hasCat('finance'); }
+/* contract-level "needs checking" flag (data brought in from accounting's Excel, not yet checked against the signed contract) */
+async function verifyContract(eid){ if(!payCanVerify()){ toast('ไม่มีสิทธิ์'); return; } const e=DB.entries.find(x=>x.id===eid); if(!e) return; const vf=(e.meta&&e.meta.verify)||{};
+  const cp=contractPathFor(e.category); const note=prompt('ยืนยันว่าตรวจสัญญา '+(e.category||'')+' แล้ว'+(cp.path?'':'\n(ยังไม่ได้อัปโหลด PDF สัญญา)')+'\nหมายเหตุการตรวจ (ไม่บังคับ):','');
+  if(note===null) return;
+  const meta=Object.assign({},e.meta||{},{verify:Object.assign({},vf,{needs:false,verified_by:(USER&&USER.email)||null,verified_at:new Date().toISOString(),verify_note:note.trim()||null,had_pdf:!!cp.path})});
+  try{ await patchRow('cf_entries',eid,{meta}); e.meta=meta; toast('บันทึกว่าตรวจแล้ว ✓'); render(); }catch(err){ toast('บันทึกไม่สำเร็จ: '+err.message); } }
 async function verifyPay(id){ const l=DB.lines.find(x=>x.id===id); if(!l) return; const e=DB.entries.find(x=>x.id===l.entry_id)||{};
   const pm=Object.assign({},l.pay_meta||{},{verified:true,verified_by:(USER&&USER.email)||null,verified_at:new Date().toISOString()});
   try{ await patchRow('cf_lines',id,{pay_meta:pm}); l.pay_meta=pm; await logPayAudit(l,'verify',null,{verified_by:pm.verified_by}); toast('บัญชียืนยันแล้ว ✓'); openLockedView(l,e); }
