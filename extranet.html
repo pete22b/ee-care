@@ -294,7 +294,12 @@ function allLines(){ const em=Object.fromEntries(DB.entries.map(e=>[e.id,e])); c
 function fillCoSwitch(){ const s=g('coswitch'); if(!s) return; const cos=(DB.companies||[]); const cur=(S&&S.company)||'';
   s.innerHTML='<option value="">🏢 ทุกบริษัท</option>'+cos.map(c=>`<option value="${esc(c.name)}"${cur===c.name?' selected':''}>${esc(c.name)}</option>`).join('');
   s.value=cur; }
-function setCompany(v){ S.company=v||''; render(); }
+/* Strict company separation: the system always works inside ONE company (no combined view). Changed only on the Companies page; remembered per viewer. */
+function pickCompany(){ const names=(DB.companies||[]).map(c=>c.name); if(!names.length) return;
+  if(S.company && names.includes(S.company)) return;
+  let saved=''; try{ saved=localStorage.getItem('ee_company')||''; }catch(e){}
+  S.company=names.includes(saved)?saved:(names.includes('Elite Escapes')?'Elite Escapes':names[0]); }
+function setCompany(v){ if(!v) return; S.company=v; try{ localStorage.setItem('ee_company',v); }catch(e){} render(); }
 
 /* ============ Supabase REST ============ */
 async function token(){ try{ const {data}=await SBC.auth.getSession(); return (data&&data.session)?data.session.access_token:SB_KEY; }catch(e){ return SB_KEY; } }
@@ -1109,6 +1114,7 @@ async function guestSync(){ const gs=DB.guests||[]; if(!gs.length){ toast('ไ�
   }catch(e){ toast('สรุปไม่สำเร็จ: '+e.message); } }
 
 function render(){
+  pickCompany();
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===S.tab));
   if(S.tab==='dashboard') return rDashboard();
   if(S.tab==='cashflow') return rCashflow();
@@ -1205,7 +1211,7 @@ function rDashboard(){
   const banksToUpdate=(DB.bankAccounts||[]).filter(a=>a.active!==false&&a.acct_type!=='cash');
   const notUpdated=banksToUpdate.filter(a=>!(DB.bankSnaps||[]).some(s=>s.account_id===a.id&&s.as_of===S.bankDate));
   // sales
-  const deals=DB.entries.filter(e=>e.kind==='income'&&DB.lines.some(l=>l.entry_id===e.id&&l.line_type==='deposit'));
+  const deals=DB.entries.filter(e=>e.kind==='income'&&(!S.company||e.company===S.company||!e.company)&&DB.lines.some(l=>l.entry_id===e.id&&l.line_type==='deposit'));
   const dMonth=deals.filter(e=>{const d=dealDate(e);return d&&d.slice(0,7)===mk;});
   const dYear=deals.filter(e=>{const d=dealDate(e);return d&&d.slice(0,4)===yr;});
   const valYear=dYear.reduce((s,e)=>s+dealValue(e),0);
@@ -1816,7 +1822,7 @@ function rRegistry(){
   const tot=registryData().length;
   const byCo={}; registryData().forEach(o=>byCo[o.company]=(byCo[o.company]||0)+1);
   const R='text-align:right',C='text-align:center';
-  const head=`<div class="head"><div><h1>ทะเบียนสัญญา (Registry)</h1><p class="mini">รายชื่อสัญญาทั้งหมดในระบบ — มีหรือยังไม่มีข้อมูลการเงินก็แสดง · กรองบริษัทที่แถบบน</p></div>${canAddContract()?'<button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
+  const head=`<div class="head"><div><h1>ทะเบียนสัญญา (Registry)</h1><p class="mini">รายชื่อสัญญาทั้งหมดในระบบ — มีหรือยังไม่มีข้อมูลการเงินก็แสดง · บริษัท: <b>${esc(S.company||'')}</b> (เปลี่ยนที่หน้า Companies)</p></div>${canAddContract()?'<button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
   const chips=Object.entries(byCo).map(([c,n])=>`<span class="pill fc" style="margin:2px 6px 2px 0">${esc(c)} · ${n}</span>`).join('');
   const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:12px">
      <input id="regq" placeholder="ค้นหา ชื่อลูกค้า / เลขสัญญา / สัญชาติ…" value="${esc(S.regQ||'')}" oninput="S.regQ=this.value;clearTimeout(window._rt);window._rt=setTimeout(rRegistry,200)" style="flex:1;min-width:220px">
@@ -2206,7 +2212,7 @@ async function confirmBooking(id){ const b=(DB.bookings||[]).find(x=>x.id===id);
     toast('Confirmed'+(cno&&b.check_in?' · stay logged':'')); await loadAll(); S.tab='bookings'; render();
   }catch(e){ toast('Failed: '+e.message); }
 }
-function contractGroup(cno){ return membershipContracts().find(g=>g.cno===cno)||null; }
+function contractGroup(cno){ return membershipContracts(true).find(g=>g.cno===cno)||null; } /* lookup by number (booking verify) — not a listing */
 /* Full verification: everything the system CAN check for "can this member really stay?".
    Room/date availability is NOT here — it lives in the resort calendar, so it's a manual step. */
 function bookingChecks(b,cno){
@@ -2331,8 +2337,8 @@ function upsellInfo(g){ const ii=iiOf(g.meta); const term=termOf(g.cno); const f
   return {soonest, due, upsell: due<=1, ends}; }
 function toggleSy(cno){ S.syOpen[cno]=!S.syOpen[cno]; render(); }
 function syAll(open){ S.syOpen={}; if(open) membershipContracts().forEach(g=>S.syOpen[g.cno]=true); render(); }
-function membershipContracts(){
-  const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); if(e.contract_path && !g.contract_path){ g.contract_path=e.contract_path; g.contract_name=e.contract_name; } } });
+function membershipContracts(all){ const co=all?'':((S&&S.company)||'');
+  const m={}; DB.entries.forEach(e=>{ if(e.kind==='income' && e.category && (!co || e.company===co || !e.company)){ const g=(m[e.category]=m[e.category]||{cno:e.category,entries:[],meta:{}}); g.entries.push(e); if(e.meta&&Object.keys(e.meta).length) g.meta=Object.assign({},e.meta,g.meta); if(e.contract_path && !g.contract_path){ g.contract_path=e.contract_path; g.contract_name=e.contract_name; } } });
   return Object.values(m).sort((a,b)=>a.cno<b.cno?-1:1);
 }
 function contractPathFor(cat){ const e=(DB.entries||[]).find(x=>x.category===cat && x.contract_path); return e?{path:e.contract_path,name:e.contract_name}:{path:null,name:null}; }
@@ -2700,10 +2706,10 @@ async function runBankImport(){
 /* ============ Companies ============ */
 function rCompanies(){
   const cnt={}; DB.entries.forEach(e=>{ if(e.company) cnt[e.company]=(cnt[e.company]||0)+1; });
-  const cur=(S&&S.company)||''; const tot=Object.values(cnt).reduce((a,b)=>a+b,0);
-  const head=`<div class="head"><div><h1>Companies</h1><p class="mini">คลิกบริษัทเพื่อกรองทั้งระบบให้เห็นเฉพาะบริษัทนั้น (ไม่ปนกัน) · คลิก “ทุกบริษัท” เพื่อดูรวม</p></div><div class="sp"></div><button class="btn pri" onclick="openCompany()">＋ Add company</button></div>`;
+  const cur=(S&&S.company)||'';
+  const head=`<div class="head"><div><h1>Companies</h1><p class="mini">คลิกเลือกบริษัทที่จะทำงาน — ทั้งระบบจะเห็นเฉพาะบริษัทนั้น แยกขาด ไม่ปนกัน · เปลี่ยนบริษัทได้ที่หน้านี้</p></div><div class="sp"></div><button class="btn pri" onclick="openCompany()">＋ Add company</button></div>`;
   const badge=n=>cur===n?'<span class="pill inc">✓ กำลังดู</span>':'';
-  const allRow=`<tr class="corow${cur===''?' on':''}" onclick="setCompany('')"><td><b>🏢 ทุกบริษัท</b> <span class="mini">(ดูรวมทั้งหมด)</span></td><td class="n">${tot} entries</td><td>${badge('')}</td></tr>`;
+  const allRow='';
   const rows=DB.companies.length?DB.companies.map(c=>`<tr class="corow${cur===c.name?' on':''}" onclick="setCompany('${esc(c.name)}')"><td><b>${esc(c.name)}</b>${c.note?'<br><span class="mini">'+esc(c.note)+'</span>':''}</td><td class="n">${cnt[c.name]||0} entries</td><td style="white-space:nowrap">${badge(c.name)} <button class="btn link" onclick="event.stopPropagation();openCompany('${esc(c.id)}')">Edit</button></td></tr>`).join('')
     :'<tr><td colspan="3" style="opacity:.5;padding:20px">No companies yet.</td></tr>';
   g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Company</th><th class="n">Entries</th><th></th></tr></thead><tbody>${allRow}${rows}</tbody></table></div>`;
