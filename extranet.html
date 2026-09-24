@@ -69,6 +69,7 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
 .top-in{max-width:none;margin:0;display:flex;align-items:center;gap:22px;padding:0 24px;height:var(--top-h)}
 .top-in .brand{flex:none;display:flex;align-items:center}
 .top-in .brand .logo{height:40px;width:auto;display:block}
+.top-in .brand-tag{margin-left:14px;padding-left:14px;border-left:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#b8912e;line-height:28px}
 .top .right{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2);white-space:nowrap;flex:none}
 .gsearch{position:relative;flex:1 1 auto;max-width:680px;margin:0 auto}
 .gsearch input{width:100%;padding:11px 16px;border-radius:22px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
@@ -187,7 +188,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 </head>
 <body>
 <div class="top"><div class="top-in">
-  <div class="brand"><img src="logo.png" alt="Elite Escapes" class="logo"></div>
+  <div class="brand"><img src="logo.png" alt="Elite Escapes" class="logo"><span class="brand-tag">Extranet</span></div>
   <div class="gsearch">
     <input id="gsq" type="search" placeholder="🔍  ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
     <div id="gsres" class="gsres hide"></div>
@@ -196,7 +197,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 </div></div>
 <aside class="side">
   <nav class="sidecard" id="tabs">
-    <div class="side-title">Extranet</div>
     <div class="navgrp">
       <div class="navlbl">Overview</div>
       <button data-t="dashboard" class="on">Dashboard</button>
