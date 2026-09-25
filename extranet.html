@@ -332,16 +332,22 @@ function fileContext(path){ const e=(DB.entries||[]).find(x=>x.contract_path===p
 async function logAccess(action, o){ o=o||{};
   await api('cf_access_log',{method:'POST',prefer:'return=minimal',body:JSON.stringify([{actor:(USER&&USER.email)||'?',action,bucket:o.bucket||null,path:o.path||null,name:o.name||null,
     context:o.context||(o.path?fileContext(o.path):null),company:(S&&S.company)||null,tab:(S&&S.tab)||null}])}); }
-async function openFile(bucket, path){ try{ await logAccess('open',{bucket,path}); }catch(e){ toast('เปิดไฟล์ไม่ได้ — บันทึกการเข้าถึงไม่สำเร็จ'); return; }
-  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,300); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
+/* Files are served by the Edge Function "wm-file": it logs the access (server side) and stamps a watermark
+   (viewer email + time) on every page — a downloaded copy carries the name of whoever opened it. JPG/PNG slips come back as a watermarked PDF. */
+async function wmFetch(bucket, path, action, name){ const tok=await token(); if(!tok||tok===SB_KEY) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
+  const r=await fetch(SB_URL+'/functions/v1/wm-file',{method:'POST',headers:{Authorization:'Bearer '+tok,apikey:SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({bucket,path,action,name:name||null,context:fileContext(path),company:(S&&S.company)||null,tab:(S&&S.tab)||null})});
+  if(!r.ok){ let m=''; try{ m=(await r.json()).error; }catch(e){} throw new Error(m||('HTTP '+r.status)); }
+  return r.blob(); }
+async function openFile(bucket, path){ const w=window.open('','_blank'); if(w) w.document.write('<p style="font:14px Tahoma;padding:24px">กำลังเตรียมไฟล์ (ใส่ลายน้ำ)…</p>');
+  try{ const b=await wmFetch(bucket,path,'open'); const u=URL.createObjectURL(b); if(w) w.location.href=u; else window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),300000); }
+  catch(e){ if(w) w.close(); toast('เปิดไฟล์ไม่ได้: '+e.message); } }
 async function embedProof(bucket, path, name, elId){ const box=g(elId); if(!box) return;
-  try{ await logAccess('preview',{bucket,path,name}); }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้ — บันทึกการเข้าถึงไม่สำเร็จ</span>'; return; }
-  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,300); if(error) throw error;
-    const url=data.signedUrl; const ext=((name||path).split('.').pop()||'').toLowerCase();
-    if(['pdf'].includes(ext)) box.innerHTML=`<iframe src="${url}#toolbar=1" title="สลิป"></iframe>`;
-    else if(['png','jpg','jpeg','gif','webp','bmp'].includes(ext)) box.innerHTML=`<a href="${url}" target="_blank" title="คลิกเพื่อดูเต็มจอ"><img src="${url}" alt="สลิป"></a>`;
-    else box.innerHTML=`<a href="${url}" target="_blank">เปิดไฟล์หลักฐาน</a>`;
-  }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้ — กด “เปิดเต็มจอ” ด้านบน</span>'; }
+  try{ const b=await wmFetch(bucket,path,'preview',name); const u=URL.createObjectURL(b); if(!g(elId)) return;
+    if(b.type==='application/pdf') box.innerHTML=`<iframe src="${u}#toolbar=1" title="สลิป"></iframe>`;
+    else if(/^image\//.test(b.type)) box.innerHTML=`<img src="${u}" alt="สลิป">`;
+    else box.innerHTML=`<span class="mini">ไฟล์ชนิดนี้แสดงตัวอย่างไม่ได้ — กด “เปิดเต็มจอ” ด้านบน</span>`;
+  }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้: '+esc(e.message)+'</span>'; }
 }
 /* print watermark: name + time of whoever prints, on every printed page (in-page prints and Ctrl+P); popup prints add it themselves */
 function wmText(){ const d=new Date(); const p=x=>String(x).padStart(2,'0');
