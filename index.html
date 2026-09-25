@@ -81,8 +81,12 @@ label{font-size:12px;font-weight:600;color:var(--ink2);display:block;margin-bott
 .coseg button+button{border-left:1px solid #e3d3a8}
 .coseg button:hover:not(.on){background:#fbf6ea}
 .coseg button.on{color:#fff;cursor:default}
+.yearsel{flex:none;display:flex;align-items:center}
+.yearsel:empty{display:none}
+.yearsel select{width:auto;padding:8px 12px;border-radius:22px;border:1px solid #b8912e;font:600 12.5px/1 inherit;color:#14324a;background:#fff;cursor:pointer}
+.yearsel select:focus{outline:none;box-shadow:0 0 0 3px rgba(184,145,46,.18)}
 .coband{height:24px;display:flex;align-items:center;padding:0 24px;font-size:11.5px;font-weight:700;letter-spacing:.14em;color:#fff}
-@media(max-width:720px){ .coseg button{padding:6px 9px;font-size:11px} .coband{padding:0 14px;font-size:10.5px}
+@media(max-width:720px){ .coseg button{padding:6px 9px;font-size:11px} .yearsel select{padding:6px 8px;font-size:11px;max-width:122px} .coband{padding:0 14px;font-size:10.5px}
   .top-in{gap:10px;padding:0 12px} .top-in .brand-tag{display:none} .gsearch{flex:1 1 60px;min-width:60px} .gsearch input{width:100%!important} .top .right{font-size:11px} }
 #topfilter{flex:none;display:flex;align-items:center}
 #topfilter select{width:auto;min-width:180px;padding:10px 14px;border-radius:10px;border:1px solid #b8912e;font-size:13.5px}
@@ -265,6 +269,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 <div class="top"><div class="top-in">
   <div class="brand"><img src="logo.png" alt="Elite Escapes" class="logo"><span class="brand-tag">Extranet</span></div>
   <div id="coswitch" class="coseg" role="group" aria-label="Company"></div>
+  <div id="yearsel" class="yearsel"></div>
   <div class="gsearch">
     <input id="gsq" type="search" placeholder="ค้นหาทุกอย่าง… ( / )" autocomplete="off" spellcheck="false" oninput="onSearch(this.value)" onkeydown="gsKey(event)" onfocus="onSearch(this.value)">
     <div id="gsres" class="gsres hide"></div>
@@ -368,22 +373,39 @@ function occ(line, from, to){
 /* flatten all lines with parent entry */
 function allLines(){ const em=Object.fromEntries(DB.entries.map(e=>[e.id,e])); const co=S&&S.company;
   return DB.lines.map(l=>({l,e:em[l.entry_id]})).filter(x=>x.e && (!co || x.e.company===co || !x.e.company)); }
-/* top-bar company switch (option C, chosen by the user 2026-09-25): one button per company, no "all" option,
-   plus a colour band under the bar saying which company you are working in */
+/* top-bar company switch (option C, 2026-09-25): one button per company + "รวม" (combined view, added on the user's request
+   2026-09-25) and a contract-year selector; colour band under the bar says what you are looking at */
 const CO_COLOR={'Club Unique':'#7a2e2e','Elite Escapes':'#14324a'};
-function coColor(n){ return CO_COLOR[n]||'#14324a'; }
-function fillCoSwitch(){ const s=g('coswitch'), b=g('coband'); if(!s) return; const cos=(DB&&DB.companies)||[]; const cur=(S&&S.company)||'';
-  if(!USER||!cos.length){ s.innerHTML=''; if(b) b.hidden=true; document.documentElement.style.setProperty('--band-h','0px'); return; }
-  s.innerHTML=cos.map((c,i)=>`<button type="button" class="${cur===c.name?'on':''}" style="${cur===c.name?'background:'+coColor(c.name):''}" ${cur===c.name?'aria-pressed="true"':''} onclick="switchCompany(${i})">${esc(c.name)}</button>`).join('');
-  if(b){ b.hidden=false; b.style.background=coColor(cur); b.textContent='กำลังทำงานใน '+String(cur).toUpperCase(); }
+const CO_ALL_COLOR='#5b5446';
+function coColor(n){ return n?(CO_COLOR[n]||'#14324a'):CO_ALL_COLOR; }
+function coLabel(){ return (S&&S.company)||'รวมทุกบริษัท'; }
+function yearLabel(){ const y=S&&S.year; return !y||y==='all'?'ทุกปี':(Number(y)>=CUR_YEAR_NOW?'ปี '+y+' ขึ้นไป':'ปี '+y); }
+function fillCoSwitch(){ const s=g('coswitch'), b=g('coband'), ys=g('yearsel'); if(!s) return; const cos=(DB&&DB.companies)||[]; const cur=(S&&S.company)||'';
+  if(!USER||!cos.length){ s.innerHTML=''; if(ys) ys.innerHTML=''; if(b) b.hidden=true; document.documentElement.style.setProperty('--band-h','0px'); return; }
+  const btn=(on,label,col,click)=>`<button type="button" class="${on?'on':''}" style="${on?'background:'+col:''}" ${on?'aria-pressed="true"':''} onclick="${click}">${label}</button>`;
+  s.innerHTML=cos.map((c,i)=>btn(cur===c.name,esc(c.name),coColor(c.name),`switchCompany(${i})`)).join('')+btn(!cur,'รวม',CO_ALL_COLOR,'switchCompany(-1)');
+  if(ys){ const yrs=[]; for(let y=CUR_YEAR_NOW; y>=YEAR_MIN; y--) yrs.push(String(y)); const v=S.year||'all';
+    ys.innerHTML=`<select onchange="setYear(this.value)" title="เลือกปีที่ทำสัญญา — โหลดเฉพาะปีที่เลือกให้เบาขึ้น">${yrs.map(y=>`<option value="${y}"${v===y?' selected':''}>${Number(y)===CUR_YEAR_NOW?'สัญญาปี '+y+'+':'สัญญาปี '+y}</option>`).join('')}<option value="all"${v==='all'?' selected':''}>ทุกปี (โหลดทั้งหมด)</option></select>`; }
+  if(b){ b.hidden=false; b.style.background=coColor(cur); b.textContent=(cur?'กำลังทำงานใน '+String(cur).toUpperCase():'กำลังดูรวมทุกบริษัท')+' · '+yearLabel(); }
   document.documentElement.style.setProperty('--band-h','24px'); }
-function switchCompany(i){ const c=(DB.companies||[])[i]; if(!c||c.name===S.company) return; setCompany(c.name); toast('สลับเป็น '+c.name); }
-/* Strict company separation: the system always works inside ONE company (no combined view). Switched from the top bar or the Companies page; remembered per viewer. */
+function switchCompany(i){ if(i<0){ if(!S.company) return; setCompany(''); toast('แสดงผลรวมทุกบริษัท'); return; }
+  const c=(DB.companies||[])[i]; if(!c||c.name===S.company) return; setCompany(c.name); toast('สลับเป็น '+c.name); }
+/* One company at a time by default; "รวม" = combined view (S.coAll, S.company=''). Pages that must stay per company (Commission pay slips) ask to pick one. Remembered per viewer. */
 function pickCompany(){ const names=(DB.companies||[]).map(c=>c.name); if(!names.length) return;
+  if(S.coAll){ S.company=''; return; }
   if(S.company && names.includes(S.company)) return;
   let saved=''; try{ saved=localStorage.getItem('ee_company')||''; }catch(e){}
+  if(saved==='__all'){ S.coAll=true; S.company=''; return; }
   S.company=names.includes(saved)?saved:(names.includes('Elite Escapes')?'Elite Escapes':names[0]); }
-function setCompany(v){ if(!v) return; S.company=v; try{ localStorage.setItem('ee_company',v); }catch(e){} render(); }
+function setCompany(v){ S.coAll=!v; S.company=v||''; try{ localStorage.setItem('ee_company',v||'__all'); }catch(e){} render(); }
+/* contract-year scope: only contracts signed in the chosen year are loaded (current year = that year and later); undated rows always load */
+const CUR_YEAR_NOW=Number(TODAY.slice(0,4)), YEAR_MIN=2016;
+function initYear(){ let y=''; try{ y=localStorage.getItem('ee_year')||''; }catch(e){} S.year=(y==='all'||/^\d{4}$/.test(y))?y:String(CUR_YEAR_NOW); }
+function entriesPath(){ const y=S.year||'all'; let p='cf_entries?select=*&order=title.asc,id.asc';
+  if(y!=='all') p+='&or=(sign_year.is.null,sign_year.'+(Number(y)>=CUR_YEAR_NOW?'gte':'eq')+'.'+Number(y)+')';
+  return p; }
+function linesFor(entries,lines){ const ids=new Set((entries||[]).map(e=>e.id)); return (lines||[]).filter(l=>ids.has(l.entry_id)); }
+async function setYear(y){ S.year=y; try{ localStorage.setItem('ee_year',y); }catch(e){} S.rcLim=60; S.syLim=60; S.fuLim=50; await loadAll(); toast('แสดงสัญญา: '+yearLabel()); }
 
 /* ============ Supabase REST ============ */
 async function token(){ try{ const {data}=await SBC.auth.getSession(); return (data&&data.session)?data.session.access_token:SB_KEY; }catch(e){ return SB_KEY; } }
@@ -397,9 +419,11 @@ async function api(path, opts={}){
 async function apiAll(path){ const out=[]; const sep=path.indexOf('?')>=0?'&':'?';
   for(let off=0; off<200000; off+=1000){ const rows=await api(path+sep+'limit=1000&offset='+off); if(!rows||!rows.length) break; out.push(...rows); if(rows.length<1000) break; }
   return out; }
-async function upsert(table, rows){ if(!rows.length) return; return api(table+'?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(rows.map(r=>Object.assign({updated_by:USER&&USER.email},r)))}); }
+/* sign_year is a generated column in cf_entries — never send it back */
+function noGen(r){ if(r&&typeof r==='object'&&'sign_year' in r){ r=Object.assign({},r); delete r.sign_year; } return r; }
+async function upsert(table, rows){ if(!rows.length) return; return api(table+'?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(rows.map(r=>Object.assign({updated_by:USER&&USER.email},noGen(r))))}); }
 async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); }
-async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(obj)}); }
+async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(noGen(obj))}); }
 /* ---- storage (payment slips + contract scans) ---- */
 /* insert-only: members may add files but cannot read, overwrite or delete them directly (reads go through wm-file) — every path is unique */
 async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:false,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
@@ -526,16 +550,18 @@ async function boot(){
 }
 function logout(){ SBC.auth.signOut().then(()=>location.reload(),()=>location.reload()); }
 async function loadAll(){
-  g('main').innerHTML='<div class="emptyc"><div class="big">⏳</div>Loading cash flow…</div>';
+  if(!S.year) initYear();
+  g('main').innerHTML='<div class="emptyc"><div class="big">⏳</div>Loading · '+esc(yearLabel())+'…</div>';
   try{
-    const [co,ac,ca,en,li,ba,bs,bl,st,bk]=await Promise.all([
+    const [co,ac,ca,en,li0,ba,bs,bl,st,bk]=await Promise.all([
       api('cf_companies?select=*&order=name.asc'), api('cf_accounts?select=*&order=sort.asc'),
-      api('cf_categories?select=*&order=name.asc'), apiAll('cf_entries?select=*&order=title.asc,id.asc'),
+      api('cf_categories?select=*&order=name.asc'), apiAll(entriesPath()),
       apiAll('cf_lines?select=*&order=txn_date.asc,id.asc'),
       api('cf_bank_accounts?select=*&order=sort.asc'), api('cf_bank_snapshots?select=*'),
       api('cf_bank_audit?select=*&order=ts.desc&limit=300'), api('cf_stays?select=*'),
       api('cf_bookings?select=*&order=created_at.desc')
     ]);
+    const li=linesFor(en,li0);
     DB={companies:co||[],accounts:ac||[],categories:ca||[],entries:en||[],lines:li||[],
         bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[],stays:st||[],bookings:(bk||[])};
     /* commission pay slips: staff roster + saved slips (optional — a miss must not block the app) */
@@ -756,7 +782,7 @@ async function mktSave(){ const p=mktPeriod(); const reps=DB.mktReps||[];
     toast('บันทึก + ลงบัญชีแล้ว (สัปดาห์ '+p.week+', '+reps.length+' คน)');
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
 /* ---- accounting sync (wages + taxi -> cf_entries/cf_lines) ---- */
-async function reloadEL(){ try{ const [en,li]=await Promise.all([apiAll('cf_entries?select=*&order=title.asc,id.asc'),apiAll('cf_lines?select=*&order=txn_date.asc,id.asc')]); if(en)DB.entries=en; if(li)DB.lines=li; }catch(e){} }
+async function reloadEL(){ try{ const [en,li]=await Promise.all([apiAll(entriesPath()),apiAll('cf_lines?select=*&order=txn_date.asc,id.asc')]); if(en)DB.entries=en; if(li)DB.lines=linesFor(DB.entries,li); }catch(e){} }
 async function ensureExpEntry(id,title,category){ await upsert('cf_entries',[{id,kind:'expense',title,category,account:(primaryAccount()||{}).id||null,active:true,meta:{source:'auto'}}]); }
 async function syncWageLine(year,week,amount,dateISO){ await ensureExpEntry('en_mkt_wages','ค่าจ้างทีมการตลาด (OPC)','Marketing/OPC Wages');
   await upsert('cf_lines',[{id:'ln_mktw_'+year+'_'+week,entry_id:'en_mkt_wages',amount:Math.round(amount||0),txn_date:dateISO,repeat:'never',line_type:'mktwage',memo:'ค่าจ้าง OPC สัปดาห์ '+week,paid:false}]); }
@@ -956,6 +982,8 @@ function commPeople(rows){ const m={};
   return Object.values(m).filter(p=>p.due>0).sort((a,b)=>b.due-a.due);
 }
 function rCommission(){
+  if(!S.company){ /* pay slips are per company — never mix the two in one slip */
+    g('main').innerHTML=`<div class="head"><div><h1>Commission · ค่าคอมมิชชั่น</h1></div></div><div class="card"><div class="emptyc" style="padding:34px">หน้านี้ทำจ่ายแยกบริษัท — ตอนนี้กำลังดูแบบรวม<br><br>${(DB.companies||[]).map((c,i)=>`<button class="btn pri" style="margin:4px;background:${coColor(c.name)};border-color:${coColor(c.name)}" onclick="switchCompany(${i})">ไปที่ ${esc(c.name)}</button>`).join('')}</div></div>`; return; }
   if(!S.commP) S.commP=commPeriodOf(TODAY);
   if(S.commFx==null) S.commFx=commLastFx()||'';
   const {P,rows,nofin}=commData(S.commP); const v=S.commView||'person'; const fx=Number(S.commFx)||0;
@@ -1220,7 +1248,7 @@ function rFollowup(){
   let list=base.filter(c=>fuInGroup(c,f));
   const pr={unreach:0,trying:1,todo:2,reach:3,active:4,history:5};
   list.sort((a,b)=>(b.due-a.due)||(f==='overdue'?b.odAmt-a.odAmt:0)||(pr[a.st]-pr[b.st])||(b.lastLyo-a.lastLyo)||(a.name<b.name?-1:1));
-  const head=`<div class="head"><div><h1>Member Follow-up · ติดตามลูกค้า</h1><p class="mini">ลูกค้าไหลต่อเนื่อง: สัญญายังเดิน → สัญญาจบ → ติดต่อ → ติดต่อได้ / ติดต่อไม่ได้ (ไม่สำเร็จ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → ลองใหม่ทุก 6 เดือน) · บริษัท: <b>${esc(S.company||'')}</b></p></div></div>`;
+  const head=`<div class="head"><div><h1>Member Follow-up · ติดตามลูกค้า</h1><p class="mini">ลูกค้าไหลต่อเนื่อง: สัญญายังเดิน → สัญญาจบ → ติดต่อ → ติดต่อได้ / ติดต่อไม่ได้ (ไม่สำเร็จ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → ลองใหม่ทุก 6 เดือน) · บริษัท: <b>${esc(coLabel())}</b> · ${esc(yearLabel())}</p></div></div>`;
   const counts={}; FU_GROUPS.forEach(([k])=>counts[k]=base.filter(c=>fuInGroup(c,k)).length);
   const kpis=fuPills(counts,f,'fu')+fuSubBar(all,S.fuSub||{},'fu');
   const lim=S.fuLim||50; S._fu=list.slice(0,lim).map(c=>c.key);
@@ -2406,7 +2434,7 @@ function rReceipts(){
   allLines().forEach(({l,e})=>{ const a=Number(l.amount)||0;
     if(e.kind==='expense'){ if(!l.paid) payOut+=a; return; }
     if(l.paid) recv+=Number(l.paid_amount!=null?l.paid_amount:a); else { out+=a; if(l.txn_date<TODAY){odue+=a;odueN++;} else if(l.txn_date<=soon) dueSoon+=a; } });
-  const head=`<div class="head"><div><h1>Contracts &amp; Payments</h1><p class="mini">ทุกสัญญาอยู่ที่นี่ที่เดียว · 1 การ์ดต่อสัญญา · รับเงิน (mark received) / ค่า Interval ที่เราจ่าย พร้อมสลิป · เก็บสัญญาที่เซ็น · บริษัท: <b>${esc(S.company||'')}</b></p></div>${canAddContract()?'<div class="sp"></div><button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
+  const head=`<div class="head"><div><h1>Contracts &amp; Payments</h1><p class="mini">ทุกสัญญาอยู่ที่นี่ที่เดียว · 1 การ์ดต่อสัญญา · รับเงิน (mark received) / ค่า Interval ที่เราจ่าย พร้อมสลิป · เก็บสัญญาที่เซ็น · บริษัท: <b>${esc(coLabel())}</b> · ${esc(yearLabel())}</p></div>${canAddContract()?'<div class="sp"></div><button class="btn pri" onclick="openNewContract()">+ New Contract</button>':''}</div>`;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="v" style="color:var(--income)">${fmt(recv)}</div><div class="l">Received to date</div></div>
     <div class="kpi"><div class="v">${fmt(out)}</div><div class="l">Outstanding (to receive)</div></div>
