@@ -532,12 +532,16 @@ const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','financ
   bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
-function canTab(tab){ if(USER&&USER.is_admin) return true; if(tab==='accesslog') return false; /* admin only */ const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
+/* Access Log + Legacy link: only these two people (not every admin) — also enforced by RLS on cf_access_log */
+const PRIV_EMAILS=['acm@elite-escapes.club','it@elite-escapes.club'];
+function isPriv(){ return !!USER && PRIV_EMAILS.includes(String(USER.email||'').toLowerCase()); }
+function canTab(tab){ if(tab==='accesslog') return isPriv(); if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
 function firstAllowedTab(){ return Object.keys(TAB_CAT).find(t=>canTab(t))||'dashboard'; }
 function applyAccess(){
   document.querySelectorAll('#tabs button').forEach(b=>{ b.hidden=!canTab(b.dataset.t); });
   // hide a group's label + wrapper when all its buttons are hidden
-  document.querySelectorAll('.navgrp').forEach(gp=>{ const any=[...gp.querySelectorAll('button')].some(b=>!b.hidden) || !!gp.querySelector('a.navext'); gp.hidden=!any; });
+  document.querySelectorAll('a.navext').forEach(a=>{ a.hidden=!isPriv(); });
+  document.querySelectorAll('.navgrp').forEach(gp=>{ const any=[...gp.querySelectorAll('button')].some(b=>!b.hidden) || [...gp.querySelectorAll('a.navext')].some(a=>!a.hidden); gp.hidden=!any; });
   if(!canTab(S.tab)) S.tab=firstAllowedTab();
 }
 
@@ -1112,7 +1116,7 @@ function slipHtml(person){ const {rows}=commData(S.commP); const p=commPeople(ro
    ${c.remark?`<div style="margin-top:8px">Remark : ${esc(c.remark)}</div>`:''}
    <div style="margin-top:8px;font-size:11px;color:#666">Y-T-D นับจากสลิปที่บันทึกในระบบ (ปี ${y})</div></div>`; }
 /* ===== Access Log viewer (admin only) — who opened / previewed / printed what ===== */
-async function rAccessLog(){ if(!(USER&&USER.is_admin)){ g('main').innerHTML='<div class="emptyc">เฉพาะ admin</div>'; return; }
+async function rAccessLog(){ if(!isPriv()){ g('main').innerHTML='<div class="emptyc">ไม่มีสิทธิ์ดูหน้านี้</div>'; return; }
   g('main').innerHTML='<div class="emptyc">⏳ กำลังโหลดประวัติ…</div>';
   let rows=[]; try{ rows=await api('cf_access_log?select=*&order=ts.desc&limit=1000')||[]; }catch(e){ g('main').innerHTML='<div class="emptyc">โหลดไม่ได้: '+esc(e.message)+'</div>'; return; }
   if(S.tab!=='accesslog') return;
