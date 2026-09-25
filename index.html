@@ -392,6 +392,10 @@ async function api(path, opts={}){
   if(!r.ok) throw new Error((await r.text()).slice(0,300));
   if(r.status===204) return null; const t=await r.text(); return t?JSON.parse(t):null;
 }
+/* PostgREST returns at most 1,000 rows per request — page through everything (Club Unique legacy import = 2,500+ entries) */
+async function apiAll(path){ const out=[]; const sep=path.indexOf('?')>=0?'&':'?';
+  for(let off=0; off<200000; off+=1000){ const rows=await api(path+sep+'limit=1000&offset='+off); if(!rows||!rows.length) break; out.push(...rows); if(rows.length<1000) break; }
+  return out; }
 async function upsert(table, rows){ if(!rows.length) return; return api(table+'?on_conflict=id',{method:'POST',prefer:'return=minimal,resolution=merge-duplicates',body:JSON.stringify(rows.map(r=>Object.assign({updated_by:USER&&USER.email},r)))}); }
 async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); }
 async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(obj)}); }
@@ -525,8 +529,8 @@ async function loadAll(){
   try{
     const [co,ac,ca,en,li,ba,bs,bl,st,bk]=await Promise.all([
       api('cf_companies?select=*&order=name.asc'), api('cf_accounts?select=*&order=sort.asc'),
-      api('cf_categories?select=*&order=name.asc'), api('cf_entries?select=*&order=title.asc'),
-      api('cf_lines?select=*&order=txn_date.asc'),
+      api('cf_categories?select=*&order=name.asc'), apiAll('cf_entries?select=*&order=title.asc,id.asc'),
+      apiAll('cf_lines?select=*&order=txn_date.asc,id.asc'),
       api('cf_bank_accounts?select=*&order=sort.asc'), api('cf_bank_snapshots?select=*'),
       api('cf_bank_audit?select=*&order=ts.desc&limit=300'), api('cf_stays?select=*'),
       api('cf_bookings?select=*&order=created_at.desc')
@@ -750,7 +754,7 @@ async function mktSave(){ const p=mktPeriod(); const reps=DB.mktReps||[];
     toast('บันทึก + ลงบัญชีแล้ว (สัปดาห์ '+p.week+', '+reps.length+' คน)');
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message); } }
 /* ---- accounting sync (wages + taxi -> cf_entries/cf_lines) ---- */
-async function reloadEL(){ try{ const [en,li]=await Promise.all([api('cf_entries?select=*&order=title.asc'),api('cf_lines?select=*&order=txn_date.asc')]); if(en)DB.entries=en; if(li)DB.lines=li; }catch(e){} }
+async function reloadEL(){ try{ const [en,li]=await Promise.all([apiAll('cf_entries?select=*&order=title.asc,id.asc'),apiAll('cf_lines?select=*&order=txn_date.asc,id.asc')]); if(en)DB.entries=en; if(li)DB.lines=li; }catch(e){} }
 async function ensureExpEntry(id,title,category){ await upsert('cf_entries',[{id,kind:'expense',title,category,account:(primaryAccount()||{}).id||null,active:true,meta:{source:'auto'}}]); }
 async function syncWageLine(year,week,amount,dateISO){ await ensureExpEntry('en_mkt_wages','ค่าจ้างทีมการตลาด (OPC)','Marketing/OPC Wages');
   await upsert('cf_lines',[{id:'ln_mktw_'+year+'_'+week,entry_id:'en_mkt_wages',amount:Math.round(amount||0),txn_date:dateISO,repeat:'never',line_type:'mktwage',memo:'ค่าจ้าง OPC สัปดาห์ '+week,paid:false}]); }
@@ -819,7 +823,7 @@ function rAR(tgt){ const data=arData();
   const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('สัญญา / ลูกค้า')}${th('ค้างรวม',R)}${th('ยังไม่ถึง',R)}${th('1–30',R)}${th('31–60',R)}${th('61–90',R)}${th('90+',R)}${th('สถานะ',C)}${th('',R)}</tr></thead><tbody>${trs}${data.length?totR:''}</tbody></table></div>`;
   (tgt?g(tgt):g('main')).innerHTML=(tgt?'':head)+kpis+aging+table;
 }
-function arGo(cat){ goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
+function arGo(cat){ S.rcFocus=cat; goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
   setTimeout(()=>{ const el=g('rc_'+cssId(cat)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600); } },90); }
 
 /* ============ AP — payables by vendor/category + aging ============ */
@@ -2300,7 +2304,9 @@ function rReceipts(){
       const proof= l.proof_path?`<a href="#" onclick="openFile('cf-receipts','${esc(l.proof_path)}');return false" title="${esc(l.proof_name||'')}">📎 evidence</a>`:'<span class="mini" style="opacity:.4">no file</span>';
       const act= l.paid?`<button class="btn link" onclick="markReceived('${esc(l.id)}')">${lineLocked(l)?'🔒 view':'edit'}</button>`:`<button class="btn sm ${exp?'ghost':'pri'}" onclick="markReceived('${esc(l.id)}')">${exp?'Mark paid':'Mark received'}</button>`;
       return `<tr><td>${fmtDate(l.txn_date)}</td><td>${esc(l.memo||l.line_type||'')}</td><td class="n"${exp?' style="color:var(--expense)"':''}>${exp?'−':''}${fmt(l.amount)}</td><td>${pill}</td><td>${l.paid?fmtDate(l.paid_date):'<span class="mini" style="opacity:.4">—</span>'}</td><td class="mini">${l.paid?esc(methodLabel(l.method))+cardTag(l)+(l.pay_meta&&l.pay_meta.source==='excel-accounting'?' <span class="pill off" style="font-size:9px" title="ยอดยกมาจากไฟล์ Excel คอมของบัญชี — ยังไม่มีสลิปในระบบ">Excel · ไม่มีสลิป</span>':'')+(l.pay_meta&&l.pay_meta.verified===false?' <span class="pill exp" style="font-size:9px">⏳ รอยืนยัน</span>':(l.pay_meta&&l.pay_meta.verified===true?' <span class="pill inc" style="font-size:9px">✓ ยืนยันแล้ว</span>':'')):''}</td><td>${l.paid?proof:''}</td><td>${act}</td></tr>`; };
-  const blocks=list.map(gp=>{
+  let rcLim=S.rcLim||60; if(S.rcFocus){ const ix=list.findIndex(x=>x.cno===S.rcFocus); if(ix>=rcLim) rcLim=ix+1; }
+  const moreRc=list.length>rcLim?`<div style="text-align:center;margin:14px 0"><button class="btn" onclick="S.rcLim=${rcLim+100};render()">แสดงเพิ่ม 100 · เหลืออีก ${list.length-rcLim} สัญญา</button></div>`:'';
+  const blocks=list.slice(0,rcLim).map(gp=>{
     const open=!!S.rcOpen[gp.key];
     const allL=gp.items.map(x=>x.l);
     const incL=gp.items.filter(x=>x.e.kind!=='expense').map(x=>x.l); const expL=gp.items.filter(x=>x.e.kind==='expense').map(x=>x.l);
@@ -2336,7 +2342,7 @@ function rReceipts(){
       <div class="mini" onclick="event.stopPropagation()">${scan}</div></div>
       ${open?(nofin?`<div class="mini" style="border-top:1px solid var(--line);padding:12px 16px;opacity:.8">ยังไม่มีตารางเงินของสัญญานี้ — กด “＋ เพิ่มข้อมูลการเงิน” เพื่อใส่ราคา / มัดจำ / งวด / MFEE แล้วจะรับเงินและแนบสลิปได้เหมือนสัญญาอื่น</div>`:`<div style="overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Date</th><th>Item</th><th class="n">Amount</th><th>Status</th><th>Recorded</th><th>Method</th><th>Evidence</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`):''}</div>`;
   }).join('');
-  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">ไม่พบสัญญา</div></div>');
+  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">ไม่พบสัญญา</div></div>')+moreRc;
 }
 /* ===== Payment record locking + audit trail =====
    A payment that is paid AND has evidence attached is LOCKED (read-only). Unlocking to edit needs a reason and is logged.
@@ -2745,7 +2751,9 @@ function rStays(){
     <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owes MFEE</div></div>
     <div class="kpi"><div class="v" style="color:var(--gold)">${upsell}</div><div class="l">Renew / upsell soon</div></div></div>`;
   const bar=`<div class="toolbar" style="margin-bottom:10px"><button class="btn sm ghost" onclick="syAll(true)">Expand all</button><button class="btn sm ghost" onclick="syAll(false)">Collapse all</button></div>`;
-  const blocks=groups.map(g=>{
+  const syLim=S.syLim||60;
+  const moreSy=groups.length>syLim?`<div style="text-align:center;margin:14px 0"><button class="btn" onclick="S.syLim=${syLim+100};render()">แสดงเพิ่ม 100 · เหลืออีก ${groups.length-syLim} สัญญา</button></div>`:'';
+  const blocks=groups.slice(0,syLim).map(g=>{
     const open=!!S.syOpen[g.cno];
     const el=eligibility(g.cno); const fyo=Number(g.meta.fyo)||null; const term=termOf(g.cno); const lyo=(fyo&&term)?fyo+term-1:null;
     const badge= el.blocked
@@ -2787,7 +2795,7 @@ function rStays(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center">${g.contract_path?`<a class="pill" style="text-decoration:none" href="#" onclick="event.stopPropagation();openFile('cf-contracts','${esc(g.contract_path)}');return false" title="View signed contract PDF">📎 Contract</a>`:''}${ent?`<span class="pill" style="background:var(--brandsoft);color:var(--brand2)" title="${ent.wk} week(s)/yr · ${ent.usedTot} used of ${ent.earnedTot}">📅 Weeks ${ent.usedTot}/${ent.earnedTot} used</span>`:''}${badge}${iiBadge}${upBadge}</div></div>
       ${open?`<div style="overflow:auto"><table><thead><tr><th>Year</th><th>Management Fee</th><th>Stay</th><th>Weeks left</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:''}</div>`;
   }).join('');
-  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>');
+  g('main').innerHTML=head+kpis+bar+(blocks||'<div class="card"><div class="emptyc">No membership contracts yet.</div></div>')+moreSy;
 }
 function openStay(cno,year){ const s=stayOf(cno,year);
   openModal(`<h2>${s?'Edit':'Log'} stay — ${esc(cno)} · ${year}</h2>
