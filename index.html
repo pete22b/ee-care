@@ -283,6 +283,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="navlbl">Member Service</div>
       <button data-t="bookings">Bookings</button>
       <button data-t="stays">Member Benefits</button>
+      <button data-t="followup">Member Follow-up</button>
     </div>
     <div class="navgrp">
       <div class="navlbl">Marketing</div>
@@ -539,6 +540,7 @@ async function loadAll(){
         bankAccounts:ba||[],bankSnaps:bs||[],bankAudit:bl||[],stays:st||[],bookings:(bk||[])};
     /* commission pay slips: staff roster + saved slips (optional — a miss must not block the app) */
     try{ const [sf,cs]=await Promise.all([api('cf_staff?select=*&order=name.asc'),api('cf_comm_slips?select=*')]); DB.staff=sf||[]; DB.commSlips=cs||[]; }catch(e){ DB.staff=DB.staff||[]; DB.commSlips=DB.commSlips||[]; }
+    try{ DB.contacts=await apiAll('cf_contacts?select=*&order=ts.desc,id.desc'); }catch(e){ DB.contacts=DB.contacts||[]; }
     if(!DB.accounts.length){ /* seed a Primary account like Pulse */
       const a={id:uid('ac'),name:'Elite Escapes (USD)',opening_balance:0,opening_date:TODAY,currency:'USD',is_primary:true,sort:0};
       await upsert('cf_accounts',[a]); DB.accounts=[a];
@@ -548,7 +550,7 @@ async function loadAll(){
 }
 
 /* ============ access control (role -> menu category) ============ */
-const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
+const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],followup:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
   bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
@@ -1136,6 +1138,87 @@ function slipHtml(person){ const {rows}=commData(S.commP); const p=commPeople(ro
      <td>Y-T-D Income: <b>${b(Y.income+c.income)}</b></td><td>Y-T-D Tax: <b>${b(Y.tax+c.tax)}</b></td><td>Y-T-D Social Security: <b>${b(Y.sso+c.sso)}</b></td><td>Y-T-D Visa &amp; WP: <b>${b(Y.visa+c.visa_wp)}</b></td></tr></table>
    ${c.remark?`<div style="margin-top:8px">Remark : ${esc(c.remark)}</div>`:''}
    <div style="margin-top:8px;font-size:11px;color:#666">Y-T-D นับจากสลิปที่บันทึกในระบบ (ปี ${y})</div></div>`; }
+/* ============ Member Follow-up — customers flow: 1 active contract → contract ended → contact attempts → 2 reachable / 3 unreachable ============
+   Rules (user, 2026-09-25): unreachable = 3 failed attempts in a row, or one bounced email / wrong number; unreachable customers come back for a retry
+   every 6 months; reaching them again moves them to "reachable". One customer = legacy client_code (may hold several contracts). Log = cf_contacts (append-only). */
+const FU_FAIL=['no_answer','bounced','wrong_number'], FU_HARD=['bounced','wrong_number'];
+const FU_RESULT={reached:'ติดต่อได้',declined:'ติดต่อได้ · ไม่สนใจ',no_answer:'ไม่รับสาย / ไม่ตอบ',bounced:'อีเมลเด้ง',wrong_number:'เบอร์ผิด / ไม่มีผู้ใช้',other:'อื่นๆ'};
+const FU_CHANNEL={phone:'โทร',email:'อีเมล',line:'LINE',whatsapp:'WhatsApp',in_person:'พบตัว',other:'อื่นๆ'};
+const FU_ST={active:['สัญญายังเดิน','inc'],todo:['ยังไม่ได้ติดต่อ','off'],trying:['กำลังติดต่อ','fc'],reach:['ติดต่อได้','inc'],unreach:['ติดต่อไม่ได้','exp'],history:['ประวัติ (ยกเลิก/อัปเกรด)','off']};
+function addMonthsDate(iso,n){ return addMonthsISO(String(iso).slice(0,10),n); }
+function fuClients(){ const co=S.company||''; const yr=Number(TODAY.slice(0,4)); const m={};
+  DB.entries.forEach(e=>{ if(e.kind!=='income'||!e.category) return; if(co&&e.company!==co) return; const mt=e.meta||{};
+    const key=mt.client_code||('c:'+e.category); const c=(m[key]=m[key]||{key,code:mt.client_code||null,name:'',contracts:{},emails:new Set(),phones:new Set(),nat:''});
+    if(!c.name&&e.description) c.name=String(e.description).replace(/\n/g,' & ');
+    if(!c.nat&&mt.nationality) c.nat=mt.nationality;
+    (Array.isArray(mt.emails)?mt.emails:[]).forEach(x=>x&&c.emails.add(String(x).trim())); if(mt.email) c.emails.add(String(mt.email).trim()); if(mt.phone) c.phones.add(String(mt.phone).trim());
+    if(c.contracts[e.category]) return;
+    const st=String(mt.status||''); const cancelled=/cancel|canx|cxl|refund|terminat/i.test(st), upgraded=/upgrad|downgrad/i.test(st);
+    const term=termOf(e.category); const lyo=Number(mt.lyo)||((Number(mt.fyo)&&term)?Number(mt.fyo)+term-1:null);
+    c.contracts[e.category]={cno:e.category,status:st||(e.active===false?'Cancelled':''),cancelled,upgraded,lyo,active:!cancelled&&!upgraded&&(lyo==null?e.active!==false:lyo>=yr)}; });
+  const logs={}; (DB.contacts||[]).forEach(l=>{ if(co&&l.company!==co) return; (logs[l.client_code]=logs[l.client_code]||[]).push(l); });
+  return Object.values(m).map(c=>{ const cs=Object.values(c.contracts); const lg=(logs[c.code||c.key]||[]).slice().sort((a,b)=>a.ts<b.ts?1:-1);
+    let st, retry=null;
+    if(cs.some(x=>x.active)) st='active';
+    else if(cs.every(x=>x.cancelled||x.upgraded)) st='history';
+    else { const ri=lg.findIndex(l=>l.result==='reached'||l.result==='declined'); const since=ri<0?lg:lg.slice(0,ri);
+      const fails=since.filter(l=>FU_FAIL.includes(l.result)); const hard=since.some(l=>FU_HARD.includes(l.result));
+      if(!lg.length) st='todo'; else if(ri===0) st='reach'; else if(hard||fails.length>=3){ st='unreach'; retry=addMonthsDate((fails[0]||since[0]).ts,6); } else if(ri>0) st='trying'; else st='trying'; }
+    const last=lg[0]||null; const next=(last&&last.next_date)||retry;
+    const lastLyo=Math.max(0,...cs.map(x=>x.lyo||0));
+    return Object.assign(c,{list:cs,logs:lg,st,retry,last,next,due:!!(next&&next<=TODAY),lastLyo,emails:[...c.emails],phones:[...c.phones]}); });
+}
+function rFollowup(){
+  const all=fuClients(); const f=S.fuF||'queue'; const cnt=k=>all.filter(c=>c.st===k).length; const dueN=all.filter(c=>c.due&&c.st!=='history').length;
+  const inQ=c=>c.st==='todo'||c.st==='trying'||(c.st==='unreach'&&c.due)||(c.due&&c.st!=='history');
+  let list=all.filter(c=>f==='queue'?inQ(c):(f==='due'?(c.due&&c.st!=='history'):c.st===f));
+  const pr={unreach:0,trying:1,todo:2,reach:3,active:4,history:5};
+  list.sort((a,b)=>(b.due-a.due)||(pr[a.st]-pr[b.st])||(b.lastLyo-a.lastLyo)||(a.name<b.name?-1:1));
+  const kpi=(k,label,n,color)=>`<div class="kpi" style="cursor:pointer;${f===k?'outline:2px solid #b8912e':''}" onclick="S.fuF='${k}';S.fuLim=50;render()"><div class="v" style="${color?'color:'+color:''}">${n.toLocaleString()}</div><div class="l">${label}</div></div>`;
+  const head=`<div class="head"><div><h1>Member Follow-up · ติดตามลูกค้า</h1><p class="mini">ลูกค้าไหลต่อเนื่อง: สัญญายังเดิน → สัญญาจบ → ติดต่อ → ติดต่อได้ / ติดต่อไม่ได้ (ไม่สำเร็จ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → ลองใหม่ทุก 6 เดือน) · บริษัท: <b>${esc(S.company||'')}</b></p></div></div>`;
+  const kpis=`<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    ${kpi('queue','ต้องติดต่อ (คิวงาน)',all.filter(inQ).length,'#b8912e')}${kpi('due','ถึงวันนัด / ลองใหม่',dueN,'var(--expense)')}
+    ${kpi('active','1 · สัญญายังเดิน',cnt('active'),'var(--income)')}${kpi('todo','สัญญาจบ · ยังไม่ได้ติดต่อ',cnt('todo'))}${kpi('trying','กำลังติดต่อ',cnt('trying'))}
+    ${kpi('reach','2 · ติดต่อได้',cnt('reach'),'#185FA5')}${kpi('unreach','3 · ติดต่อไม่ได้',cnt('unreach'),'var(--expense)')}${kpi('history','ประวัติ',cnt('history'))}</div>`;
+  const lim=S.fuLim||50; S._fu=list.slice(0,lim).map(c=>c.key);
+  const dt=s=>s?fmtDate(String(s).slice(0,10)):'—';
+  const rows=list.slice(0,lim).map((c,i)=>{ const [lab,cls]=FU_ST[c.st]; const cs=c.list;
+    const chips=cs.slice(0,4).map(x=>`<span class="pill ${x.active?'inc':(x.cancelled?'off':(x.upgraded?'fc':'off'))}" style="font-size:10px;margin:1px 3px 1px 0">${esc(x.cno)}${x.lyo?' · '+x.lyo:''}</span>`).join('')+(cs.length>4?`<span class="mini">+${cs.length-4}</span>`:'');
+    const contact=[c.emails[0]?esc(c.emails[0]):'',c.phones[0]?esc(c.phones[0]):''].filter(Boolean).join('<br>')||'<span class="mini" style="color:var(--expense)">ไม่มีข้อมูลติดต่อ</span>';
+    const last=c.last?`${dt(c.last.ts)} · ${esc(FU_CHANNEL[c.last.channel]||c.last.channel)}<br><span class="mini">${esc(FU_RESULT[c.last.result]||c.last.result)} · ${esc(String(c.last.actor||'').split('@')[0])}</span>`:'<span class="mini">—</span>';
+    return `<tr><td><b>${esc(c.name||c.code||'—')}</b>${c.code?`<br><span class="mini">${esc(c.code)}${c.nat?' · '+esc(c.nat):''}</span>`:''}</td><td>${chips}</td><td class="mini" style="white-space:nowrap">${contact}</td><td class="mini">${last}</td>
+      <td class="mini" style="white-space:nowrap;${c.due?'color:var(--expense);font-weight:700':''}">${c.next?dt(c.next):'—'}</td><td><span class="pill ${cls}" style="font-size:10px">${lab}</span></td>
+      <td style="white-space:nowrap"><button class="btn sm pri" onclick="fuLog(S._fu[${i}])">บันทึกการติดต่อ</button> ${c.logs.length?`<button class="btn link" onclick="fuHistory(S._fu[${i}])">ประวัติ (${c.logs.length})</button>`:''}</td></tr>`; }).join('');
+  const more=list.length>lim?`<div style="text-align:center;margin:14px 0"><button class="btn" onclick="S.fuLim=${lim+100};render()">แสดงเพิ่ม 100 · เหลืออีก ${list.length-lim} ราย</button></div>`:'';
+  g('main').innerHTML=head+kpis+`<div class="mini" style="margin:4px 0 10px">${list.length.toLocaleString()} ราย · เรียงตาม: ถึงวันนัดก่อน → ติดต่อไม่ได้ → กำลังติดต่อ → ยังไม่ได้ติดต่อ (สัญญาจบล่าสุดก่อน)</div>
+    <div class="card" style="overflow-x:auto"><table><thead><tr><th>ลูกค้า</th><th>สัญญา · ปีสุดท้าย</th><th>ติดต่อ</th><th>ติดต่อล่าสุด</th><th>นัดครั้งถัดไป</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7"><div class="emptyc" style="padding:22px">ไม่มีลูกค้าในกลุ่มนี้</div></td></tr>'}</tbody></table></div>`+more;
+}
+function fuFind(key){ return fuClients().find(c=>c.key===key); }
+function fuLog(key){ const c=fuFind(key); if(!c) return;
+  const o=(obj,cur)=>Object.entries(obj).map(([k,v])=>`<option value="${k}"${k===cur?' selected':''}>${v}</option>`).join('');
+  openModal(`<h2>บันทึกการติดต่อ · ${esc(c.name||c.code)}</h2>
+   <div class="mini" style="margin-bottom:10px">${esc(c.code||'')} · ${c.emails.map(esc).join(', ')||'ไม่มีอีเมล'}${c.phones.length?' · '+c.phones.map(esc).join(', '):''} · สถานะตอนนี้: <b>${FU_ST[c.st][0]}</b></div>
+   <div class="grid2">
+     <div><label>ช่องทาง</label><select id="fu_ch">${o(FU_CHANNEL,'phone')}</select></div>
+     <div><label>ผลการติดต่อ</label><select id="fu_res" onchange="fuNextDefault()">${o(FU_RESULT,'reached')}</select></div>
+     <div><label>เรื่องของสัญญา</label><select id="fu_cno"><option value="">— ทั่วไป —</option>${c.list.map(x=>`<option>${esc(x.cno)}</option>`).join('')}</select></div>
+     <div><label>นัดติดต่อครั้งถัดไป</label><input type="date" id="fu_next"></div>
+     <div class="full"><label>บันทึก</label><textarea id="fu_note" rows="3" placeholder="คุยเรื่องอะไร ลูกค้าตอบว่าอะไร"></textarea></div>
+   </div>
+   <div class="mini" style="margin-top:6px">ไม่สำเร็จครบ 3 ครั้งติดกัน หรืออีเมลเด้ง/เบอร์ผิด → ย้ายไป "ติดต่อไม่ได้" และระบบนัดลองใหม่อีก 6 เดือน · บันทึกแล้วแก้ไม่ได้ (บันทึกใหม่แทน)</div>
+   <div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn pri" id="fu_save" onclick="fuSave(S._fuKey)">บันทึก</button></div>`);
+  S._fuKey=key; fuNextDefault(); }
+function fuNextDefault(){ const r=g('fu_res').value, n=g('fu_next'); if(!n) return;
+  n.value= r==='no_answer'?addDaysISO(TODAY,7):(FU_HARD.includes(r)?addMonthsISO(TODAY,6):(r==='reached'?addMonthsISO(TODAY,3):'')); }
+async function fuSave(key){ const c=fuFind(key); if(!c) return; const b=g('fu_save'); b.disabled=true;
+  const row={company:S.company||'',client_code:c.code||c.key,contract:g('fu_cno').value||null,channel:g('fu_ch').value,result:g('fu_res').value,note:(g('fu_note').value||'').trim()||null,next_date:g('fu_next').value||null,actor:(USER&&USER.email)||''};
+  try{ await api('cf_contacts',{method:'POST',prefer:'return=minimal',body:JSON.stringify([row])});
+    DB.contacts=[Object.assign({id:'tmp'+Date.now(),ts:new Date().toISOString()},row)].concat(DB.contacts||[]);
+    closeModal(); const after=fuFind(key); toast('บันทึกแล้ว · สถานะ: '+FU_ST[after.st][0]); render();
+  }catch(e){ b.disabled=false; toast('บันทึกไม่สำเร็จ: '+e.message); } }
+function fuHistory(key){ const c=fuFind(key); if(!c) return;
+  openModal(`<h2>ประวัติการติดต่อ · ${esc(c.name||c.code)}</h2><div style="max-height:60vh;overflow:auto">${c.logs.map(l=>`<div style="padding:8px 0;border-top:1px solid var(--line2)"><b>${fmtDate(String(l.ts).slice(0,10))}</b> · ${esc(FU_CHANNEL[l.channel]||l.channel)} · <span class="pill ${FU_FAIL.includes(l.result)?'exp':'inc'}" style="font-size:10px">${esc(FU_RESULT[l.result]||l.result)}</span> · ${esc(l.actor||'')}${l.contract?'<br><span class="mini">สัญญา '+esc(l.contract)+'</span>':''}${l.note?'<div class="mini" style="margin-top:3px">'+esc(l.note)+'</div>':''}${l.next_date?'<div class="mini">นัดถัดไป '+fmtDate(l.next_date)+'</div>':''}</div>`).join('')}</div>
+   <div class="right" style="margin-top:10px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn pri" onclick="fuLog(S._fuKeyH)">บันทึกการติดต่อ</button></div>`); S._fuKeyH=key; }
 /* ===== Access Log viewer (admin only) — who opened / previewed / printed what ===== */
 async function rAccessLog(){ if(!isPriv()){ g('main').innerHTML='<div class="emptyc">ไม่มีสิทธิ์ดูหน้านี้</div>'; return; }
   g('main').innerHTML='<div class="emptyc">⏳ กำลังโหลดประวัติ…</div>';
@@ -1442,6 +1525,7 @@ function render(){
   if(S.tab==='ap') return rAP();
   if(S.tab==='arap') return rARAP();
   if(S.tab==='commission') return rCommission();
+  if(S.tab==='followup') return rFollowup();
   if(S.tab==='accesslog') return rAccessLog();
   if(S.tab==='stays') return rStays();
   if(S.tab==='registry'){ S.tab='receipts'; return render(); } /* old Registry page merged into Contracts & Payments */
