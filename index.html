@@ -290,7 +290,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <div class="navgrp">
       <div class="navlbl">System</div>
       <button data-t="companies">Companies</button>
-      <button data-t="accounts">Accounts</button>
       <button data-t="accesslog">Access Log</button>
       <a class="navext" href="legacy.html" target="_blank" rel="noopener" title="ระบบเดิม (Customer Care) — สำหรับข้อมูลที่ยังไม่ได้ย้ายมา">Legacy system ↗</a>
     </div>
@@ -519,7 +518,7 @@ async function loadAll(){
     /* commission pay slips: staff roster + saved slips (optional — a miss must not block the app) */
     try{ const [sf,cs]=await Promise.all([api('cf_staff?select=*&order=name.asc'),api('cf_comm_slips?select=*')]); DB.staff=sf||[]; DB.commSlips=cs||[]; }catch(e){ DB.staff=DB.staff||[]; DB.commSlips=DB.commSlips||[]; }
     if(!DB.accounts.length){ /* seed a Primary account like Pulse */
-      const a={id:uid('ac'),name:'Pulse Cash Flow',opening_balance:0,opening_date:TODAY,currency:'THB',is_primary:true,sort:0};
+      const a={id:uid('ac'),name:'Elite Escapes (USD)',opening_balance:0,opening_date:TODAY,currency:'USD',is_primary:true,sort:0};
       await upsert('cf_accounts',[a]); DB.accounts=[a];
     }
     render();
@@ -562,7 +561,7 @@ function globalSearch(q){ q=(q||'').trim().toLowerCase(); if(q.length<2) return 
   (DB.bankAccounts||[]).forEach(a=>{ const hay=[a.name,a.bank,a.number,a.company].filter(Boolean).join(' ').toLowerCase(); if(hay.indexOf(q)>=0)
     res.push({type:'Bank',icon:'🏦',tab:'bank',label:a.name||a.bank||'Account',sub:[a.bank,a.number].filter(Boolean).join(' · '),go:()=>goto('bank')}); });
   (DB.companies||[]).forEach(c=>{ if((c.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Company',icon:'🏢',tab:'companies',label:c.name,sub:'',go:()=>goto('companies')}); });
-  (DB.accounts||[]).forEach(a=>{ if((a.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Account',icon:'💳',tab:'accounts',label:a.name,sub:a.currency||'',go:()=>goto('accounts')}); });
+  (DB.accounts||[]).forEach(a=>{ if((a.name||'').toLowerCase().indexOf(q)>=0) res.push({type:'Account',icon:'💳',tab:'bank',label:a.name,sub:a.currency||'',go:()=>goto('bank')}); });
   return res.filter(r=>canTab(r.tab)).slice(0,25);
 }
 function onSearch(v){ const box=g('gsres'); if(!box) return;
@@ -1429,7 +1428,7 @@ function render(){
   if(S.tab==='mktwages') return rMktWages();
   if(S.tab==='bank') return rBankCash();
   if(S.tab==='companies') return rCompanies();
-  if(S.tab==='accounts') return rAccounts();
+  if(S.tab==='accounts'){ S.tab='bank'; return render(); } /* merged into Cash & Bank */
   if(S.tab==='import'){ S.tab='dashboard'; return render(); } /* removed page */
 }
 
@@ -2823,7 +2822,6 @@ function rBankCash(){
      <input type="date" value="${date}" onchange="S.bankDate=this.value;render()" style="width:auto">
      <button class="btn pri" onclick="openBankAcct()">＋ Add account</button>
      <button class="btn ghost" onclick="openBankImport()">⬆ Import from Excel</button>
-     <button class="btn inc" onclick="useBankAsOpening()" title="Set the Cash Flow opening balance to this total">Use as Cash on Hand</button>
      <div class="sp" style="flex:1"></div>
      <button class="btn ghost sm" onclick="window.print()">🖨 Print</button></div>
      ${dates.length?`<div class="mini" style="margin:-4px 0 12px">Snapshots: ${dates.slice(0,8).map(d=>`<a href="#" onclick="S.bankDate='${d}';render();return false" style="margin-right:10px">${fmtDate(d)}</a>`).join('')}</div>`:''}`;
@@ -2832,6 +2830,13 @@ function rBankCash(){
     <div class="kpi"><div class="v">${fmtB(bankTotal)}</div><div class="l">Bank balance · ${bankUpd.length}/${bankAccs.length} updated${waitBank>0?' · '+waitBank+' waiting':''}</div></div>
     <div class="kpi"><div class="v">${fmtB(cashTotal)}</div><div class="l">Cash on hand · ${cashUpd.length} point(s)${waitCash>0?' · '+waitCash+' waiting':''}</div></div>
     <div class="kpi"><div class="v">${odUpd.length}</div><div class="l">OD accounts (updated)</div></div></div>`;
+  /* Cash Flow starting point (was the separate "Financial Accounts" page) — opening balance the forecast starts from */
+  const opening=(DB.accounts||[]).map(a=>`<div class="card pad" style="margin:0 0 14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+     <div style="flex:1;min-width:240px"><div style="font-weight:700">Cash Flow starting point ${a.is_primary?'<span class="pill inc" style="font-size:10px">Primary</span>':''}</div>
+       <div class="mini">เงินสดตั้งต้นที่หน้า Cash Flow และกราฟพยากรณ์บน Dashboard ใช้เริ่มนับ · ${esc(a.name)} (${esc(a.currency||'')})</div></div>
+     <div style="text-align:right"><div style="font-size:20px;font-weight:700">${fmt(a.opening_balance)}</div><div class="mini">as of ${a.opening_date?fmtDate(a.opening_date):'—'}</div></div>
+     <button class="btn ghost sm" onclick="openAccount('${esc(a.id)}')">Edit</button>
+     ${a.is_primary?`<button class="btn inc sm" onclick="useBankAsOpening()" title="Set the opening balance to this snapshot's grand total">Use this snapshot total</button>`:''}</div>`).join('');
   const companies=[...new Set(accs.map(a=>a.company).filter(Boolean))];
   const banks=[...new Set(accs.map(a=>a.bank).filter(Boolean))];
   const filt=`<div class="toolbar">
@@ -2844,7 +2849,7 @@ function rBankCash(){
   const body= empty
     ? `<div class="card"><div class="emptyc"><div class="big">🏦</div><h2 style="margin:10px 0 4px">No accounts yet</h2><p class="mini" style="max-width:440px;margin:0 auto 16px">Add your bank and cash accounts, then update each day's balance and attach the statement / count sheet.</p><button class="btn pri" onclick="openBankAcct()">＋ Add account</button></div></div>`
     : `<div class="scroll"><table id="banktbl"><thead><tr><th>#</th><th>Company / owner</th><th>Bank</th><th>Account no.</th><th>Type</th><th class="n">Balance (฿)</th><th class="n">%</th><th>Note</th><th></th></tr></thead><tbody id="bankbody">${bankRows(bankFiltered(),date,grand)}</tbody></table></div>`;
-  g('main').innerHTML=head+bar+kpis+(empty?'':filt)+body+bankAuditHtml();
+  g('main').innerHTML=head+bar+kpis+opening+(empty?'':filt)+body+bankAuditHtml();
   const inp=g('bankq'); if(inp) inp.oninput=()=>{ S.bankQ=inp.value; const b=g('bankbody'); if(b) b.innerHTML=bankRows(bankFiltered(),S.bankDate,grand); };
 }
 function bankRows(list,date,grand){
@@ -3074,11 +3079,7 @@ async function saveCompany(id){ const name=g('c_name').value.trim(); if(!name){ 
 async function delCompany(id){ if(!confirm('Delete company?')) return; try{ await del('cf_companies',id); closeModal(); toast('Deleted'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
 
 /* ============ Accounts (Financial Accounts) ============ */
-function rAccounts(){
-  const head=`<div class="head"><div><h1>Financial Accounts</h1><p class="mini">Opening balance per account — the starting point for Cash on Hand</p></div><div class="sp"></div><button class="btn pri" onclick="openAccount()">＋ Add account</button></div>`;
-  const rows=DB.accounts.map(a=>`<tr><td><b>${esc(a.name)}</b> ${a.is_primary?'<span class="pill inc">Primary</span>':''}</td><td>${esc(a.currency||'THB')}</td><td class="n">${fmt(a.opening_balance)}</td><td>${a.opening_date?fmtDate(a.opening_date):'—'}</td><td><button class="btn link" onclick="openAccount('${esc(a.id)}')">Edit</button></td></tr>`).join('');
-  g('main').innerHTML=head+`<div class="scroll"><table><thead><tr><th>Account</th><th>Currency</th><th class="n">Opening balance</th><th>As of</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
+/* "Financial Accounts" page merged into Cash & Bank (2026-09-25) — the edit modal below is opened from there */
 function openAccount(id){ const a=id?DB.accounts.find(x=>x.id===id):null;
   openModal(`<h2>${id?'Edit':'Add'} account</h2><div class="grid2">
     <div class="full"><label>Name</label><input id="a_name" value="${esc(a?a.name:'')}"></div>
