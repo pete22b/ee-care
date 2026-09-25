@@ -1470,6 +1470,11 @@ async function boot(){
     if(location.search.indexOf('code=')>-1){ history.replaceState({}, '', location.origin+location.pathname); }
     if(!sess){ renderLogin(); return; }
     const em=(sess.user.email||'').toLowerCase();
+    /* legacy system restricted to acm@ + it@ (2026-09-25) — data tables are also locked by RLS is_priv(); do not sign out (session is shared with the Extranet) */
+    if(!['acm@elite-escapes.club','it@elite-escapes.club'].includes(em)){
+      document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3eee4;font-family:system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:30px 34px;max-width:420px;text-align:center;box-shadow:0 14px 34px -14px rgba(15,42,61,.35)"><h2 style="margin:0 0 8px;color:#14324a">Restricted</h2><p style="color:#5b6775;margin:0 0 18px">The legacy system is limited to authorised administrators.</p><a href="/" style="display:inline-block;background:#14324a;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none">Go to the Extranet</a></div></div>';
+      return;
+    }
     const gname=(sess.user.user_metadata&&sess.user.user_metadata.full_name)||em;
     const isCompany = em.endsWith('@elite-escapes.club');
     let rows=[];
