@@ -324,7 +324,8 @@ async function upsert(table, rows){ if(!rows.length) return; return api(table+'?
 async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=minimal'}); }
 async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(obj)}); }
 /* ---- storage (payment slips + contract scans) ---- */
-async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
+/* insert-only: members may add files but cannot read, overwrite or delete them directly (reads go through wm-file) — every path is unique */
+async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:false,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
 /* ===== Access log (append-only cf_access_log): every contract/slip file opened or previewed and every print is recorded — who / when / what.
    Files do not open if the log cannot be written. Signed links are short-lived (5 min). */
 function fileContext(path){ const e=(DB.entries||[]).find(x=>x.contract_path===path); if(e) return e.category||null;
@@ -1859,7 +1860,7 @@ async function saveSlip(){
   try{
     const slipId=uid('sl'); const bank=g('slip_bank').value, fu=g('slip_fu').value.trim()||null, sdate=g('slip_date').value||TODAY, note=g('slip_note').value.trim()||null;
     const file=g('slip_file').files[0]; let doc_path=null,doc_name=null;
-    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); doc_path='income/'+slipId+'.'+ext; await uploadTo('cf-receipts',doc_path,file); doc_name=file.name; }
+    if(file){ const ext=(file.name.split('.').pop()||'bin').toLowerCase(); doc_path='income/'+slipId+'-'+Date.now()+'.'+ext; await uploadTo('cf-receipts',doc_path,file); doc_name=file.name; }
     let matched=0, created=0, totThb=0, totUsd=0; const lineIds=[]; const unresolved=[];
     for(const r of rows){
       const usd=parseFloat(r.usd)||0, thb=parseFloat(r.thb)||0, rate=parseFloat(r.rate)||null;
