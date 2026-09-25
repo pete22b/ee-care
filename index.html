@@ -1147,15 +1147,22 @@ const FU_CHANNEL={phone:'โทร',email:'อีเมล',line:'LINE',whatsapp
 const FU_ST={active:['สัญญายังเดิน','inc'],todo:['ยังไม่ได้ติดต่อ','off'],trying:['กำลังติดต่อ','fc'],reach:['ติดต่อได้','inc'],unreach:['ติดต่อไม่ได้','exp'],history:['ประวัติ (ยกเลิก/อัปเกรด)','off']};
 function addMonthsDate(iso,n){ return addMonthsISO(String(iso).slice(0,10),n); }
 function fuClients(){ const co=S.company||''; const yr=Number(TODAY.slice(0,4)); const m={};
+  /* overdue money per contract (works for both companies — Elite has instalment lines, Club Unique once its AR is migrated) */
+  const catOfE={}; DB.entries.forEach(e=>{ if(e.kind==='income'&&e.category) catOfE[e.id]=e.category; });
+  const od={}; (DB.lines||[]).forEach(l=>{ const c=catOfE[l.entry_id]; if(!c||l.paid||!l.txn_date||l.txn_date>=TODAY) return; od[c]=(od[c]||0)+(Number(l.amount)||0); });
+  /* one key per contract first (MFEE / Interval entries of a contract carry no contact info), then contracts group into customers */
+  const catKey={}; DB.entries.forEach(e=>{ if(e.kind!=='income'||!e.category) return; if(co&&e.company!==co) return; const mt=e.meta||{};
+    const em1=(Array.isArray(mt.emails)&&mt.emails[0])||mt.email||''; const k=mt.client_code||(em1?'m:'+String(em1).trim().toLowerCase():'');
+    const cur=catKey[e.category]; if(k && (!cur||(mt.client_code&&cur.startsWith('m:')))) catKey[e.category]=k; });
   DB.entries.forEach(e=>{ if(e.kind!=='income'||!e.category) return; if(co&&e.company!==co) return; const mt=e.meta||{};
-    const key=mt.client_code||('c:'+e.category); const c=(m[key]=m[key]||{key,code:mt.client_code||null,name:'',contracts:{},emails:new Set(),phones:new Set(),nat:''});
+    const key=catKey[e.category]||('c:'+e.category); const c=(m[key]=m[key]||{key,code:mt.client_code||null,name:'',contracts:{},emails:new Set(),phones:new Set(),nat:''});
     if(!c.name&&e.description) c.name=String(e.description).replace(/\n/g,' & ');
     if(!c.nat&&mt.nationality) c.nat=mt.nationality;
     (Array.isArray(mt.emails)?mt.emails:[]).forEach(x=>x&&c.emails.add(String(x).trim())); if(mt.email) c.emails.add(String(mt.email).trim()); if(mt.phone) c.phones.add(String(mt.phone).trim());
     if(c.contracts[e.category]) return;
     const st=String(mt.status||''); const cancelled=/cancel|canx|cxl|refund|terminat/i.test(st), upgraded=/upgrad|downgrad/i.test(st);
     const term=termOf(e.category); const lyo=Number(mt.lyo)||((Number(mt.fyo)&&term)?Number(mt.fyo)+term-1:null);
-    c.contracts[e.category]={cno:e.category,status:st||(e.active===false?'Cancelled':''),cancelled,upgraded,lyo,active:!cancelled&&!upgraded&&(lyo==null?e.active!==false:lyo>=yr)}; });
+    c.contracts[e.category]={cno:e.category,prod:String(e.category).split('/')[0].toUpperCase(),status:st||(e.active===false?'Cancelled':''),cancelled,upgraded,lyo,od:od[e.category]||0,active:!cancelled&&!upgraded&&(lyo==null?e.active!==false:lyo>=yr)}; });
   const logs={}; (DB.contacts||[]).forEach(l=>{ if(co&&l.company!==co) return; (logs[l.client_code]=logs[l.client_code]||[]).push(l); });
   return Object.values(m).map(c=>{ const cs=Object.values(c.contracts); const lg=(logs[c.code||c.key]||[]).slice().sort((a,b)=>a.ts<b.ts?1:-1);
     let st, retry=null;
@@ -1165,21 +1172,41 @@ function fuClients(){ const co=S.company||''; const yr=Number(TODAY.slice(0,4));
       const fails=since.filter(l=>FU_FAIL.includes(l.result)); const hard=since.some(l=>FU_HARD.includes(l.result));
       if(!lg.length) st='todo'; else if(ri===0) st='reach'; else if(hard||fails.length>=3){ st='unreach'; retry=addMonthsDate((fails[0]||since[0]).ts,6); } else if(ri>0) st='trying'; else st='trying'; }
     const last=lg[0]||null; const next=(last&&last.next_date)||retry;
-    const lastLyo=Math.max(0,...cs.map(x=>x.lyo||0));
-    return Object.assign(c,{list:cs,logs:lg,st,retry,last,next,due:!!(next&&next<=TODAY),lastLyo,emails:[...c.emails],phones:[...c.phones]}); });
+    const lastLyo=Math.max(0,...cs.map(x=>x.lyo||0)); const odAmt=cs.reduce((s,x)=>s+x.od,0);
+    return Object.assign(c,{list:cs,logs:lg,st,retry,last,next,due:!!(next&&next<=TODAY),lastLyo,odAmt,prods:[...new Set(cs.map(x=>x.prod))],emails:[...c.emails],phones:[...c.phones]}); });
 }
+/* main filter = customer groups (row 1) + narrowing filters (row 2); options come from the selected company's own data, so it works for Club Unique and Elite */
+const FU_GROUPS=[['queue','คิวงานวันนี้','#14324a'],['due','ถึงวันนัด / ลองใหม่','#b8912e'],['active','1 สัญญายังเดิน','#0F6E56'],['overdue','ค้างชำระ','#A32D2D'],
+  ['todo','สัญญาจบ · ยังไม่ติดต่อ','#5F5E5A'],['trying','กำลังติดต่อ','#854F0B'],['reach','2 ติดต่อได้','#185FA5'],['unreach','3 ติดต่อไม่ได้','#993C1D'],['history','ประวัติ','#888780'],['all','ทั้งหมด','#444441']];
+function fuInQ(c){ return c.st==='todo'||c.st==='trying'||(c.due&&c.st!=='history'); }
+function fuInGroup(c,k){ return k==='all'?true:k==='queue'?fuInQ(c):k==='due'?(c.due&&c.st!=='history'):k==='overdue'?c.odAmt>0:c.st===k; }
+function fuSub(c){ const F=S.fuSub||{};
+  if(F.nat&&c.nat!==F.nat) return false;
+  if(F.prod&&!c.prods.includes(F.prod)) return false;
+  if(F.lyo&&String(c.lastLyo)!==F.lyo) return false;
+  if(F.ch==='email'&&!c.emails.length) return false; if(F.ch==='phone'&&!c.phones.length) return false; if(F.ch==='none'&&(c.emails.length||c.phones.length)) return false;
+  if(F.by&&!(c.last&&c.last.actor===F.by)) return false;
+  return true; }
+function fuSetSub(k,v){ S.fuSub=Object.assign({},S.fuSub||{},{[k]:v}); S.fuLim=50; render(); }
 function rFollowup(){
-  const all=fuClients(); const f=S.fuF||'queue'; const cnt=k=>all.filter(c=>c.st===k).length; const dueN=all.filter(c=>c.due&&c.st!=='history').length;
-  const inQ=c=>c.st==='todo'||c.st==='trying'||(c.st==='unreach'&&c.due)||(c.due&&c.st!=='history');
-  let list=all.filter(c=>f==='queue'?inQ(c):(f==='due'?(c.due&&c.st!=='history'):c.st===f));
+  const all=fuClients(); const f=S.fuF||'queue';
+  const base=all.filter(fuSub);
+  let list=base.filter(c=>fuInGroup(c,f));
   const pr={unreach:0,trying:1,todo:2,reach:3,active:4,history:5};
-  list.sort((a,b)=>(b.due-a.due)||(pr[a.st]-pr[b.st])||(b.lastLyo-a.lastLyo)||(a.name<b.name?-1:1));
-  const kpi=(k,label,n,color)=>`<div class="kpi" style="cursor:pointer;${f===k?'outline:2px solid #b8912e':''}" onclick="S.fuF='${k}';S.fuLim=50;render()"><div class="v" style="${color?'color:'+color:''}">${n.toLocaleString()}</div><div class="l">${label}</div></div>`;
+  list.sort((a,b)=>(b.due-a.due)||(f==='overdue'?b.odAmt-a.odAmt:0)||(pr[a.st]-pr[b.st])||(b.lastLyo-a.lastLyo)||(a.name<b.name?-1:1));
   const head=`<div class="head"><div><h1>Member Follow-up · ติดตามลูกค้า</h1><p class="mini">ลูกค้าไหลต่อเนื่อง: สัญญายังเดิน → สัญญาจบ → ติดต่อ → ติดต่อได้ / ติดต่อไม่ได้ (ไม่สำเร็จ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → ลองใหม่ทุก 6 เดือน) · บริษัท: <b>${esc(S.company||'')}</b></p></div></div>`;
-  const kpis=`<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-    ${kpi('queue','ต้องติดต่อ (คิวงาน)',all.filter(inQ).length,'#b8912e')}${kpi('due','ถึงวันนัด / ลองใหม่',dueN,'var(--expense)')}
-    ${kpi('active','1 · สัญญายังเดิน',cnt('active'),'var(--income)')}${kpi('todo','สัญญาจบ · ยังไม่ได้ติดต่อ',cnt('todo'))}${kpi('trying','กำลังติดต่อ',cnt('trying'))}
-    ${kpi('reach','2 · ติดต่อได้',cnt('reach'),'#185FA5')}${kpi('unreach','3 · ติดต่อไม่ได้',cnt('unreach'),'var(--expense)')}${kpi('history','ประวัติ',cnt('history'))}</div>`;
+  const pills=FU_GROUPS.map(([k,lab,col])=>{ const n=base.filter(c=>fuInGroup(c,k)).length; const on=f===k;
+    return `<button type="button" onclick="S.fuF='${k}';S.fuLim=50;render()" style="border:1px solid ${col};background:${on?col:'#fff'};color:${on?'#fff':col};border-radius:22px;padding:8px 15px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">${lab} · ${n.toLocaleString()}</button>`; }).join('');
+  const F=S.fuSub||{}; const uniq=a=>[...new Set(a.filter(Boolean))].sort();
+  const sel=(k,label,opts)=>`<select onchange="fuSetSub('${k}',this.value)" style="width:auto;max-width:220px"><option value="">${label}: ทั้งหมด</option>${opts.map(([v,t])=>`<option value="${esc(v)}"${F[k]===v?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
+  const sub=`<div class="toolbar" style="gap:8px;flex-wrap:wrap;margin:10px 0 6px">
+    ${sel('nat','สัญชาติ',uniq(all.map(c=>c.nat)).map(v=>[v,v]))}
+    ${sel('prod','สินค้า',uniq(all.flatMap(c=>c.prods)).map(v=>[v,v]))}
+    ${sel('lyo','ปีสุดท้ายของสัญญา',uniq(all.map(c=>c.lastLyo?String(c.lastLyo):'')).reverse().map(v=>[v,v]))}
+    ${sel('ch','ช่องทางติดต่อ',[['email','มีอีเมล'],['phone','มีเบอร์โทร'],['none','ไม่มีข้อมูลติดต่อ']])}
+    ${sel('by','ผู้ติดต่อล่าสุด',uniq(all.map(c=>c.last&&c.last.actor)).map(v=>[v,v.split('@')[0]]))}
+    ${Object.values(F).some(Boolean)?`<button class="btn link" onclick="S.fuSub={};render()">ล้างตัวกรอง</button>`:''}</div>`;
+  const kpis=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">${pills}</div>`+sub;
   const lim=S.fuLim||50; S._fu=list.slice(0,lim).map(c=>c.key);
   const dt=s=>s?fmtDate(String(s).slice(0,10)):'—';
   const rows=list.slice(0,lim).map((c,i)=>{ const [lab,cls]=FU_ST[c.st]; const cs=c.list;
@@ -1187,7 +1214,7 @@ function rFollowup(){
     const contact=[c.emails[0]?esc(c.emails[0]):'',c.phones[0]?esc(c.phones[0]):''].filter(Boolean).join('<br>')||'<span class="mini" style="color:var(--expense)">ไม่มีข้อมูลติดต่อ</span>';
     const last=c.last?`${dt(c.last.ts)} · ${esc(FU_CHANNEL[c.last.channel]||c.last.channel)}<br><span class="mini">${esc(FU_RESULT[c.last.result]||c.last.result)} · ${esc(String(c.last.actor||'').split('@')[0])}</span>`:'<span class="mini">—</span>';
     return `<tr><td><b>${esc(c.name||c.code||'—')}</b>${c.code?`<br><span class="mini">${esc(c.code)}${c.nat?' · '+esc(c.nat):''}</span>`:''}</td><td>${chips}</td><td class="mini" style="white-space:nowrap">${contact}</td><td class="mini">${last}</td>
-      <td class="mini" style="white-space:nowrap;${c.due?'color:var(--expense);font-weight:700':''}">${c.next?dt(c.next):'—'}</td><td><span class="pill ${cls}" style="font-size:10px">${lab}</span></td>
+      <td class="mini" style="white-space:nowrap;${c.due?'color:var(--expense);font-weight:700':''}">${c.next?dt(c.next):'—'}</td><td><span class="pill ${cls}" style="font-size:10px">${lab}</span>${c.odAmt>0?`<br><span class="pill exp" style="font-size:10px;margin-top:3px">ค้าง ${fmt(c.odAmt)}</span>`:''}</td>
       <td style="white-space:nowrap"><button class="btn sm pri" onclick="fuLog(S._fu[${i}])">บันทึกการติดต่อ</button> ${c.logs.length?`<button class="btn link" onclick="fuHistory(S._fu[${i}])">ประวัติ (${c.logs.length})</button>`:''}</td></tr>`; }).join('');
   const more=list.length>lim?`<div style="text-align:center;margin:14px 0"><button class="btn" onclick="S.fuLim=${lim+100};render()">แสดงเพิ่ม 100 · เหลืออีก ${list.length-lim} ราย</button></div>`:'';
   g('main').innerHTML=head+kpis+`<div class="mini" style="margin:4px 0 10px">${list.length.toLocaleString()} ราย · เรียงตาม: ถึงวันนัดก่อน → ติดต่อไม่ได้ → กำลังติดต่อ → ยังไม่ได้ติดต่อ (สัญญาจบล่าสุดก่อน)</div>
