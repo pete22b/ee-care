@@ -2858,7 +2858,26 @@ function mfeeLinesFor(cno){ return allLines().filter(x=>x.e.category===cno && x.
 function stayOf(cno,year){ return (DB.stays||[]).find(s=>s.contract===cno && Number(s.year)===Number(year))||null; }
 function eligibility(cno){ const out=mfeeLinesFor(cno).filter(l=>l.txn_date<=TODAY && !l.paid); return {blocked:out.length>0, out}; }
 const CUR_YEAR=Number(TODAY.slice(0,4));
-function iiOf(meta){ meta=meta||{}; if(!meta.ii_tier && !meta.ii_membership) return null; return {tier:meta.ii_tier||'', from:Number(meta.ii_from)||null, until:Number(meta.ii_until)||null, label:meta.ii_membership||('Interval '+(meta.ii_tier||''))}; }
+/* Interval membership: CSV import fields (ii_tier/ii_from/ii_until) and/or the legacy add-on record meta.addons.iv
+   {t:"5 yrs Gold", act:yes|no, pay:paid|owing|unknown, owe, id (II member no), ad (activation date dd.mm.yyyy)} */
+function iiOf(meta){ meta=meta||{}; const iv=(meta.addons&&typeof meta.addons.iv==='object')?meta.addons.iv:null;
+  if(!meta.ii_tier && !meta.ii_membership && !iv) return null;
+  const t=String((iv&&iv.t)||meta.ii_membership||''); const yrs=Number((t.match(/(\d+)\s*y/i)||[])[1])||Number(meta.ii_years)||null;
+  const tier=meta.ii_tier||((t.match(/gold|platinum|silver/i)||[''])[0].replace(/^./,c=>c.toUpperCase()));
+  const adY=iv&&iv.ad?Number(String(iv.ad).slice(-4))||null:null;
+  /* the Interval term runs from activation — a membership that is not activated yet has no end year */
+  const notAct=iv&&iv.act!=='yes'&&!meta.ii_until;
+  const from=notAct?null:(Number(meta.ii_from)||adY||Number(meta.fyo)||null); const until=Number(meta.ii_until)||((from&&yrs)?from+yrs-1:null);
+  return {tier, years:yrs, from, until, label:meta.ii_membership||('Interval '+tier+(yrs?' '+yrs+' ปี':'')),
+    act:iv?(iv.act==='yes'?'yes':(iv.act==='no'?'no':'')):'', pay:iv?(iv.pay||''):'', owe:iv&&iv.owe!=null?Number(iv.owe):null, id:iv?(iv.id||''):'', ad:iv?(iv.ad||''):''}; }
+function iiStatusKey(ii){ if(!ii) return 'none'; if(ii.act==='yes') return 'active'; if(ii.pay==='owing') return 'owing'; if(ii.act==='no') return 'notact'; return 'unknown'; }
+const II_STATUS={active:['✓ Activated','inc'],owing:['⏳ ยังไม่ activate · ค้างค่า II','exp'],notact:['ยังไม่ activate','off'],unknown:['ไม่ทราบสถานะ','off'],none:['ไม่มี Interval','off']};
+function iiBadgeHtml(ii){ if(!ii) return ''; const k=iiStatusKey(ii); const [lab,cls]=II_STATUS[k];
+  const extra=k==='active'?((ii.id?' #'+esc(ii.id):'')+(ii.ad?' · '+esc(ii.ad):'')):(k==='owing'&&ii.owe?' $'+ii.owe.toLocaleString():'');
+  return `<span class="pill fc" title="Interval International">🌐 ${esc(ii.label)}${ii.until?' · ถึง '+ii.until:''}</span> <span class="pill ${cls}" style="font-size:10px">${lab}${extra}</span>`; }
+function udpBadgeHtml(meta){ const u=meta&&meta.addons&&meta.addons.udp; if(!u||typeof u!=='object') return '';
+  const lab=u.act==='yes'?'✓ UDP active':(u.act==='enroll'?'UDP · รอ enroll':'UDP · ยังไม่ activate');
+  return ` <span class="pill ${u.act==='yes'?'inc':'off'}" style="font-size:10px" title="Unique Discount Platform ${esc(u.t||'')}">${lab}${u.t?' · '+esc(u.t):''}</span>`; }
 /* upsell when Interval membership (or the contract itself) expires this year or next */
 function upsellInfo(g){ const ii=iiOf(g.meta); const term=termOf(g.cno); const fyo=Number(g.meta&&g.meta.fyo)||null; const lyo=(fyo&&term)?fyo+term-1:null;
   const ends=[]; if(ii&&ii.until) ends.push({what:'Interval '+(ii.tier||'')+' expires',year:ii.until}); if(lyo) ends.push({what:'Membership ends',year:lyo});
@@ -2905,9 +2924,14 @@ function rStays(){
     <div class="kpi"><div class="v">${groups.length}</div><div class="l">Membership contracts</div></div>
     <div class="kpi"><div class="v" style="color:var(--income)">${eligible}</div><div class="l">Eligible to stay</div></div>
     <div class="kpi"><div class="v" style="color:var(--expense)">${blocked}</div><div class="l">Blocked · owes MFEE</div></div>
-    <div class="kpi"><div class="v" style="color:var(--gold)">${upsell}</div><div class="l">Renew / upsell soon</div></div></div>`;
-  const fg=fuFilterContracts(groups,'sy'); const shown=fg.list;
-  const bar=fg.bar+`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><button class="btn sm ghost" onclick="syAll(true)">Expand all</button><button class="btn sm ghost" onclick="syAll(false)">Collapse all</button>
+    <div class="kpi"><div class="v" style="color:var(--gold)">${upsell}</div><div class="l">Renew / upsell soon</div></div>
+    <div class="kpi click" onclick="S.syII='owing';render()" title="กรองเฉพาะที่ยังไม่ activate และค้างค่า II"><div class="v" style="color:var(--expense)">${groups.filter(g=>iiStatusKey(iiOf(g.meta))==='owing').length}</div><div class="l">Interval ยังไม่ activate · ค้างค่า II</div></div></div>`;
+  const fg=fuFilterContracts(groups,'sy');
+  /* Interval status filter (from the legacy add-on record: activated / not activated / II fee owing) */
+  const iiK=g=>iiStatusKey(iiOf(g.meta)); const iiCnt={}; fg.list.forEach(g=>{ const k=iiK(g); iiCnt[k]=(iiCnt[k]||0)+1; });
+  const IIF=S.syII||''; const shown=IIF?fg.list.filter(g=>iiK(g)===IIF):fg.list;
+  const iiSel=`<select onchange="S.syII=this.value;S.syLim=60;render()" style="width:auto;max-width:260px" title="สถานะ Interval International"><option value="">Interval: ทั้งหมด</option>${['active','owing','notact','unknown','none'].map(k=>`<option value="${k}"${IIF===k?' selected':''}>${II_STATUS[k][0]} (${(iiCnt[k]||0).toLocaleString()})</option>`).join('')}</select>`;
+  const bar=fg.bar+`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">${iiSel}<button class="btn sm ghost" onclick="syAll(true)">Expand all</button><button class="btn sm ghost" onclick="syAll(false)">Collapse all</button>
     <span class="mini">${shown.length.toLocaleString()} สัญญา${shown.length!==groups.length?' (จาก '+groups.length.toLocaleString()+')':''}</span></div>`;
   const syLim=S.syLim||60;
   const moreSy=shown.length>syLim?`<div style="text-align:center;margin:14px 0"><button class="btn" onclick="S.syLim=${syLim+100};render()">แสดงเพิ่ม 100 · เหลืออีก ${shown.length-syLim} สัญญา</button></div>`:'';
@@ -2918,7 +2942,7 @@ function rStays(){
       ? `<span class="pill exp">🔴 Blocked — owes MFEE ${fmt(el.out.reduce((s,l)=>s+Number(l.amount||0),0))}</span>`
       : `<span class="pill inc">🟢 Can stay</span>`;
     const ii=iiOf(g.meta); const u=upsellInfo(g);
-    const iiBadge= ii? `<span class="pill fc" title="Interval International membership">🌐 Interval ${esc(ii.tier)}${ii.until?' · until '+ii.until:''}</span>` : '';
+    const iiBadge= iiBadgeHtml(ii) + udpBadgeHtml(g.meta);
     const upBadge= (u&&u.upsell)? `<span class="pill" style="background:#fbf1d8;color:#8a6d1f" title="${esc(u.soonest.what)} ${u.soonest.year}">⭐ Upsell — ${esc(u.soonest.what)} ${u.soonest.year}${u.due<0?' (expired)':''}</span>` : '';
     const ent=entitlement(g);
     let rows='';
