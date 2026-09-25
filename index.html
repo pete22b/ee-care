@@ -139,30 +139,27 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 #toast.show{opacity:1}
 /* gate */
 #gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#0f2a3d;overflow:hidden;transition:opacity .5s}
-/* login (option B): split — brand panel left (navy + light logo), sign-in right (white) */
-#gate.split{display:grid;grid-template-columns:1.2fr 1fr;align-items:stretch;justify-items:stretch;background:#fff}
-#gate.split .gbrand{background:linear-gradient(180deg,#40566a 0%,#1c3d5a 48%,#0b2338 100%);color:#f3eee4;display:flex;flex-direction:column;justify-content:center;padding:6vh 6vw;overflow:auto}
-#gate.split .glogo{width:210px;max-width:70%;height:auto;display:block}
-#gate.split .gtag{margin-top:22px;font-family:Marcellus,Georgia,serif;letter-spacing:.32em;font-size:13.5px;color:#dcbb7f}
-#gate.split .gintro{margin-top:14px;max-width:520px;font-family:'Nunito Sans',system-ui,sans-serif;font-size:15px;line-height:1.7;color:rgba(243,238,228,.8)}
-#gate.split .gmods{margin-top:30px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:620px}
-#gate.split .gmod{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px 18px}
-#gate.split .gmod h4{margin:0 0 6px;font:700 11px 'Nunito Sans',system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#d8b65e}
-#gate.split .gmod p{margin:0 0 8px;font:14px/1.5 'Nunito Sans',system-ui,sans-serif;color:#fff}
-#gate.split .gmod small{display:block;font:12.5px/1.6 'Nunito Sans',system-ui,sans-serif;color:rgba(243,238,228,.62)}
-#gate.split .gsign{position:relative;display:flex;flex-direction:column;justify-content:center;padding:6vh 7vw;font-family:'Nunito Sans',system-ui,sans-serif}
-#gate.split .gsign h2{margin:0;font-size:28px;font-weight:700;color:#14324a}
-#gate.split .gsign .gsub{margin:6px 0 30px;font-size:15px;color:#6b7785}
-#gate.split .gbtn{width:100%;max-width:380px;padding:14px;border-radius:12px;background:#fff;border:1.5px solid #b8912e;color:#14324a;font-family:'Nunito Sans',system-ui,sans-serif;font-weight:700;font-size:15px}
-#gate.split .gbtn:hover{background:#fbf6ea}
+/* login: form left (white, logo top-left) · resort photo right — layout after the reference the user sent */
+#gate.split{display:grid;grid-template-columns:1fr 1fr;align-items:stretch;justify-items:stretch;background:#fff}
+#gate.split .gsign{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:90px 6vw 80px;font-family:'Nunito Sans',system-ui,sans-serif}
+#gate.split .glogo{position:absolute;top:28px;left:32px;height:48px;width:auto}
+#gate.split .gbox{width:100%;max-width:400px;text-align:left}
+#gate.split .gsign h2{margin:0;font-size:26px;font-weight:700;color:#14324a}
+#gate.split .gsign .gsub{margin:4px 0 26px;font-size:15px;color:#5b6775}
+#gate.split .gbtn{width:100%;padding:13px;border-radius:8px;background:#fff;border:1px solid #c9ced6;color:#14324a;font-family:'Nunito Sans',system-ui,sans-serif;font-weight:700;font-size:15px}
+#gate.split .gbtn:hover{border-color:#b8912e;background:#fbf6ea}
 #gate.split .gnote{margin-top:16px;font-size:13px;color:#6b7785}
 #gate.split .gerr{color:#c0392b}
-#gate.split .gfoot{position:absolute;left:7vw;bottom:22px;font-size:12px;color:#98a2ad}
-#gate.split .gfoot a{color:#6b7785;text-decoration:none}
+#gate.split .gfoot{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:13px;color:#98a2ad}
+#gate.split .gfoot a{color:#14324a;text-decoration:underline;text-underline-offset:3px;margin:0 4px}
 #gate.split .gfoot a:hover{color:#b8912e}
-@media(max-width:760px){ #gate.split{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
-  #gate.split .gbrand{padding:34px 24px 26px;align-items:center;text-align:center} #gate.split .glogo{width:170px}
-  #gate.split .gintro,#gate.split .gmods{display:none} #gate.split .gsign{padding:32px 24px 70px;align-items:center;text-align:center} #gate.split .gfoot{left:0;right:0;text-align:center} }
+#gate.split .gphoto{position:relative;background:#14324a url(login-lounge.jpg) center/cover no-repeat}
+#gate.split .gcap{position:absolute;left:28px;right:28px;bottom:28px;background:rgba(15,42,61,.78);border-radius:14px;padding:18px 22px;color:#f3eee4;font-family:'Nunito Sans',system-ui,sans-serif}
+#gate.split .gcap .gtag{font-family:Marcellus,Georgia,serif;letter-spacing:.3em;font-size:12.5px;color:#dcbb7f}
+#gate.split .gcap p{margin:6px 0 10px;font-size:15px;line-height:1.55}
+#gate.split .gcap .gmodl{font-size:12.5px;color:rgba(243,238,228,.72);line-height:1.8}
+#gate.split .gcap .gmodl b{color:#d8b65e;font-weight:700;letter-spacing:.06em}
+@media(max-width:760px){ #gate.split{grid-template-columns:1fr} #gate.split .gphoto{display:none} #gate.split .glogo{left:50%;transform:translateX(-50%)} #gate.split .gsign{text-align:center} }
 #gate.bye{opacity:0;pointer-events:none}
 #gate .orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 15s ease-in-out infinite alternate}
 #gate .o1{width:520px;height:520px;background:#12564c;top:-150px;left:-120px}
@@ -394,19 +391,13 @@ function cardTag(l){ const p=l&&l.pay_meta; if(!p||!(p.card_last4||p.card_brand)
 /* ============ auth + boot ============ */
 function renderGate(msg){
   document.body.insertAdjacentHTML('beforeend',`<div id="gate" class="split">
-    <div class="gbrand"><img class="glogo" src="logo-light.png" alt="Elite Escapes"><div class="gtag">OPERATIONS EXTRANET</div>
-      <div class="gintro">One place to run the club — from the day a member signs to every payment, stay and commission.</div>
-      <div class="gmods">
-        <div class="gmod"><h4>Member Service</h4><p>Serve members and approve stays</p><small>Bookings · Member Benefits</small></div>
-        <div class="gmod"><h4>Marketing</h4><p>Track guests, tours and OPC pay</p><small>Daily Guest Register · OPC Wages</small></div>
-        <div class="gmod"><h4>Financial</h4><p>Contracts, money in and out, commission</p><small>Contracts &amp; Payments · Cash &amp; Bank · Cash Flow · Record Payment · AR / AP · Commission</small></div>
-        <div class="gmod"><h4>Overview</h4><p>See the business at a glance</p><small>Dashboard · Reports</small></div>
-      </div></div>
-    <div class="gsign"><h2>ยินดีต้อนรับ</h2><div class="gsub">เข้าสู่ระบบด้วยอีเมลบริษัท</div>
+    <div class="gsign"><img class="glogo" src="logo.png" alt="Elite Escapes"><div class="gbox"><h2>Welcome back</h2><div class="gsub">to the Elite Escapes Operations Extranet</div>
     <button class="gbtn" onclick="doLogin()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.4 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.3-4.5 2.1-8.8 2.1-6.3 0-11.7-3.7-13.6-9l-7.9 6.1C6.4 42.6 14.6 48 24 48z"/></svg> Sign in with Google</button>
-    <div class="gnote">🔒 เฉพาะพนักงาน · การเข้าใช้ทุกครั้งถูกบันทึก</div>
-    <div class="gerr" id="gerr">${msg?esc(msg):''}</div>
-    <div class="gfoot">© ${new Date().getFullYear()} Elite Escapes Co., Ltd. · <a href="https://www.elite-escapes.club/">← กลับเว็บไซต์</a></div></div></div>`);
+    <div class="gnote">🔒 Authorized staff only · every access is logged</div>
+    <div class="gerr" id="gerr">${msg?esc(msg):''}</div></div>
+    <div class="gfoot"><a href="https://www.elite-escapes.club/">Home Page</a> · <a href="https://www.elite-escapes.club/member-services.html">Member Services</a> · <a href="https://www.elite-escapes.club/privacy.html">Privacy Policy</a></div></div>
+    <div class="gphoto"><div class="gcap"><div class="gtag">OPERATIONS EXTRANET</div><p>One place to run the club — from the day a member signs to every payment, stay and commission.</p>
+      <div class="gmodl"><b>MEMBER SERVICE</b> Bookings · Benefits &nbsp; <b>MARKETING</b> Guests · OPC &nbsp; <b>FINANCIAL</b> Contracts · Payments · Commission &nbsp; <b>OVERVIEW</b> Dashboard · Reports</div></div></div></div>`);
 }
 function doLogin(){ g('gerr').textContent='Taking you to Google…'; SBC.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}}); }
 function closeGate(){ const x=g('gate'); if(x){ x.classList.add('bye'); setTimeout(()=>x.remove(),520);} }
