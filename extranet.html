@@ -189,6 +189,12 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .chtl-row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .chtl-amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 @media(max-width:820px){ .chgrid{grid-template-columns:1fr} .chside{position:static;max-height:none} .chlist{max-height:300px} }
+/* print watermark (filled on beforeprint) */
+#printwm{display:none}
+@media print{ #printwm{display:block} }
+.wm-tiles{position:fixed;inset:0;display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;pointer-events:none;z-index:9999;overflow:hidden}
+.wm-tiles span{transform:rotate(-30deg);font:600 15px Tahoma,sans-serif;color:rgba(0,0,0,.09);white-space:nowrap;padding:40px 30px}
+.wm-foot{position:fixed;left:0;right:0;bottom:0;text-align:center;font:11px Tahoma,sans-serif;color:#555;background:#fff;padding:3px 0;z-index:10000}
 </style>
 </head>
 <body>
@@ -231,6 +237,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="navlbl">System</div>
       <button data-t="companies">Companies</button>
       <button data-t="accounts">Accounts</button>
+      <button data-t="accesslog">Access Log</button>
     </div>
   </nav>
 </aside>
@@ -318,15 +325,32 @@ async function del(table, id){ return api(table+'?id=eq.'+encodeURIComponent(id)
 async function patchRow(table, id, obj){ return api(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(obj)}); }
 /* ---- storage (payment slips + contract scans) ---- */
 async function uploadTo(bucket, path, file){ const {error}=await SBC.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error) throw new Error(error.message); return path; }
-async function openFile(bucket, path){ try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
+/* ===== Access log (append-only cf_access_log): every contract/slip file opened or previewed and every print is recorded — who / when / what.
+   Files do not open if the log cannot be written. Signed links are short-lived (5 min). */
+function fileContext(path){ const e=(DB.entries||[]).find(x=>x.contract_path===path); if(e) return e.category||null;
+  const l=(DB.lines||[]).find(x=>x.proof_path===path); return l?catOf(l):null; }
+async function logAccess(action, o){ o=o||{};
+  await api('cf_access_log',{method:'POST',prefer:'return=minimal',body:JSON.stringify([{actor:(USER&&USER.email)||'?',action,bucket:o.bucket||null,path:o.path||null,name:o.name||null,
+    context:o.context||(o.path?fileContext(o.path):null),company:(S&&S.company)||null,tab:(S&&S.tab)||null}])}); }
+async function openFile(bucket, path){ try{ await logAccess('open',{bucket,path}); }catch(e){ toast('เปิดไฟล์ไม่ได้ — บันทึกการเข้าถึงไม่สำเร็จ'); return; }
+  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,300); if(error) throw error; window.open(data.signedUrl,'_blank'); }catch(e){ toast('Cannot open file: '+e.message); } }
 async function embedProof(bucket, path, name, elId){ const box=g(elId); if(!box) return;
-  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,3600); if(error) throw error;
+  try{ await logAccess('preview',{bucket,path,name}); }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้ — บันทึกการเข้าถึงไม่สำเร็จ</span>'; return; }
+  try{ const {data,error}=await SBC.storage.from(bucket).createSignedUrl(path,300); if(error) throw error;
     const url=data.signedUrl; const ext=((name||path).split('.').pop()||'').toLowerCase();
     if(['pdf'].includes(ext)) box.innerHTML=`<iframe src="${url}#toolbar=1" title="สลิป"></iframe>`;
     else if(['png','jpg','jpeg','gif','webp','bmp'].includes(ext)) box.innerHTML=`<a href="${url}" target="_blank" title="คลิกเพื่อดูเต็มจอ"><img src="${url}" alt="สลิป"></a>`;
     else box.innerHTML=`<a href="${url}" target="_blank">เปิดไฟล์หลักฐาน</a>`;
   }catch(e){ box.innerHTML='<span class="mini" style="opacity:.6">แสดงตัวอย่างไม่ได้ — กด “เปิดเต็มจอ” ด้านบน</span>'; }
 }
+/* print watermark: name + time of whoever prints, on every printed page (in-page prints and Ctrl+P); popup prints add it themselves */
+function wmText(){ const d=new Date(); const p=x=>String(x).padStart(2,'0');
+  return 'พิมพ์โดย '+((USER&&USER.email)||'?')+' · '+p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function wmHtml(t){ t=esc(t); let tiles=''; for(let i=0;i<24;i++) tiles+=`<span>${t}</span>`;
+  return `<div class="wm-tiles">${tiles}</div><div class="wm-foot">${t} · Elite Escapes Extranet — เอกสารภายใน ห้ามเผยแพร่</div>`; }
+const WM_CSS='.wm-tiles{position:fixed;inset:0;display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;pointer-events:none;z-index:9999;overflow:hidden}.wm-tiles span{transform:rotate(-30deg);font:600 15px Tahoma,sans-serif;color:rgba(0,0,0,.09);white-space:nowrap;padding:40px 30px}.wm-foot{position:fixed;left:0;right:0;bottom:0;text-align:center;font:11px Tahoma,sans-serif;color:#555;background:#fff;padding:3px 0;z-index:10000}';
+window.addEventListener('beforeprint',()=>{ let w=g('printwm'); if(!w){ w=document.createElement('div'); w.id='printwm'; document.body.appendChild(w); }
+  w.innerHTML=wmHtml(wmText()); logAccess('print',{context:(S&&S.tab)||null,name:document.title}).catch(()=>{}); });
 function methodLabel(m){ return {transfer:'Transfer · credit advice',card:'Card slip',cash:'Cash',other:'Other'}[m]||m||''; }
 function cardTag(l){ const p=l&&l.pay_meta; if(!p||!(p.card_last4||p.card_brand)) return '';
   const tip=[p.card_brand,p.card_last4?'••'+p.card_last4:'',p.card_thb?'THB '+Number(p.card_thb).toLocaleString():'',p.card_ref?'ref '+p.card_ref:'',p.card_auth?'auth '+p.card_auth:''].filter(Boolean).join(' · ');
@@ -394,7 +418,7 @@ const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','financ
   bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
-function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
+function canTab(tab){ if(USER&&USER.is_admin) return true; if(tab==='accesslog') return false; /* admin only */ const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
 function firstAllowedTab(){ return Object.keys(TAB_CAT).find(t=>canTab(t))||'dashboard'; }
 function applyAccess(){
   document.querySelectorAll('#tabs button').forEach(b=>{ b.hidden=!canTab(b.dataset.t); });
@@ -973,9 +997,34 @@ function slipHtml(person){ const {rows}=commData(S.commP); const p=commPeople(ro
      <td>Y-T-D Income: <b>${b(Y.income+c.income)}</b></td><td>Y-T-D Tax: <b>${b(Y.tax+c.tax)}</b></td><td>Y-T-D Social Security: <b>${b(Y.sso+c.sso)}</b></td><td>Y-T-D Visa &amp; WP: <b>${b(Y.visa+c.visa_wp)}</b></td></tr></table>
    ${c.remark?`<div style="margin-top:8px">Remark : ${esc(c.remark)}</div>`:''}
    <div style="margin-top:8px;font-size:11px;color:#666">Y-T-D นับจากสลิปที่บันทึกในระบบ (ปี ${y})</div></div>`; }
-function slipPrint(person){ const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์'); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Pay Slip · '+esc(person)+' · '+esc(commPeriod(S.commP).label)+'</title><style>body{padding:24px;background:#fff}@media print{body{padding:0}}</style></head><body>'+slipHtml(person)+'</body></html>');
+/* ===== Access Log viewer (admin only) — who opened / previewed / printed what ===== */
+async function rAccessLog(){ if(!(USER&&USER.is_admin)){ g('main').innerHTML='<div class="emptyc">เฉพาะ admin</div>'; return; }
+  g('main').innerHTML='<div class="emptyc">⏳ กำลังโหลดประวัติ…</div>';
+  let rows=[]; try{ rows=await api('cf_access_log?select=*&order=ts.desc&limit=1000')||[]; }catch(e){ g('main').innerHTML='<div class="emptyc">โหลดไม่ได้: '+esc(e.message)+'</div>'; return; }
+  if(S.tab!=='accesslog') return;
+  const who=S.alWho||'all', act=S.alAct||'all';
+  const people=[...new Set(rows.map(r=>r.actor))].sort();
+  const list=rows.filter(r=>(who==='all'||r.actor===who)&&(act==='all'||r.action===act));
+  const A={open:'เปิดไฟล์',preview:'ดูสลิปในหน้า',print:'พิมพ์'};
+  const since=new Date(Date.now()-7*864e5).toISOString(); const wk=rows.filter(r=>r.ts>=since);
+  const top=Object.entries(wk.reduce((m,r)=>(m[r.actor]=(m[r.actor]||0)+1,m),{})).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const opt=(v,l,cur)=>`<option value="${esc(v)}"${cur===v?' selected':''}>${esc(l)}</option>`;
+  const dt=s=>{ const d=new Date(s); const p=x=>String(x).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); };
+  g('main').innerHTML=`<div class="head"><div><h1>Access Log · ประวัติการเข้าถึง</h1><p class="mini">ทุกครั้งที่มีคนเปิดไฟล์สัญญา / สลิป หรือพิมพ์เอกสาร ระบบบันทึกไว้ที่นี่ — แก้หรือลบไม่ได้ · เห็นเฉพาะ admin</p></div></div>
+   <div class="kpis"><div class="kpi"><div class="v">${wk.length}</div><div class="l">ครั้ง ใน 7 วันที่ผ่านมา</div></div>
+     <div class="kpi"><div class="v" style="font-size:15px;line-height:1.5">${top.map(([a,n])=>esc(a)+' · '+n).join('<br>')||'—'}</div><div class="l">ใครเข้าถึงบ่อยสุด (7 วัน)</div></div></div>
+   <div class="toolbar" style="gap:10px;margin-bottom:10px"><select style="width:auto" onchange="S.alWho=this.value;rAccessLog()">${opt('all','ทุกคน',who)}${people.map(p=>opt(p,p,who)).join('')}</select>
+     <select style="width:auto" onchange="S.alAct=this.value;rAccessLog()">${opt('all','ทุกการกระทำ',act)}${Object.entries(A).map(([k,l])=>opt(k,l,act)).join('')}</select><span class="mini">${list.length} รายการ (ล่าสุด 1,000)</span></div>
+   <div class="card" style="overflow-x:auto"><table><thead><tr><th>เวลา</th><th>ใคร</th><th>ทำอะไร</th><th>สัญญา / เรื่อง</th><th>ไฟล์ / เอกสาร</th><th>บริษัท</th></tr></thead><tbody>
+   ${list.map(r=>`<tr><td class="mini" style="white-space:nowrap">${dt(r.ts)}</td><td>${esc(r.actor)}</td><td><span class="pill ${r.action==='print'?'fc':(r.action==='open'?'exp':'off')}" style="font-size:10px">${esc(A[r.action]||r.action)}</span></td><td>${esc(r.context||'—')}</td><td class="mini">${esc(r.name||((r.path||'').split('/').pop())||'—')}</td><td class="mini">${esc(r.company||'')}</td></tr>`).join('')||'<tr><td colspan="6"><div class="emptyc" style="padding:20px">ยังไม่มีประวัติ</div></td></tr>'}
+   </tbody></table></div>`;
+}
+/* print in a popup — logged first (no log = no print), watermarked with who/when on every page */
+async function printPopup(title, html, context, css){ const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์'); return; }
+  try{ await logAccess('print',{name:title,context}); }catch(e){ w.close(); toast('พิมพ์ไม่ได้ — บันทึกการเข้าถึงไม่สำเร็จ'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>body{padding:24px 24px 40px;background:#fff}@media print{body{padding:0 0 30px}}'+WM_CSS+(css||'')+'</style></head><body>'+html+wmHtml(wmText())+'</body></html>');
   w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+function slipPrint(person){ printPopup('Pay Slip · '+person+' · '+commPeriod(S.commP).label, slipHtml(person), person); }
 async function slipMail(person){ const st=staffOf(person)||{}; if(!st.email){ toast('ยังไม่มีอีเมลของ '+person+' — เพิ่มที่ “รายชื่อพนักงาน”'); return; }
   const P=commPeriod(S.commP), pd=slipPayDay(P), d1=P.start.slice(8,10).replace(/^0/,''); const {rows}=commData(S.commP);
   const p=commPeople(rows.filter(r=>r.setup)).find(x=>x.name===person); const c=slipCalc(person,p?p.due:0,Number(S.commFx)||0);
@@ -1004,9 +1053,8 @@ function commStatement(name){ const {P,rows}=commData(S.commP); const p=commPeop
   S._commPrint=html;
   openModal(html+`<div class="right" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn pri" onclick="commPrint()">🖨️ พิมพ์</button></div>`);
 }
-function commPrint(){ const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์'); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Commission Statement</title><style>body{font-family:Tahoma,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 7px;font-size:12px}th{background:#eee}.mini{color:#555;font-size:12px}h2{margin:0 0 4px}</style></head><body>'+S._commPrint+'</body></html>');
-  w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+function commPrint(){ printPopup('Commission Statement · '+commPeriod(S.commP).label, S._commPrint, 'commission statement',
+  'body{font-family:Tahoma,sans-serif;color:#111}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:5px 7px;font-size:12px}th{background:#eee}.mini{color:#555;font-size:12px}h2{margin:0 0 4px}'); }
 /* ---- OPC Wages history / trends ---- */
 async function mktLoadHistory(){ await loadMktBase(); let rows=[]; try{ rows=await api('mkt_dgr?select=*&year=eq.2026&order=week.asc')||[]; }catch(e){} S.mktHist=rows; }
 function rMktHistory(){
@@ -1255,6 +1303,7 @@ function render(){
   if(S.tab==='ap') return rAP();
   if(S.tab==='arap') return rARAP();
   if(S.tab==='commission') return rCommission();
+  if(S.tab==='accesslog') return rAccessLog();
   if(S.tab==='stays') return rStays();
   if(S.tab==='registry'){ S.tab='receipts'; return render(); } /* old Registry page merged into Contracts & Payments */
   if(S.tab==='bookings') return rBookings();
