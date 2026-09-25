@@ -231,7 +231,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="navlbl">System</div>
       <button data-t="companies">Companies</button>
       <button data-t="accounts">Accounts</button>
-      <button data-t="import">Import/Export</button>
     </div>
   </nav>
 </aside>
@@ -392,7 +391,7 @@ async function loadAll(){
 /* ============ access control (role -> menu category) ============ */
 const TAB_CAT={dashboard:'overview',reports:'overview',registry:['sales','finance'],bookings:'sales',stays:'sales',guests:['marketing','sales'],
   mktwages:'marketing',
-  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data',import:'data'};
+  bank:'finance',cashflow:'finance',income:['finance','sales'],receipts:['finance','sales'],ar:'finance',ap:'finance',arap:'finance',commission:'finance',companies:'data',accounts:'data'};
 function myCats(){ return (USER&&Array.isArray(USER.cats))?USER.cats:['overview']; }
 function hasCat(c){ return !!(USER&&USER.is_admin) || myCats().indexOf(c)>=0; }
 function canTab(tab){ if(USER&&USER.is_admin) return true; const c=TAB_CAT[tab]; if(!c) return true; const cats=Array.isArray(c)?c:[c]; return cats.some(x=>myCats().indexOf(x)>=0); }
@@ -1264,7 +1263,7 @@ function render(){
   if(S.tab==='bank') return rBankCash();
   if(S.tab==='companies') return rCompanies();
   if(S.tab==='accounts') return rAccounts();
-  if(S.tab==='import') return rImport();
+  if(S.tab==='import'){ S.tab='dashboard'; return render(); } /* removed page */
 }
 
 /* ============ matrix engine ============ */
@@ -1410,8 +1409,6 @@ function rCashflow(){
     <div class="sp" style="flex:1"></div>
     <button class="btn inc" onclick="openEntry('income')">＋ Add Income</button>
     <button class="btn exp" onclick="openEntry('expense')">＋ Add Expense</button>
-    <button class="btn ghost sm" onclick="S.tab='import';render()">Import</button>
-    <button class="btn ghost sm" onclick="exportCSV()">Export</button>
   </div>`;
   const head=`<div class="head"><div><h1>Cash Flow</h1><p class="mini">Forecast your cash on hand — money in, money out. ${DB.entries.length} entries · ${DB.accounts.length} account(s)</p></div></div>`;
   let body;
@@ -2931,28 +2928,7 @@ async function saveAccount(id){ const name=g('a_name').value.trim(); if(!name){ 
 async function delAccount(id){ if(!confirm('Delete account?')) return; try{ await del('cf_accounts',id); closeModal(); toast('Deleted'); await loadAll(); }catch(e){ toast('Failed: '+e.message); } }
 
 /* ============ Import / Export (Pulse CSV) ============ */
-const IMPORT_COLS=['Date','Title','Account','Company','Description','Category','Memo','Payment','Deposit'];
-function rImport(){
-  const head=`<div class="head"><div><h1>Import / Export</h1><p class="mini">Bring data in from a CSV, or export what you have — Pulse-compatible format</p></div></div>`;
-  const body=`<div class="card pad" style="margin-bottom:16px">
-    <h2>Import from CSV</h2>
-    <p class="mini" style="margin-bottom:12px">One (1) payment or deposit per row. Required: <b>Date</b> and either <b>Payment</b> (expense) or <b>Deposit</b> (income). Optional: Title, Account, Company, Description, Category, Memo.</p>
-    <input type="file" id="csvfile" accept=".csv,text/csv" style="max-width:340px;display:inline-block;width:auto">
-    <button class="btn ghost sm" onclick="downloadTemplate()">⬇ Download CSV template</button>
-    <div id="preview" style="margin-top:16px"></div>
-  </div>
-  <div class="card pad"><h2>Export</h2><p class="mini" style="margin-bottom:10px">Download every scheduled line as CSV (${DB.lines.length} rows) in the same column format.</p>
-  <button class="btn" onclick="exportCSV()">⬇ Export CSV</button></div>
-  <table style="margin-top:16px" class="mini"><thead><tr>${IMPORT_COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
-  <tbody><tr><td>2026-10-01</td><td>Office Rent</td><td>Primary</td><td>Club Unique</td><td>HQ Patong</td><td>Rent</td><td>Monthly</td><td>50000</td><td></td></tr>
-  <tr><td>2026-10-05</td><td>Sales Deck PBH</td><td>Primary</td><td>Club Unique</td><td>John Smith</td><td>TCU-0001</td><td>Instalment</td><td></td><td>36500</td></tr></tbody></table>`;
-  g('main').innerHTML=head+body;
-  g('csvfile').onchange=onCSV;
-}
-function downloadTemplate(){
-  const rows=[IMPORT_COLS.join(','),'2026-10-01,Office Rent,Primary,Club Unique,HQ,Rent,Monthly,50000,','2026-10-05,Sales Deck PBH,Primary,Club Unique,John Smith,TCU-0001,Instalment,,36500'];
-  downloadFile('cashflow-template.csv', rows.join('\n'));
-}
+/* Import/Export page removed 2026-09-25 — data leaked before and could not be traced; nothing leaves the system as a bulk file. */
 function downloadFile(name, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
 function parseCSV(text){
   const rows=[]; let i=0,f='',row=[],q=false; text=text.replace(/^﻿/,'');
@@ -2969,81 +2945,6 @@ function normDate(s){ s=(s||'').trim(); if(!s) return null;
   const d=new Date(s); if(!isNaN(d)) return iso(d); return null;
 }
 function num(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
-let _importRows=null;
-function onCSV(ev){
-  const file=ev.target.files[0]; if(!file) return;
-  const rd=new FileReader();
-  rd.onload=()=>{ try{ buildPreview(parseCSV(rd.result)); }catch(e){ g('preview').innerHTML='<div class="pill exp">Parse error: '+esc(e.message)+'</div>'; } };
-  rd.readAsText(file);
-}
-function buildPreview(rows){
-  if(rows.length<2){ g('preview').innerHTML='<div class="mini">Empty file.</div>'; return; }
-  const hdr=rows[0].map(h=>h.trim().toLowerCase());
-  const idx=name=>hdr.indexOf(name.toLowerCase());
-  const col={date:idx('date'),title:idx('title'),account:idx('account'),company:idx('company'),description:idx('description'),category:idx('category'),memo:idx('memo'),payment:idx('payment'),deposit:idx('deposit')};
-  if(col.date<0){ g('preview').innerHTML='<div class="pill exp">Missing required "Date" column</div>'; return; }
-  const parsed=[], bad=[];
-  for(let r=1;r<rows.length;r++){ const row=rows[r]; if(!row.join('').trim()) continue;
-    const date=normDate(row[col.date]);
-    const pay=col.payment>=0?num(row[col.payment]):0, dep=col.deposit>=0?num(row[col.deposit]):0;
-    if(!date || (pay<=0&&dep<=0)){ bad.push(r+1); continue; }
-    const kind = dep>0?'income':'expense', amount= dep>0?dep:pay;
-    parsed.push({date,kind,amount,
-      title:(col.title>=0?row[col.title]:'')||'(imported)',
-      account:col.account>=0?(row[col.account]||''):'',
-      company:col.company>=0?(row[col.company]||''):'',
-      description:col.description>=0?(row[col.description]||''):'',
-      category:col.category>=0?(row[col.category]||''):'',
-      memo:col.memo>=0?(row[col.memo]||''):''});
-  }
-  _importRows=parsed;
-  const inc=parsed.filter(p=>p.kind==='income'), exp=parsed.filter(p=>p.kind==='expense');
-  const sum=a=>a.reduce((s,x)=>s+x.amount,0);
-  const prev=parsed.slice(0,12).map(p=>`<tr><td>${fmtDate(p.date)}</td><td><span class="pill ${p.kind==='income'?'inc':'exp'}">${p.kind}</span></td><td>${esc(p.title)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.company||'—')}</td><td class="n">${fmt(p.amount)}</td></tr>`).join('');
-  g('preview').innerHTML=`<div class="kpis" style="margin-bottom:12px">
-      <div class="kpi"><div class="v">${parsed.length}</div><div class="l">Rows ready</div></div>
-      <div class="kpi"><div class="v" style="color:var(--income)">${fmt(sum(inc))}</div><div class="l">${inc.length} income</div></div>
-      <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(sum(exp))}</div><div class="l">${exp.length} expense</div></div>
-      ${bad.length?`<div class="kpi"><div class="v" style="color:var(--ink3)">${bad.length}</div><div class="l">Skipped (no date/amount)</div></div>`:''}
-    </div>
-    <div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>Title</th><th>Category</th><th>Company</th><th class="n">Amount</th></tr></thead><tbody>${prev}</tbody></table></div>
-    ${parsed.length>12?`<p class="mini" style="margin-top:6px">…and ${parsed.length-12} more rows</p>`:''}
-    <div class="right"><button class="btn pri" onclick="runImport()">Import ${parsed.length} rows</button></div>`;
-}
-async function runImport(){
-  if(!_importRows||!_importRows.length){ toast('Nothing to import'); return; }
-  const btn=event.target; btn.disabled=true; btn.textContent='Importing…';
-  try{
-    const primary=primaryAccount();
-    // ensure companies & categories
-    const cos=[...new Set(_importRows.map(r=>r.company).filter(Boolean))];
-    const cats=[...new Set(_importRows.map(r=>r.category).filter(Boolean))];
-    const newCos=cos.filter(n=>!DB.companies.some(c=>c.name===n)).map(n=>({id:uid('co'),name:n}));
-    const newCats=cats.filter(n=>!DB.categories.some(c=>c.name===n)).map(n=>({id:uid('ct'),name:n}));
-    if(newCos.length) await upsert('cf_companies',newCos);
-    if(newCats.length) await upsert('cf_categories',newCats);
-    const entries=[], lines=[];
-    _importRows.forEach(r=>{ const id=uid('en');
-      const acc=DB.accounts.find(a=>a.name.toLowerCase()===(r.account||'').toLowerCase());
-      entries.push({id,kind:r.kind,title:r.title,category:r.category||null,company:r.company||null,account:(acc&&acc.id)||(primary&&primary.id),description:r.description||null,active:true,note:r.memo||null});
-      lines.push({id:uid('ln'),entry_id:id,amount:r.amount,txn_date:r.date,repeat:'never',forecast:false});
-    });
-    // batch in chunks of 500
-    for(let i=0;i<entries.length;i+=500) await upsert('cf_entries',entries.slice(i,i+500));
-    for(let i=0;i<lines.length;i+=500) await upsert('cf_lines',lines.slice(i,i+500));
-    toast('Imported '+entries.length+' entries'); _importRows=null;
-    await loadAll(); S.tab='cashflow'; render();
-  }catch(e){ toast('Import failed: '+e.message); btn.disabled=false; btn.textContent='Retry import'; }
-}
-function exportCSV(){
-  const out=[IMPORT_COLS.join(',')];
-  allLines().forEach(({l,e})=>{ const cell=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-    out.push([l.txn_date,e.title,accName(e.account),e.company,e.description,e.category,(l.memo||(l.repeat&&l.repeat!=='never'?REPLBL[l.repeat]:'')||e.note||''),
-      e.kind==='expense'?l.amount:'', e.kind==='income'?l.amount:''].map(cell).join(',')); });
-  downloadFile('elite-cashflow-'+TODAY+'.csv', out.join('\n'));
-  toast('Exported '+(out.length-1)+' rows');
-}
-
 /* ============ start ============ */
 boot();
 </script>
