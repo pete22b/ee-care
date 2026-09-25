@@ -168,20 +168,23 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 #gate.split .gfoot a{color:#14324a;text-decoration:underline;text-underline-offset:3px;margin:0 4px}
 #gate.split .gfoot a:hover{color:#b8912e}
 /* right side = photo mosaic (mixed sizes, portrait + landscape, layered shadows) + brand tile with Elite + Interval */
-#gate.split .gphoto{position:relative;background:#0f2a3d;overflow:hidden}
+#gate.split .gphoto{position:relative;background:#f3eee4;overflow:hidden}
 #gate.split .gmosaic{position:absolute;inset:0;padding:22px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr)) auto;gap:12px}
-#gate.split .gt{border-radius:16px;background:#1c3d5a center/cover no-repeat;box-shadow:0 14px 34px -10px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.25);min-height:0}
+#gate.split .gt{border-radius:16px;background:#1c3d5a center/cover no-repeat;box-shadow:0 14px 30px -14px rgba(15,42,61,.45),0 2px 6px rgba(15,42,61,.12);min-height:0}
 #gate.split .t1{grid-area:1/1/4/4;background-image:url(login/pool-aerial.jpg)}
 #gate.split .tb{grid-area:1/4/3/7}
 #gate.split .t2{grid-area:3/4/5/6;background-image:url(login/spa.jpg)}
 #gate.split .t3{grid-area:3/6/6/7;background-image:url(login/sunset.jpg);background-position:30% center}
 #gate.split .t4{grid-area:4/1/6/3;background-image:url(login/rooftop.jpg)}
-#gate.split .t5{grid-area:4/3/6/4;background-image:url(login/lounge.jpg);background-position:60% center;transform:translateY(-8px) scale(1.03);z-index:1;box-shadow:0 22px 40px -12px rgba(0,0,0,.7)}
+#gate.split .t5{grid-area:4/3/6/4;background-image:url(login/lounge.jpg);background-position:60% center;transform:translateY(-8px) scale(1.03);z-index:1;box-shadow:0 22px 40px -14px rgba(15,42,61,.55)}
 #gate.split .t6{grid-area:5/4/6/6;background-image:url(login/paradise.jpg)}
 #gate.split .tb{background:linear-gradient(160deg,#1c3d5a,#0b2338);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px 18px;border:1px solid rgba(216,182,94,.35);overflow:hidden}
-#gate.split .tb img{max-width:78%;max-height:62%;width:auto;height:auto;object-fit:contain}
-#gate.split .tb .iilogo{display:flex;align-items:center;gap:8px;font:600 10.5px 'Nunito Sans',system-ui,sans-serif;letter-spacing:.16em;color:#d8b65e;text-transform:uppercase;text-align:center}
-#gate.split .tb .iilogo img{height:26px}
+#gate.split .tb img{width:82%;max-width:340px;height:auto}
+#gate.split .tb .tdiv{width:48px;height:1px;background:#b8912e;margin:4px 0}
+#gate.split .tb .iilogo{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+#gate.split .tb .iilogo small{font:600 10.5px 'Nunito Sans',system-ui,sans-serif;letter-spacing:.3em;color:rgba(243,238,228,.7)}
+#gate.split .tb .iilogo b{font:400 17px Marcellus,Georgia,serif;letter-spacing:.22em;color:#dcbb7f}
+#gate.split .tb .iilogo img{height:34px;width:auto}
 #gate.split .gcap{grid-area:6/1/7/7;position:relative;background:rgba(28,61,90,.9);border:1px solid rgba(216,182,94,.25);box-shadow:0 14px 34px -10px rgba(0,0,0,.55);border-radius:16px;padding:16px 20px;color:#f3eee4;font-family:'Nunito Sans',system-ui,sans-serif}
 #gate.split .gcap .gtag{font-family:Marcellus,Georgia,serif;letter-spacing:.3em;font-size:12.5px;color:#dcbb7f}
 #gate.split .gcap p{margin:6px 0 10px;font-size:15px;line-height:1.55}
@@ -432,7 +435,7 @@ function renderGate(msg){
     <div class="galt" id="g_alt">Don't have an account? <a href="#" onclick="gateMode('signup');return false">Sign up</a></div>
     <div class="gnote">🔒 Authorized staff only · every access is logged</div></div>
     <div class="gfoot"><a href="https://www.elite-escapes.club/">Home Page</a> · <a href="https://www.elite-escapes.club/member-services.html">Member Services</a> · <a href="https://www.elite-escapes.club/privacy.html">Privacy Policy</a></div></div>
-    <div class="gphoto"><div class="gmosaic" aria-hidden="true"><div class="gt t1"></div><div class="gt tb"><img src="logo-light.png" alt=""><div class="iilogo" id="g_ii">Member of Interval International</div></div><div class="gt t2"></div><div class="gt t3"></div><div class="gt t4"></div><div class="gt t5"></div><div class="gt t6"></div><div class="gcap"><div class="gtag">OPERATIONS EXTRANET</div><p>One place to run the club — from the day a member signs to every payment, stay and commission.</p>
+    <div class="gphoto"><div class="gmosaic" aria-hidden="true"><div class="gt t1"></div><div class="gt tb"><img src="logo-wordmark.png" alt="Elite Escapes"><div class="tdiv"></div><div class="iilogo" id="g_ii"><small>MEMBER OF</small><b>INTERVAL INTERNATIONAL</b></div></div><div class="gt t2"></div><div class="gt t3"></div><div class="gt t4"></div><div class="gt t5"></div><div class="gt t6"></div><div class="gcap"><div class="gtag">OPERATIONS EXTRANET</div><p>One place to run the club — from the day a member signs to every payment, stay and commission.</p>
       <div class="gmodl"><b>MEMBER SERVICE</b> Bookings · Benefits &nbsp; <b>MARKETING</b> Guests · OPC &nbsp; <b>FINANCIAL</b> Contracts · Payments · Commission &nbsp; <b>OVERVIEW</b> Dashboard · Reports</div></div></div></div></div>`);
 }
 function doLogin(){ g('gerr').textContent='Taking you to Google…'; SBC.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}}); }
