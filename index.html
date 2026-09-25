@@ -825,7 +825,7 @@ function rAR(tgt){ const data=arData();
   const table=`<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${th('สัญญา / ลูกค้า')}${th('ค้างรวม',R)}${th('ยังไม่ถึง',R)}${th('1–30',R)}${th('31–60',R)}${th('61–90',R)}${th('90+',R)}${th('สถานะ',C)}${th('',R)}</tr></thead><tbody>${trs}${data.length?totR:''}</tbody></table></div>`;
   (tgt?g(tgt):g('main')).innerHTML=(tgt?'':head)+kpis+aging+table;
 }
-function arGo(cat){ S.rcFocus=cat; goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
+function arGo(cat){ S.rcFocus=cat; S.rcG='all'; S.rcSub={}; goto('receipts'); S.rcOpen=S.rcOpen||{}; S.rcOpen[cat]=true; render();
   setTimeout(()=>{ const el=g('rc_'+cssId(cat)); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.boxShadow='0 0 0 2px var(--brand)'; setTimeout(()=>{el.style.boxShadow='';},1600); } },90); }
 
 /* ============ AP — payables by vendor/category + aging ============ */
@@ -1180,33 +1180,38 @@ const FU_GROUPS=[['queue','คิวงานวันนี้','#14324a'],['du
   ['todo','สัญญาจบ · ยังไม่ติดต่อ','#5F5E5A'],['trying','กำลังติดต่อ','#854F0B'],['reach','2 ติดต่อได้','#185FA5'],['unreach','3 ติดต่อไม่ได้','#993C1D'],['history','ประวัติ','#888780'],['all','ทั้งหมด','#444441']];
 function fuInQ(c){ return c.st==='todo'||c.st==='trying'||(c.due&&c.st!=='history'); }
 function fuInGroup(c,k){ return k==='all'?true:k==='queue'?fuInQ(c):k==='due'?(c.due&&c.st!=='history'):k==='overdue'?c.odAmt>0:c.st===k; }
-function fuSub(c){ const F=S.fuSub||{};
+function fuSub(c,F){ F=F||S.fuSub||{};
   if(F.nat&&c.nat!==F.nat) return false;
   if(F.prod&&!c.prods.includes(F.prod)) return false;
   if(F.lyo&&String(c.lastLyo)!==F.lyo) return false;
   if(F.ch==='email'&&!c.emails.length) return false; if(F.ch==='phone'&&!c.phones.length) return false; if(F.ch==='none'&&(c.emails.length||c.phones.length)) return false;
   if(F.by&&!(c.last&&c.last.actor===F.by)) return false;
   return true; }
-function fuSetSub(k,v){ S.fuSub=Object.assign({},S.fuSub||{},{[k]:v}); S.fuLim=50; render(); }
+/* shared by Member Follow-up (ns 'fu', counts customers) and Contracts & Payments (ns 'rc', counts contracts) — each page keeps its own selection */
+function fuSetSub(k,v,ns){ if(ns==='rc'){ S.rcSub=Object.assign({},S.rcSub||{},{[k]:v}); S.rcLim=60; S.rcFocus=null; } else { S.fuSub=Object.assign({},S.fuSub||{},{[k]:v}); S.fuLim=50; } render(); }
+function fuSetG(k,ns){ if(ns==='rc'){ S.rcG=k; S.rcLim=60; S.rcFocus=null; } else { S.fuF=k; S.fuLim=50; } render(); }
+function fuClearSub(ns){ if(ns==='rc') S.rcSub={}; else S.fuSub={}; render(); }
+function fuPills(counts,cur,ns){ return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">`+FU_GROUPS.map(([k,lab,col])=>{ const on=cur===k;
+    return `<button type="button" onclick="fuSetG('${k}','${ns}')" style="border:1px solid ${col};background:${on?col:'#fff'};color:${on?'#fff':col};border-radius:22px;padding:8px 15px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">${lab} · ${(counts[k]||0).toLocaleString()}</button>`; }).join('')+`</div>`; }
+function fuSubBar(all,F,ns){ const uniq=a=>[...new Set(a.filter(Boolean))].sort();
+  const lyos=ns==='rc'?all.flatMap(c=>c.list.map(x=>x.lyo?String(x.lyo):'')):all.map(c=>c.lastLyo?String(c.lastLyo):'');
+  const sel=(k,label,opts)=>`<select onchange="fuSetSub('${k}',this.value,'${ns}')" style="width:auto;max-width:220px"><option value="">${label}: ทั้งหมด</option>${opts.map(([v,t])=>`<option value="${esc(v)}"${F[k]===v?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
+  return `<div class="toolbar" style="gap:8px;flex-wrap:wrap;margin:10px 0 6px">
+    ${sel('nat','สัญชาติ',uniq(all.map(c=>c.nat)).map(v=>[v,v]))}
+    ${sel('prod','สินค้า',uniq(all.flatMap(c=>c.prods)).map(v=>[v,v]))}
+    ${sel('lyo','ปีสุดท้ายของสัญญา',uniq(lyos).reverse().map(v=>[v,v]))}
+    ${sel('ch','ช่องทางติดต่อ',[['email','มีอีเมล'],['phone','มีเบอร์โทร'],['none','ไม่มีข้อมูลติดต่อ']])}
+    ${sel('by','ผู้ติดต่อล่าสุด',uniq(all.map(c=>c.last&&c.last.actor)).map(v=>[v,v.split('@')[0]]))}
+    ${Object.values(F).some(Boolean)?`<button class="btn link" onclick="fuClearSub('${ns}')">ล้างตัวกรอง</button>`:''}</div>`; }
 function rFollowup(){
   const all=fuClients(); const f=S.fuF||'queue';
-  const base=all.filter(fuSub);
+  const base=all.filter(c=>fuSub(c));
   let list=base.filter(c=>fuInGroup(c,f));
   const pr={unreach:0,trying:1,todo:2,reach:3,active:4,history:5};
   list.sort((a,b)=>(b.due-a.due)||(f==='overdue'?b.odAmt-a.odAmt:0)||(pr[a.st]-pr[b.st])||(b.lastLyo-a.lastLyo)||(a.name<b.name?-1:1));
   const head=`<div class="head"><div><h1>Member Follow-up · ติดตามลูกค้า</h1><p class="mini">ลูกค้าไหลต่อเนื่อง: สัญญายังเดิน → สัญญาจบ → ติดต่อ → ติดต่อได้ / ติดต่อไม่ได้ (ไม่สำเร็จ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → ลองใหม่ทุก 6 เดือน) · บริษัท: <b>${esc(S.company||'')}</b></p></div></div>`;
-  const pills=FU_GROUPS.map(([k,lab,col])=>{ const n=base.filter(c=>fuInGroup(c,k)).length; const on=f===k;
-    return `<button type="button" onclick="S.fuF='${k}';S.fuLim=50;render()" style="border:1px solid ${col};background:${on?col:'#fff'};color:${on?'#fff':col};border-radius:22px;padding:8px 15px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">${lab} · ${n.toLocaleString()}</button>`; }).join('');
-  const F=S.fuSub||{}; const uniq=a=>[...new Set(a.filter(Boolean))].sort();
-  const sel=(k,label,opts)=>`<select onchange="fuSetSub('${k}',this.value)" style="width:auto;max-width:220px"><option value="">${label}: ทั้งหมด</option>${opts.map(([v,t])=>`<option value="${esc(v)}"${F[k]===v?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
-  const sub=`<div class="toolbar" style="gap:8px;flex-wrap:wrap;margin:10px 0 6px">
-    ${sel('nat','สัญชาติ',uniq(all.map(c=>c.nat)).map(v=>[v,v]))}
-    ${sel('prod','สินค้า',uniq(all.flatMap(c=>c.prods)).map(v=>[v,v]))}
-    ${sel('lyo','ปีสุดท้ายของสัญญา',uniq(all.map(c=>c.lastLyo?String(c.lastLyo):'')).reverse().map(v=>[v,v]))}
-    ${sel('ch','ช่องทางติดต่อ',[['email','มีอีเมล'],['phone','มีเบอร์โทร'],['none','ไม่มีข้อมูลติดต่อ']])}
-    ${sel('by','ผู้ติดต่อล่าสุด',uniq(all.map(c=>c.last&&c.last.actor)).map(v=>[v,v.split('@')[0]]))}
-    ${Object.values(F).some(Boolean)?`<button class="btn link" onclick="S.fuSub={};render()">ล้างตัวกรอง</button>`:''}</div>`;
-  const kpis=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">${pills}</div>`+sub;
+  const counts={}; FU_GROUPS.forEach(([k])=>counts[k]=base.filter(c=>fuInGroup(c,k)).length);
+  const kpis=fuPills(counts,f,'fu')+fuSubBar(all,S.fuSub||{},'fu');
   const lim=S.fuLim||50; S._fu=list.slice(0,lim).map(c=>c.key);
   const dt=s=>s?fmtDate(String(s).slice(0,10)):'—';
   const rows=list.slice(0,lim).map((c,i)=>{ const [lab,cls]=FU_ST[c.st]; const cs=c.list;
@@ -2398,16 +2403,27 @@ function rReceipts(){
     <div class="kpi"><div class="v" style="color:var(--expense)">${fmt(payOut)}</div><div class="l">Interval fees to pay</div></div></div>`;
   const st=S.regStatus||'all';
   const allG=Object.values(groups);
-  let list=allG.filter(gp=>{ const o=reg[gp.cno];
+  const stList=allG.filter(gp=>{ const o=reg[gp.cno];
     if(st==='nofin') return !gp.items.length;
     if(st==='verify') return Object.values(gp.entries).some(e=>e.meta&&e.meta.verify&&e.meta.verify.needs);
     if(st!=='all'){ if(!o) return false; return (o.meta.status||(o.active?'Active':'Cancelled')).toLowerCase()===st; }
-    return true; }).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
+    return true; });
+  // customer-group filter (same groups as Member Follow-up): contract → its customer; "active" / "overdue" judged per contract, contact groups per customer
+  const fuAll=fuClients(); const cust={}; fuAll.forEach(c=>c.list.forEach(x=>{ cust[x.cno]={c,x}; }));
+  const G=S.rcG||'all', RF=S.rcSub||{}; const subOn=Object.values(RF).some(Boolean);
+  const subOk=gp=>{ if(!subOn) return true; const h=cust[gp.cno]; if(!h) return false;
+    if(!fuSub(h.c,Object.assign({},RF,{prod:'',lyo:''}))) return false;
+    if(RF.prod&&h.x.prod!==RF.prod) return false; if(RF.lyo&&String(h.x.lyo||'')!==RF.lyo) return false; return true; };
+  const inG=(gp,k)=>{ if(k==='all') return true; const h=cust[gp.cno]; if(!h) return false;
+    if(k==='active') return h.x.active; if(k==='overdue') return h.x.od>0; return fuInGroup(h.c,k); };
+  const gBase=stList.filter(subOk); const gCounts={}; FU_GROUPS.forEach(([k])=>gCounts[k]=gBase.filter(gp=>inG(gp,k)).length);
+  let list=gBase.filter(gp=>inG(gp,G)).sort((a,b)=>(a.cno||'')<(b.cno||'')?-1:1);
+  const gBar=fuPills(gCounts,G,'rc')+fuSubBar(fuAll,RF,'rc');
   const nofinN=allG.filter(gp=>!gp.items.length).length;
   const verN=allG.filter(gp=>Object.values(gp.entries).some(e=>e.meta&&e.meta.verify&&e.meta.verify.needs)).length;
   const opt=(v,l)=>`<option value="${v}"${st===v?' selected':''}>${l}</option>`;
   { const tf=g('topfilter'); if(tf) tf.innerHTML=`<select onchange="S.regStatus=this.value;render()" title="กรองสัญญาตามสถานะ">${opt('all','ทุกสถานะ')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}${opt('upgraded','Upgraded')}${opt('nofin','ยังไม่มีข้อมูลการเงิน ('+nofinN+')')}${opt('verify','⚠ ต้องตรวจสอบ ('+verN+')')}</select>`; }
-  const bar=`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+  const bar=gBar+`<div class="toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
      <button class="btn sm ghost" onclick="rcAll(true)">Expand all</button><button class="btn sm ghost" onclick="rcAll(false)">Collapse all</button>
      <span class="mini">${list.length} สัญญา${list.length!==allG.length?' (จาก '+allG.length+')':''}</span></div>`;
   const rowFor=(l)=>{ const st=lineStatus(l); const exp=kindOf[l.id]==='expense';
