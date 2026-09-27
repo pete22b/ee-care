@@ -441,9 +441,18 @@ async function wmFetch(bucket, path, action, name){ const tok=await token(); if(
     body:JSON.stringify({bucket,path,action,name:name||null,context:fileContext(path),company:(S&&S.company)||null,tab:(S&&S.tab)||null})});
   if(!r.ok){ let m=''; try{ m=(await r.json()).error; }catch(e){} throw new Error(m||('HTTP '+r.status)); }
   return r.blob(); }
-async function openFile(bucket, path){ const w=window.open('','_blank'); if(w) w.document.write('<p style="font:14px Tahoma;padding:24px">กำลังเตรียมไฟล์ (ใส่ลายน้ำ)…</p>');
-  try{ const b=await wmFetch(bucket,path,'open'); const u=URL.createObjectURL(b); if(w) w.location.href=u; else window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),300000); }
-  catch(e){ if(w) w.close(); toast('เปิดไฟล์ไม่ได้: '+e.message); } }
+/* view a contract / slip in an in-page viewer (watermarked by wm-file); "open in new tab" stays available */
+async function openFile(bucket, path){
+  const e=(DB.entries||[]).find(x=>x.contract_path===path); const label=(e&&e.contract_name)||String(path).split('/').pop();
+  openModal(`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${esc(label)}</b><span style="flex:none"><button class="btn" id="fv_tab" disabled>เปิดแท็บใหม่</button> <button class="btn" onclick="closeModal()">✕ ปิด</button></span></div><div id="fv_box" style="height:78vh;display:flex;align-items:center;justify-content:center;background:#f4f4f4;border-radius:10px"><span class="mini">กำลังเตรียมไฟล์ (ใส่ลายน้ำ)…</span></div>`);
+  const m=g('mw').querySelector('.modal'); if(m){ m.style.width='min(1100px,96vw)'; m.style.padding='14px 16px'; }
+  try{ const b=await wmFetch(bucket,path,'open'); const u=URL.createObjectURL(b); const box=g('fv_box'); if(!box){ URL.revokeObjectURL(u); return; }
+    if(b.type==='application/pdf') box.innerHTML=`<iframe src="${u}#toolbar=1&view=FitH" style="width:100%;height:100%;border:0;border-radius:10px" title="${esc(label)}"></iframe>`;
+    else if(/^image\//.test(b.type)) box.innerHTML=`<img src="${u}" alt="" style="max-width:100%;max-height:100%">`;
+    else box.innerHTML='<span class="mini">ไฟล์ชนิดนี้แสดงในหน้านี้ไม่ได้ — กด “เปิดแท็บใหม่”</span>';
+    const t=g('fv_tab'); if(t){ t.disabled=false; t.onclick=()=>window.open(u,'_blank'); }
+    setTimeout(()=>URL.revokeObjectURL(u),600000);
+  }catch(err){ const box=g('fv_box'); if(box) box.innerHTML='<span class="mini">เปิดไฟล์ไม่ได้: '+esc(err.message)+'</span>'; } }
 async function embedProof(bucket, path, name, elId){ const box=g(elId); if(!box) return;
   try{ const b=await wmFetch(bucket,path,'preview',name); const u=URL.createObjectURL(b); if(!g(elId)) return;
     if(b.type==='application/pdf') box.innerHTML=`<iframe src="${u}#toolbar=1" title="สลิป"></iframe>`;
