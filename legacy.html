@@ -4414,7 +4414,298 @@ const SOP_HTML=`
 </div>
 </main>
 `;
-function rSop(){ $main.innerHTML='<div class="sopdoc"><div class="sp-wrap">'+SOP_HTML+'</div></div>'; window.scrollTo(0,0); }
+const SOP_HTML_EN=`
+<nav class="sp-toc">
+  <div class="sp-kick">Contents</div>
+  <a href="#" onclick="sopGo('flow');return false"><i style="--c:var(--ink3)"></i>Overview Cold Line</a>
+  <a href="#" onclick="sopGo('mkt');return false"><i style="--c:#2a9d8f"></i>Marketing team (OPC)</a>
+  <a href="#" onclick="sopGo('rec');return false"><i style="--c:#1f8a70"></i>Reception</a>
+  <a href="#" onclick="sopGo('sales');return false"><i style="--c:#e0a23a"></i>Sales team</a>
+  <a href="#" onclick="sopGo('con');return false"><i style="--c:#5b8fd6"></i>Contracts office</a>
+  <a href="#" onclick="sopGo('acc');return false"><i style="--c:#b8483c"></i>Accounts</a>
+  <a href="#" onclick="sopGo('mem');return false"><i style="--c:#7a5ea8"></i>Member services & reservations</a>
+  <a href="#" onclick="sopGo('it');return false"><i style="--c:#6b7a72"></i>IT / system admin</a>
+  <div class="sp-sub"><a href="#" onclick="sopGo('raci');return false"> RACI</a><a href="#" onclick="sopGo('rules');return false">Shared rules for all teams</a><a href="#" onclick="sopGo('pend');return false">Pending confirmation</a></div>
+</nav>
+
+<main>
+<header class="sp-hd">
+  <div class="sp-kick">Standard Operating Procedure · Club Unique / Elite Escapes</div>
+  <h1>SOP Front-of-house work — who does what, at which step, in which app menu</h1>
+  <p>Operating manual for the "Cold Line" workflow, from finding guests to looking after members every year. Every step is recorded in the central system <a href="#" onclick="return false">app.elite-escapes.club</a> with the contract number as the single key — no re-entering in Excel/Access</p>
+  <div class="sp-meta"><span>Version <b>7 Sep 2026</b></span><span>Sign in with <b>company Gmail @elite-escapes.club</b> only</span><span>Access <b>admin / can edit / view only</b></span><span>Related document: system node map (admin) · Workflow map</span></div>
+</header>
+
+<div class="sp-flow" id="flow">
+  <h2>Cold Line workflow overview — 8 steps, who takes the baton</h2>
+  <div class="sp-lane">
+    <div class="sp-st" style="--c:#2a9d8f"><div class="sp-n">①</div><div class="sp-t">Market survey</div><div class="sp-w">OPC Find guests at tourist spots and bring them to the office</div></div>
+    <div class="sp-st" style="--c:#1f8a70"><div class="sp-n">②</div><div class="sp-t">Screening Q / Q+ / CT</div><div class="sp-w">Reception + GM use a 7-point checklist</div></div>
+    <div class="sp-st" style="--c:#e0a23a"><div class="sp-n">③</div><div class="sp-t">Tour + 90-minute presentation</div><div class="sp-w">Sales Rep / T/O</div></div>
+    <div class="sp-st" style="--c:#e0a23a"><div class="sp-n">④</div><div class="sp-t">Close the deal → contract number</div><div class="sp-w">Sales team fills in the Daily Sale Report</div></div>
+    <div class="sp-st" style="--c:#5b8fd6"><div class="sp-n">⑤</div><div class="sp-t">Open the file + welcome call</div><div class="sp-w">Contracts office scans the PA into Drive</div></div>
+    <div class="sp-st" style="--c:#b8483c"><div class="sp-n">⑥</div><div class="sp-t">Payments / instalments / commission</div><div class="sp-w">Accounts — AR daily, commission every 15 days, OPC every Friday</div></div>
+    <div class="sp-st" style="--c:#7a5ea8"><div class="sp-n">⑦</div><div class="sp-t">Annual member care</div><div class="sp-w">MFEE · Interval · renewals</div></div>
+    <div class="sp-st" style="--c:#7a5ea8"><div class="sp-n">⑧</div><div class="sp-t">Stay requests / using weeks</div><div class="sp-w">Reservations check MFEE with accounts before approving</div></div>
+  </div>
+</div>
+
+<!-- ================= OPC ================= -->
+<section class="sp-dept" id="mkt" style="--c:#2a9d8f">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></div>
+    <div><h2>Marketing team (OPC) and marketing managers</h2><div class="sp-who">Responsible for step ① and weekly reporting · main menu <b>Marketing team</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>every OPC (staff code) · marketing managers</div>
+    <div><small>Checked / approved by</small>marketing manager checks slips before sending to accounts · GM approves special cases</div>
+    <div><small>Timing</small>log tours daily · pay week Saturday→Friday · paid every Friday</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Find guests (market survey) and bring them to the office</h3>
+      <p>Approach guests at tourist spots, explain the basic conditions (couple, age, occupation, staying at a 4–5 star hotel), set a date and time, then call a taxi to the Club Unique office — the company pays the taxi</p>
+      <div class="sp-row"><span class="sp-chip sp-when">Daily</span><span class="sp-chip sp-to">Hand guests to Reception</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Log the tour as soon as the guest arrives at the office</h3>
+      <p>Open <b>Marketing team › Tours / Friday pay › + Log tour</b> and fill in: tour date, OPC code/name, guest name, number of people, nationality group (AUS / NZ / USA / UK / FR / SCANDI / FIN / OTHER), whether the guest was met <b>during the day</b> or <b>at night</b> (night booking = found at night, tour booked for the morning), hotel, taxi fare</p>
+      <p>Leave the "screening result" field empty for Reception to fill in</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Marketing team › Tours</span><span class="sp-chip">table mkt_tours</span><span class="sp-chip sp-to">Reception fills in the screening result</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Check your own pay before Friday</h3>
+      <p>The system calculates pay automatically once Reception/sales tick "guest actually came" and "attended the full 90-minute presentation" — under 90 minutes is not paid</p>
+      <div class="sp-rates">
+        <div>Q (Qualified)<b>฿3,000</b>paid whether or not the deal closes</div>
+        <div>Q+ (Tour Kudo)<b>฿3,500</b></div>
+        <div>CT (Cold Tour)<b>฿1,500</b>No split</div>
+        <div>Split AUS / NZ / FR / SCANDI / FIN<b>+2,000 / +1,000</b>night / daytime (on top of the Q rate Q)</div>
+        <div>Split USA<b>+2,000 / +500</b>night / day · +1,000 if the deal closes</div>
+        <div>Split UK<b>+1,000</b>only if the deal closes</div>
+      </div>
+      <div class="sp-row"><span class="sp-chip">Filter by pay week · OPC</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Marketing manager: weekly summary and printing slips</h3>
+      <p>Every <b>Friday morning</b> choose the pay week → check every tour has a screening result and is ticked came/90 minutes → click <b>Print slip</b> per person → Fill in the weekly summary in <b>Marketing team › Weekly</b> (Q / Q+ / CT per person, Pack/Full bonus if still used) → Send slips to accounts for payment</p>
+      <div class="sp-check"><b>Check before sending:</b> tours without a screening result = not paid yet · closed-deal tours must already be linked to a contract number · taxi totals are correct</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Marketing team › Weekly</span><span class="sp-chip sp-doc">OPC pay slip</span><span class="sp-chip sp-doc">CSV</span><span class="sp-chip sp-when">Every Friday</span><span class="sp-chip sp-to">Accounts</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= RECEPTION ================= -->
+<section class="sp-dept" id="rec" style="--c:#1f8a70">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+    <div><h2>Reception (screening) with the GM</h2><div class="sp-who">Responsible for step ② and guest gifts · works on the tour entries opened by OPC</div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>Reception on duty</div>
+    <div><small>Decides borderline cases</small>Yannick (GM) — especially accommodation type/nationality</div>
+    <div><small>Timing</small>before every guest starts the tour</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Screen with the 7-point checklist</h3>
+      <p>Open the guest's tour entry → tick the checklist: couple/single aged 35–71 · employed, or retired with a pension · together ≥2 years · has a credit/debit card (singles must show it) · room rate ≥฿1,000/night · on the island ≥24 hrs, not leaving the same day as the presentation · agrees to a 90-minute presentation</p>
+      <p>Result: <b>Q</b> passes everything · <b>Q+</b> Kudo tours only · <b>CT</b> under 35 or unlikely to close · <b>NQ</b> fails, does not join the tour (the system suggests a result, but Reception decides and records it)</p>
+      <div class="sp-warn"><b>Definitely not qualified:</b> going through a divorce · group of ≥4 adults · children under 5 · works in tourism/timeshare · lives in Thailand/has a Thai partner · came alone while the partner is at the hotel · military/cruise ship · Canadians / Israelis</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Marketing team › Tours › Edit</span><span class="sp-chip sp-to">Sales team takes over</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Arrange gifts and breakfast</h3>
+      <p>Night booking Choose <b>1 of 3</b>: spa ฿1,800 / Phi Phi island tour ฿1,800 / Kudo voucher · Daytime can have <b>฿1,500</b> · <b>breakfast for everyone</b> — record it in the tour's "gifts" field</p>
+      <div class="sp-row"><span class="sp-chip">gift: spa / pp / kudo / cash1500</span><span class="sp-chip sp-to">Accounts see the gift cost automatically</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Confirm the guest actually came</h3>
+      <p>When the guest arrives and enters the presentation room, tick <b>guest came (showed)</b>; the sales team ticks <b>attended full 90 minutes</b> afterwards</p>
+      <div class="sp-check"><b>Important:</b> these two fields are the conditions for paying OPC — never tick them in advance</div></div></div>
+  </div>
+</section>
+
+<!-- ================= SALES ================= -->
+<section class="sp-dept" id="sales" style="--c:#e0a23a">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2zM14 3v5h5"/></svg></div>
+    <div><h2>Sales team (Sales Rep · T/O · Closer)</h2><div class="sp-who">Responsible for step ③–④ · main menu <b>Daily Sale Report</b> · contract numbers are created here</div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>the Sales Rep who takes the guest · T/O (Take-over) · Closer</div>
+    <div><small>Checked by</small>Sales Manager checks the Daily Sale Report every evening · GM approves overprice / trade-in</div>
+    <div><small>Timing</small>enter the deal right after signing · print the report daily</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Presentation 90 minutes, then close the tour result</h3>
+      <p>end presentation → In the tour entry tick <b>attended full 90 minutes</b>, and if a contract is signed tick <b>deal closed</b> (the contract number is linked automatically in the next step)</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Marketing team › Tours</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Fill in the Daily Sale Report — the contract number is issued immediately</h3>
+      <p><b>Daily Sale Report › + New deal</b>, choose the tour from the previous step (guest name/nationality are filled in), then enter: product (Club / TCU / Kudo / EST / ESG …), years, plan A annual / B biennial, season H / L, unit T0 / T1, sale type (new / upgrade / Member IH), list price, actual price, deposit, admin fee (1,000, or 1,500 for 20 years), trade-in, refund, sales team (Rep / T/O / Closer / Manager)</p>
+      <p>Click <b>Issue contract number</b> → format <code>PROD/SEQ/YEARS/AH/T1</code>, sequence continues automatically from the old register</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Daily Sale Report</span><span class="sp-chip"> sales_deals</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Enter the items that came with the deal (deducted before commission)</h3>
+      <div class="sp-rates">
+        <div>Interval 5Y Gold<b>US$388</b></div><div>Interval 5Y Platinum<b>US$615</b></div><div>Interval 10Y Gold<b>US$776</b></div>
+        <div>Travel Hack 5 yrs / 10 yrs<b>£330 / £630</b>converted using the GBP rate in the form</div><div>Airport transfer<b>US$52</b></div><div>Management fee (if the salesperson offered it)<b>US$585</b>field Other</div>
+        <div>Rental night<b>7 nights/yr</b>entitlement, not deducted</div><div>Marketing week<b>฿15,400/nights</b>paid by the company, not deducted from sales</div>
+      </div>
+      <p style="margin-top:8px">The system calculates <b>Deal Nett = sale price − Admin − deductions − Trade-in − Refund</b> immediately</p></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Save → The system passes it on to every team automatically</h3>
+      <p>On save the system creates: a receivable in <b>Receivables (AR)</b> (price/deposit/balance) · the first deposit receipt · the customer and contract in the register (status Welcome, FYO = next year) · links the OPC tour as a closed deal</p>
+      <div class="sp-check"><b>Check before saving:</b> customer email is correct (used for statements) · nationality matches the tour · deposit matches the bank/card slip</div>
+      <div class="sp-row"><span class="sp-chip sp-to">Contracts office opens the file</span><span class="sp-chip sp-to">Accounts checks the deposit</span><span class="sp-chip sp-to">OPC gets the closed-deal split</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>Print the Daily Sale Report for the GM and accounts</h3>
+      <p>Every evening choose a range: day / week / month → <b>Print report</b> (sales, Deal Nett, total deductions) or export CSV</p>
+      <div class="sp-row"><span class="sp-chip sp-doc">Daily Sale Report</span><span class="sp-chip sp-when">Daily</span><span class="sp-chip sp-to">GM · Accounts</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= CONTRACTS ================= -->
+<section class="sp-dept" id="con" style="--c:#5b8fd6">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.2 3.8A2 2 0 0 0 7.5 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/></svg></div>
+    <div><h2>Contracts office (Contract Room)</h2><div class="sp-who">Responsible for step ⑤ and keeping the register accurate for the life of the contract · menus <b>Contract register</b> and <b>Contract files</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>Zineb · Crista · Marielle · Nicky (previously separate Access files — now one database)</div>
+    <div><small>Checked by</small>head of the contracts office spot-checks welcome-call files every week</div>
+    <div><small>Timing</small>open the file on the signing day · welcome call within 7 days</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Open the contract file from the new deal</h3>
+      <p>The <b>Contract files</b> menu shows new contracts from Daily Sale Report → Click <b>Open file</b> and fill in: category <b>Welcome call</b>, owner, due date, deal and instalment summary (Description), customer address/phone/email</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Contract files</span><span class="sp-chip">case_files · case_customers</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Scan the Purchase Agreement into Google Drive</h3>
+      <p>Scan the signed PA → Save it to the company Drive at <code>DB Elite Escape / Contracts / &lt;contract number&gt;</code> (use <code>-&gt;</code> instead of /), naming the file with the contract number — <b>never keep PDFs on personal devices or in Access</b></p>
+      <p>The contract file has a button <b>📂 Open contract file in Google Drive</b> that searches automatically</p>
+      <div class="sp-check"><b>Keep unique files only:</b> if scanned several times, keep only the latest version</div>
+      <div class="sp-row"><span class="sp-chip sp-doc">PDF on Google Drive</span><span class="sp-chip">access only to the folder DB Elite Escape</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Welcome call and follow up</h3>
+      <p>Call the customer within 7 days to confirm they understand the contract, instalment plan, stay entitlement and contact channels → Record the result in Comments with the date → Change the category to <b>Completed</b></p>
+      <p>For special cases change the category accordingly: <b>Trade in</b> · <b>Cxl</b> (cancelled) · <b>Refund</b>, with a reason — never delete the file</p>
+      <div class="sp-row"><span class="sp-chip sp-when">Within 7 days</span><span class="sp-chip sp-to">Accounts (for Cxl / Refund)</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Keep the contract register (Bible) accurate</h3>
+      <p>In <b>Contract register</b> check new contracts are complete: product, plan, season, unit, completion date, FYO / LYO, annual fee schedule · update the status of cancelled/transferred contracts · the <b>Linked data</b> button on the contract card checks AR, commission, stays and scans match</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Contract register</span><span class="sp-chip sp-menu">Customers › profile</span><span class="sp-chip sp-to">Member services</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= ACCOUNTING ================= -->
+<section class="sp-dept" id="acc" style="--c:#b8483c">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3zM3 11h18M7 15h4"/></svg></div>
+    <div><h2>Accounts (Accounting)</h2><div class="sp-who">Responsible for step ⑥ · menus <b>Receivables (AR)</b> · <b>Overdue</b> · <b>Commission</b> · <b>Payouts</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>acm@elite-escapes.club and the accounts team</div>
+    <div><small>Checked / approved by</small>head of accounts checks before every payment run · GM approves commission payouts</div>
+    <div><small>Timing</small>record receipts the same day · OPC every Friday · commission every 15 days · month-end close</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Record every instalment received</h3>
+      <p><b>Receivables (AR)</b>, search the contract number → <b>Receive payment</b>: amount (US$ or ฿ per contract currency), date, <b>TYPE</b> (Bank Transfer / Credit Card / Cash), <b>SOURCE</b> bank, remarks → The balance updates immediately; see history with the button <b>📜</b> (covering regular instalments, trade-ins, discounts, write-offs and refunds)</p>
+      <div class="sp-check"><b>Check deposits from the sales team:</b> new deals already have a deposit instalment waiting — compare it with the bank/card slip; if it doesn't match, fix it in ✏️ with a note — never delete</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Receivables (AR)</span><span class="sp-chip">receivables · ar_payments</span><span class="sp-chip sp-when">same day as the money is received</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Annual management fee (MFEE) and Statement</h3>
+      <p><b>Overdue</b> shows management fees that are due → When paid, tick paid with the date · send a <b>Statement</b> (print/PDF on letterhead) from the customer profile or from AR</p>
+      <p>Contracts paid for by the company (Paid by CU) already have a note — no need to chase</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Overdue</span><span class="sp-chip sp-doc">Receivables / management fee statement</span><span class="sp-chip sp-to">Reservations use it to check before approving stays</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Pay OPC every Friday</h3>
+      <p>Receive slips from the marketing manager → Open <b>Marketing team › Tours</b>, filter the same pay week and check totals match the slips (base + split + taxi) → Pay → keep the slips as evidence</p>
+      <div class="sp-row"><span class="sp-chip sp-when">Every Friday</span><span class="sp-chip sp-doc">slips OPC</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Sales team commission every 15 days</h3>
+      <p>Periods 1–15 and 16–end of month: the <b>Commission</b> menu shows each contract per position (Rep / T/O / Closer / Manager …), calculated from <b>money actually received in the period</b> after deducting items that came with the deal (Admin, Gift, Trade-in, Refund, Overprice) → Check against AR → Print Pay Slip → GM Approve → Pay</p>
+      <div class="sp-warn"><b>Pending confirmation:</b> % formula per position so the system calculates automatically from Deal Nett — currently shows a snapshot from Commission Master</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Commission</span><span class="sp-chip sp-when">Every 15 days</span><span class="sp-chip sp-to">GM approves</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>Stay costs and payouts Fractional</h3>
+      <p><b>Stays</b> shows the type Own / <b>Marketing Week ฿15,400/nights</b> / II Exchange with room cost = nights × rate, used for revenue recognition · <b>Payouts</b> records Fractional contract payout instalments with a paid tick</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Stays</span><span class="sp-chip sp-menu">Payouts</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">6</div><div class="sp-bd"><h3>Month-end close</h3>
+      <p>Export CSV from AR, Overdue, Stays, Daily Sale Report → reconcile with the bank → keep the files in the accounts folder of Drive</p>
+      <div class="sp-row"><span class="sp-chip sp-doc">CSV All modules</span><span class="sp-chip sp-when">Month end</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= MEMBER SERVICE ================= -->
+<section class="sp-dept" id="mem" style="--c:#7a5ea8">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9M4 8V6h4v2"/></svg></div>
+    <div><h2>Member services & reservations</h2><div class="sp-who">Responsible for step ⑦–⑧ · menus <b>Customers</b> · <b>Stays</b> · <b>Interval</b> · <b>Expiring soon</b></div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>Natalie (reservations) · Member service</div>
+    <div><small>Checked by</small>accounts confirm the management fee status before approval</div>
+    <div><small>Timing</small>reply to stay requests within 1 working day · start renewal contact 12 months ahead</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Receive stay requests → always check the management fee first</h3>
+      <p>Open <b>Customers</b>, search name/contract number → Check the contract card: is the management fee for the requested year <b>paid</b> (pulled from accounts) · contract not cancelled · requested year within FYO–LYO</p>
+      <div class="sp-warn"><b>Not paid = not approved</b>; send the customer a statement and inform accounts</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Customers › profile</span><span class="sp-chip sp-menu">Overdue</span><span class="sp-chip sp-to">Accounts</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Record stays</h3>
+      <p><b>Stays › + Save</b>: entitlement year, check-in/check-out (nights calculated), unit, type <b>Own Week</b> / <b>Marketing Week</b> (company pays ฿15,400/nights, not deducted from the member's week) / <b>II Exchange</b>, nightly rate, remarks · can be edited later from the existing entry</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Stays</span><span class="sp-chip">week_usage</span><span class="sp-chip sp-to">Accounts recognise revenue</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Interval International</h3>
+      <p>The <b>Interval</b> menu shows members who bought Interval with their deal (5Y Gold / 5Y Platinum / 10Y Gold), expiry dates, and coordinates deposits/exchanges week</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Interval</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Renew / upgrade members close to expiry</h3>
+      <p><b>Expiring soon</b> shows contracts whose LYO is this year or next year → Contact the customer and record the result in the contract file Comments → If they agree to upgrade, pass it to the sales team to enter in the Daily Sale Report as an <b>Upgrade / Member IH</b> deal (commission as normal)</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Expiring soon</span><span class="sp-chip sp-when">12 months ahead</span><span class="sp-chip sp-to">Sales team</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">5</div><div class="sp-bd"><h3>Add customers/contracts that didn't come from a new deal</h3>
+      <p>Membership transfers, family, or missed old entries: <b>Customers › + Add customer</b> (EE-xxxx code issued automatically), then add the contract in the profile — tell the contracts office to open the file</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">Customers</span><span class="sp-chip sp-to">Contracts office</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= IT ================= -->
+<section class="sp-dept" id="it" style="--c:#6b7a72">
+  <div class="sp-dhead"><div class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>
+    <div><h2>IT / System admin</h2><div class="sp-who">Looks after access, security and the central database · menus <b>Central data</b> · <b>System map</b> (visible only to admin)</div></div></div>
+  <div class="sp-owner">
+    <div><small>Done by</small>it@elite-escapes.club (admin only, for this database, separate from the team Patong Bay Hill)</div>
+    <div><small>Approved by</small>GM approves adding/removing user access</div>
+    <div><small>Timing</small>add users on request · check the activity feed weekly · back up monthly</div>
+  </div>
+  <div class="sp-steps">
+    <div class="sp-step"><div class="sp-no">1</div><div class="sp-bd"><h3>Add / remove users and set access</h3>
+      <p><b>Central data › System users</b>, add emails <code>@elite-escapes.club</code> only; choose access: <b>admin</b> (IT) · <b>can edit</b> (operations team) · <b>view only</b> (management/auditors) · <b>remove access</b> immediately for staff who leave</p>
+      <div class="sp-check"><b>Security rules:</b> access only with company Gmail via app.elite-escapes.club · the database is locked with RLS, you must be on the user list to see data · never share Supabase links or keys</div>
+      <div class="sp-row"><span class="sp-chip sp-menu">Central data</span><span class="sp-chip">app_users</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">2</div><div class="sp-bd"><h3>Check activity and unusual data</h3>
+      <p>Check the <b>activity feed</b> in Central data (who changed what recently) · check long-overdue tasks · mistyped or duplicate contract numbers: ask the contracts office to fix</p>
+      <div class="sp-row"><span class="sp-chip sp-when">Every week</span></div></div></div>
+    <div class="sp-step"><div class="sp-no">3</div><div class="sp-bd"><h3>Google Drive and contract files</h3>
+      <p>Accounts it@ Owns the <code>DB Elite Escape</code> folder (Contracts · Contract Scans), shared with the contracts office as editors <b>for this folder only</b> · check Drive space · move duplicate files to a quarantine folder, don't delete immediately</p></div></div>
+    <div class="sp-step"><div class="sp-no">4</div><div class="sp-bd"><h3>Back up and release new versions</h3>
+      <p>Every month export CSV from every module to Drive · before releasing a new app version, test every page of the Live file with a simulated login before uploading to GitHub Pages · see the <b>System map</b> to review data flows when a new table is added</p>
+      <div class="sp-row"><span class="sp-chip sp-menu">System map (admin)</span><span class="sp-chip sp-doc">CSV</span><span class="sp-chip sp-when">Monthly</span></div></div></div>
+  </div>
+</section>
+
+<!-- ================= RACI ================= -->
+<div class="sp-raci" id="raci">
+  <h2>RACI table — who does it, who is accountable, who must be consulted, who is just informed</h2>
+  <p>R = does it (Responsible) · A = accountable for the result/approves (Accountable) · C = must be consulted first (Consulted) · I = informed (Informed)</p>
+  <table>
+    <thead><tr><th>Step</th><th>OPC</th><th>Marketing mgr</th><th>Reception</th><th>Sales team</th><th>Contracts office</th><th>Accounts</th><th>Reservations</th><th>GM</th><th>IT</th></tr></thead>
+    <tbody>
+      <tr><td>① Find guests + log tours</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td></tr>
+      <tr><td>② Screening Q / Q+ / CT + gifts</td><td class="sp-c sp-I">I</td><td class="sp-c sp-I">I</td><td class="sp-c sp-R">R</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>③ Presentation 90 minutes</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>④ Daily Sale Report / Issue contract number</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑤ Open file + welcome call + scan PA</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-I">I</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥a Receive payments / AR / Statement</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-I">I</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥b OPC pay every Friday</td><td class="sp-c sp-I">I</td><td class="sp-c sp-R">R</td><td class="sp-c sp-C">C</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑥c Sales team commission every 15 days</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑦ Management fee / Interval / renewals</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-C">C</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>⑧ Approve stays + record Week</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c sp-C">C</td><td class="sp-c sp-R">R</td><td class="sp-c sp-A">A</td><td class="sp-c">·</td></tr>
+      <tr><td>User access / security / backups</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c">·</td><td class="sp-c sp-I">I</td><td class="sp-c">·</td><td class="sp-c sp-A">A</td><td class="sp-c sp-R">R</td></tr>
+    </tbody>
+  </table>
+  <div class="sp-legend"><span><span class="sp-R">R</span> does it</span><span><span class="sp-A">A</span> approves/accountable</span><span><span class="sp-C">C</span> consulted</span><span><span class="sp-I">I</span> informed</span></div>
+</div>
+
+<!-- ================= RULES ================= -->
+<section id="rules" style="margin-bottom:10px">
+  <h2 style="font-size:18px;margin-bottom:12px">Shared rules for all teams</h2>
+  <div class="sp-rules">
+    <div><b>The contract number is the single key</b>every table, file and folder refers to the contract number in one format <code>PROD/SEQ/YEARS/AH/T1</code> — one wrong character = the data comes apart</div>
+    <div><b>Enter data in the app, not again in Excel/Access</b>the old files (Bible, AR Ledger, Commission Master, Access) have been imported and are kept as history; teams enter data only in the app so everyone sees the same set</div>
+    <div><b>Don’t delete — cancel / edit / add a note</b>wrong payment entries, files or contracts are corrected in ✏️ with a reason; the system records who edited and when</div>
+    <div><b>PDF stay on Google Drive only</b>the DB Elite Escape folder keeps a single copy, no duplicates; the database only stores an index; never send contract files over personal chat</div>
+    <div><b>Pay only when conditions are met</b>OPC is paid when the guest actually came + attended 90 minutes · stays only when the management fee is paid · commission is based on money actually received after deducting items that came with the deal</div>
+    <div><b>Gmail company only</b>everyone signs in with @elite-escapes.club their own, no shared accounts; when someone leaves, IT removes access the same day</div>
+  </div>
+</section>
+
+<div class="sp-pend" id="pend"><b>Items still awaiting confirmation from management / accounts</b> (the system works, but still calculates/displays from the old data)
+  <ul>
+    <li>Commission % formula per position (Rep / T/O / Closer / Manager) so it is calculated automatically from Deal Nett every 15-day period</li>
+    <li>USA and UK get the base rate Q ฿3,000 before adding the split — is that right?</li>
+    <li>Is the OPC Pack / Full bonus still used or discontinued?</li>
+    <li>Old Commission Master files (2016–Jul 2026) to fill in past commission history</li>
+  </ul>
+</div>
+</main>
+`;
+function rSop(){ $main.innerHTML='<div class="sopdoc"><div class="sp-wrap">'+(EE_LANG==='th'?SOP_HTML:SOP_HTML_EN)+'</div></div>'; window.scrollTo(0,0); }
 function sopGo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ================= System map (node canvas) — admin only ================= */
