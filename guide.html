@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Extranet User Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f5;--surface:#fff;--surface2:#f8faf9;--ink:#17242b;--ink2:#4c5d66;--muted:#7c8b93;--line:#e2e8e6;--brand:#0e9f8e;--brand2:#0b7e70;--brandsoft:#e3f5f2;--gold:#c99a2e;--goldsoft:#fbf3df;--side:#13293d;--side2:#1c3a54;--sideink:#d7e3ea;--new:#e2574b;--shadow:0 1px 2px rgba(16,40,50,.05),0 4px 14px rgba(16,40,50,.05);--radius:14px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-theme="pastel"]){--bg:#0f171c;--surface:#16222a;--surface2:#1b2a33;--ink:#e6eef2;--ink2:#b3c3cb;--muted:#8597a1;--line:#263843;--brand:#2cc2ae;--brand2:#5fd6c5;--brandsoft:#143a37;--gold:#e0b85a;--goldsoft:#33301f;--side:#0b141a;--side2:#15252f;--sideink:#c8d6de;--shadow:none}}
+:root[data-theme="dark"]{--bg:#0f171c;--surface:#16222a;--surface2:#1b2a33;--ink:#e6eef2;--ink2:#b3c3cb;--muted:#8597a1;--line:#263843;--brand:#2cc2ae;--brand2:#5fd6c5;--brandsoft:#143a37;--gold:#e0b85a;--goldsoft:#33301f;--side:#0b141a;--side2:#15252f;--sideink:#c8d6de;--shadow:none}
+:root[data-theme="pastel"]{--bg:#fbf6ef;--surface:#fffdf9;--surface2:#fdf6ec;--ink:#3a3330;--ink2:#6a5e57;--muted:#9a8c83;--line:#efe3d5;--brand:#d07a62;--brand2:#b6614b;--brandsoft:#fbe9e2;--gold:#b98a3a;--goldsoft:#f8eed9;--side:#f3e6d8;--side2:#ead8c5;--sideink:#5b4a40}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--brand2)}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr) 300px;min-height:100vh}
+/* sidebar */
+.side{background:var(--side);color:var(--sideink);position:sticky;top:0;height:100vh;overflow:auto;padding:18px 14px 30px}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 6px 16px}
+.logo{width:40px;height:40px;border-radius:11px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;letter-spacing:.02em}
+.brand small{display:block;font-size:11px;letter-spacing:.14em;opacity:.7;text-transform:uppercase}
+.brand b{font-size:16px}
+.side .grp{margin:14px 0 4px;padding:0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.side a{display:flex;gap:9px;align-items:center;color:inherit;text-decoration:none;padding:6px 8px;border-radius:9px;font-size:14px}
+.side a:hover,.side a.on{background:var(--side2)}
+.side a .c{font-size:10.5px;font-weight:700;min-width:30px;text-align:center;padding:2px 4px;border-radius:6px;background:rgba(255,255,255,.08)}
+:root[data-theme="pastel"] .side a .c{background:rgba(0,0,0,.06)}
+.side .top a{font-weight:500}
+/* main */
+main{padding:22px 34px 60px;min-width:0}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.crumb{color:var(--muted);font-size:13px;flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:99px;background:var(--surface);overflow:hidden}
+.seg button{border:0;background:none;color:var(--ink2);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--brand);color:#fff}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;gap:6px;align-items:center}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.hero h1{font-size:40px;line-height:1.15;margin:4px 0 12px;letter-spacing:-.01em}
+.hero p{color:var(--ink2);max-width:640px;margin:0 0 18px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin:8px 0 26px}
+.gtitle{display:flex;align-items:center;gap:8px;margin:22px 0 8px;font-weight:600}
+.gtitle .dot{width:8px;height:8px;border-radius:50%;background:var(--brand)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.mini{display:flex;gap:12px;padding:13px 14px;text-decoration:none;color:inherit;align-items:flex-start}
+.mini:hover{border-color:var(--brand)}
+.badge{width:42px;height:42px;flex:none;border-radius:11px;background:var(--brandsoft);color:var(--brand2);display:grid;place-items:center;font-weight:700;font-size:13px}
+.mini b{display:block}
+.mini span{color:var(--ink2);font-size:13px;display:block}
+.mini em{font-style:normal;color:var(--muted);font-size:12px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--goldsoft);color:var(--gold);margin-left:6px;vertical-align:2px}
+.tag.new{background:#fde7e4;color:var(--new)}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0 6px}
+.flow div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.flow small{display:block;color:var(--brand2);font-weight:700;font-size:12px}
+.note{color:var(--muted);font-size:13px;margin:4px 0 22px}
+.search{display:flex;gap:8px;margin:18px 0 6px}
+.search input{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 14px;font:inherit}
+.count{color:var(--muted);font-size:13px;margin-bottom:10px}
+/* chapters */
+.sec-h{margin:34px 0 4px;font-size:22px}
+.sec-p{color:var(--ink2);margin:0 0 12px}
+.chap{padding:24px 26px;margin:14px 0 18px;scroll-margin-top:16px}
+.chap .head{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.chap .num{font-size:13px;color:var(--muted);font-weight:600}
+.chap h2{margin:2px 0 2px;font-size:24px}
+.chap .meta{color:var(--muted);font-size:13px}
+.lead{font-size:16.5px;font-weight:600;margin:14px 0 6px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin:12px 0}
+.facts div{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px}
+.facts b{color:var(--ink2);font-weight:600;margin-right:6px}
+.change{border-left:4px solid var(--brand);background:var(--brandsoft);border-radius:10px;padding:10px 14px;margin:14px 0}
+.change h4{margin:0 0 4px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.chap h3{font-size:15px;margin:18px 0 6px;color:var(--brand2)}
+.chap ul{margin:0;padding-left:20px}
+.chap li{margin:3px 0}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:s;position:relative;padding:2px 0 10px 40px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:2px;width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.steps b{display:block}
+.ex{background:var(--goldsoft);border-radius:10px;padding:10px 14px;margin-top:14px;font-size:14px}
+.warn li{color:var(--ink2)}
+.foot{display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px;margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+.foot a{text-decoration:none}
+kbd,.ui{font:600 12.5px/1 "IBM Plex Sans Thai",sans-serif;background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;white-space:nowrap}
+table.roles{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+table.roles th,table.roles td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+table.roles th{color:var(--ink2);font-weight:600}
+mark{background:#ffe58a;color:inherit;border-radius:3px}
+/* right rail */
+.rail{position:sticky;top:0;height:100vh;overflow:auto;padding:22px 18px 30px 0}
+.rail .card{padding:16px}
+.rail h3{margin:0 0 4px;font-size:15px}
+.rail .sub{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.log{border-top:1px solid var(--line);padding:9px 0}
+.log small{color:var(--brand2);font-weight:600}
+.log a{display:block;font-weight:600;text-decoration:none;color:var(--ink)}
+.log p{margin:2px 0 0;font-size:13px;color:var(--ink2)}
+.hidden{display:none!important}
+@media (max-width:1180px){.layout{grid-template-columns:250px minmax(0,1fr)}.rail{position:static;height:auto;grid-column:2;padding:0 34px 40px}}
+@media (max-width:820px){.layout{grid-template-columns:1fr}.side{position:static;height:auto;max-height:none}.side nav{display:none}.side.open nav{display:block}.rail{grid-column:1;padding:0 16px 40px}main{padding:16px}.hero h1{font-size:30px}.cols{grid-template-columns:1fr}.chap{padding:18px 16px}.menu{display:inline-flex!important}}
+.menu{display:none;margin-left:auto;background:var(--side2);color:var(--sideink);border:0;border-radius:9px;padding:6px 10px;font:inherit}
+@media print{.side,.rail,.bar,.search,.count,.foot a{display:none!important}.layout{display:block}main{padding:0}body{background:#fff;font-size:12.5px}.card{box-shadow:none;break-inside:avoid-page}.chap{break-before:page}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="side" id="side">
+    <div class="brand"><div class="logo">EE</div><div><small>Extranet</small><b>คู่มือการใช้งาน</b></div><button class="menu" onclick="document.getElementById('side').classList.toggle('open')">☰ สารบัญ</button></div>
+    <nav id="toc"></nav>
+  </aside>
+  <main>
+    <div class="bar">
+      <div class="crumb">Elite Escapes / Extranet / คู่มือ</div>
+      <div class="seg" id="theme"><button data-t="light">☀ สว่าง</button><button data-t="dark">☾ มืด</button><button data-t="pastel">✿ พาสเทล</button></div>
+      <button class="btn" onclick="window.print()">🖨 พิมพ์ / บันทึก PDF</button>
+    </div>
+    <section class="hero" id="top">
+      <div class="eyebrow">คู่มือใช้งาน · ฉบับ 7 ต.ค. 2569</div>
+      <h1>Extranet<br>ทุกหน้าใช้ทำอะไร</h1>
+      <p>คู่มือนี้บอกว่าแต่ละหน้าในระบบใช้ทำงานอะไร ใครเข้าได้ ต้องเตรียมข้อมูลอะไร และกดแล้วได้อะไร อ่านบท “เริ่มต้น” ก่อน แล้วเลือกบทที่ตรงกับงานของคุณ</p>
+      <a class="btn pri" href="https://app.elite-escapes.club/" target="_blank" rel="noopener">เปิด Extranet ↗</a>
+    </section>
+    <div id="cards"></div>
+    <h3 class="gtitle"><span class="dot"></span>ตัวอย่างลำดับงาน · ขายสัญญาใหม่</h3>
+    <div class="flow">
+      <div><small>01</small>ลูกค้าเซ็นสัญญา → <b>+ New Contract</b></div>
+      <div><small>02</small>อัปโหลดสัญญา (ถมดำก่อน)</div>
+      <div><small>03</small>คีย์สลิปที่ <b>Record Payment</b></div>
+      <div><small>04</small>บัญชีกด <b>✓ ยืนยัน</b></div>
+      <div><small>05</small>คอมมิชชันคำนวณเองที่ <b>Commission</b></div>
+    </div>
+    <h3 class="gtitle"><span class="dot"></span>ตัวอย่างลำดับงาน · สมาชิกขอเข้าพัก</h3>
+    <div class="flow">
+      <div><small>01</small>คำขอเข้ามาที่ <b>Bookings</b></div>
+      <div><small>02</small>ระบบเช็กค่า MFEE ค้างให้</div>
+      <div><small>03</small><b>🏨 check room</b> แล้ว <b>Confirm</b></div>
+      <div><small>04</small><b>→ log stay</b> ที่ Member Benefits</div>
+    </div>
+    <p class="note">ทุกขั้นตอนทำในระบบได้เอง ไม่ต้องส่งให้ IT ทำแทน การแก้ไขสำคัญทุกครั้งต้องใส่เหตุผลและถูกบันทึกประวัติไว้</p>
+    <div class="search"><input id="q" type="search" placeholder="ค้นในคู่มือ เช่น สลิป, ถมดำ, MFEE, ยกเลิกสัญญา" autocomplete="off"><button class="btn" onclick="document.getElementById('q').value='';doSearch()">ล้างคำค้น</button></div>
+    <div class="count" id="count"></div>
+    <div id="chapters"></div>
+  </main>
+  <aside class="rail">
+    <div class="card">
+      <h3>อัปเดตล่าสุด</h3>
+      <p class="sub">สิ่งที่เปลี่ยนใน 30 วันล่าสุด · กดเพื่อไปที่บทนั้น</p>
+      <div id="log"></div>
+    </div>
+  </aside>
+</div>
+<script>
+const G=[
+ {k:'start',t:'เริ่มต้น',d:'เข้าสู่ระบบ หน้าจอหลัก การเตรียมเอกสาร และสิทธิ์'},
+ {k:'overview',t:'Overview',d:'ภาพรวมเงินสดและรายงาน'},
+ {k:'member',t:'Member Service',d:'การจอง สิทธิ์สมาชิก และการติดตามลูกค้า'},
+ {k:'marketing',t:'Marketing',d:'รายงานลูกค้า ทะเบียนแขก และค่าจ้าง OPC'},
+ {k:'finance',t:'Financial',d:'สัญญา การรับ–จ่ายเงิน และคอมมิชชัน'},
+ {k:'system',t:'System',d:'บริษัท ผู้ใช้ และบันทึกการเข้าถึง'}
+];
+const C=[
+{id:'login',g:'start',c:'IN',t:'เข้าสู่ระบบ & หน้าจอหลัก',s:'เข้าใช้ด้วย Gmail บริษัท แล้วเลือกบริษัท ปี และภาษาที่แถบด้านบน',who:'พนักงานทุกคนที่มีบัญชี @elite-escapes.club',upd:'28 ก.ย. 2569',
+ desc:'Extranet อยู่ที่ app.elite-escapes.club ใช้ได้ทั้งคอมพิวเตอร์และมือถือ ข้อมูลทั้งหมดอยู่บนฐานข้อมูลกลาง ทุกคนเห็นข้อมูลชุดเดียวกันตามสิทธิ์ของตัวเอง',
+ change:{h:'ปุ่มสลับภาษา EN / TH และหน้าขอสิทธิ์',p:['หน้าจอทั้งหมดเป็นภาษาอังกฤษ กดปุ่ม TH ที่มุมขวาบนเพื่ออ่านเป็นภาษาไทย ระบบจำค่าไว้ในเครื่อง','ถ้าเข้าด้วย Gmail บริษัทแต่ยังไม่มีสิทธิ์ ระบบขึ้นหน้า “Access not set up yet” และส่งคำขอให้แอดมินอัตโนมัติ']},
+ can:['เข้าสู่ระบบด้วย Sign in with Google (Gmail บริษัท) หรืออีเมล + รหัสผ่าน','สลับบริษัทที่แถบบน: Club Unique / Elite Escapes / รวม','เลือก “ปีสัญญา” — โหลดเฉพาะสัญญาที่เซ็นในปีนั้น ทำให้ระบบเร็วขึ้น','ช่องค้นหา (กด / ) ค้นสัญญา ลูกค้า การจอง บัญชีธนาคาร','สลับภาษา EN / TH'],
+ prep:['บัญชี Gmail @elite-escapes.club ที่แอดมินเพิ่มไว้แล้ว','เบราว์เซอร์ Chrome / Edge / Safari รุ่นปัจจุบัน'],
+ steps:[['เปิด app.elite-escapes.club','กด Sign in with Google แล้วเลือกบัญชีบริษัท'],['ดูแถบสีด้านบน','แถบบอกว่ากำลังทำงานในบริษัทไหน (แดง = Club Unique, กรมท่า = Elite Escapes)'],['เลือกปีสัญญา','ค่าเริ่มต้นคือปีปัจจุบัน เลือก All years เมื่อต้องการดูทั้งหมด'],['เลือกเมนูซ้าย','เมนูที่ไม่มีสิทธิ์จะถูกซ่อนไว้เอง']],
+ out:['หน้าจอที่แสดงเฉพาะบริษัท ปี และเมนูที่คุณมีสิทธิ์'],
+ ex:'ฝ่ายบัญชีต้องปิดยอด Elite เดือนกันยายน → สลับเป็น Elite Escapes → เลือกปี 2026 → เปิด Contracts & Payments',
+ warn:['ถ้าขึ้นหน้า “Access not set up yet” ให้แจ้งแอดมิน — คำขอถูกส่งไปแล้ว ไม่ต้องสมัครใหม่','เลิกใช้งานแล้วกด Sign out ทุกครั้งเมื่อใช้เครื่องส่วนกลาง']},
+{id:'prep',g:'start',c:'DOC',t:'เตรียมเอกสารก่อนอัปโหลด (ถมดำ)',s:'ทุกไฟล์สัญญาและสลิปต้องผ่านหน้าต่างนี้ก่อนเข้าระบบ',who:'ทุกคนที่อัปโหลดสัญญา สลิป หรือเอกสารแท็กซี่/เวาเชอร์',upd:'29 ก.ย. 2569',
+ desc:'เมื่อเลือกไฟล์ ระบบเปิดหน้าต่าง “เตรียมเอกสาร” ให้เลือกหน้าที่ต้องเก็บ และลากกล่องดำทับข้อมูลอ่อนไหว จากนั้นระบบสร้างไฟล์ใหม่ที่เป็นภาพทั้งหมด ข้อความใต้กล่องดำกู้คืนไม่ได้ และไฟล์ต้นฉบับไม่ถูกอัปโหลด',
+ change:{h:'ปุ่ม 🔎 Find numbers',p:['ระบบอ่านภาพแล้วเสนอกล่องดำให้อัตโนมัติ: เลขบัตร วันหมดอายุ CVV เลขพาสปอร์ต แถว MRZ และเลขบัตรประชาชน','ครั้งแรกต้องโหลดตัวอ่าน (~7 MB) — หลังจากนั้นเร็วขึ้น ยังต้องตรวจด้วยตาทุกหน้า']},
+ can:['เลือกเก็บ/ตัดหน้าที่ไม่เกี่ยวข้อง','ลากกล่องดำ ลบกล่องที่วางผิด','ให้ระบบช่วยหาตัวเลขอ่อนไหว (🔎 Find numbers)','บันทึกว่าไฟล์นี้ถมดำอะไรไว้ (เก็บในประวัติ)'],
+ prep:['ไฟล์ PDF หรือรูปภาพ (JPG/PNG) ของสัญญาหรือสลิป'],
+ steps:[['เลือกไฟล์','กดปุ่มอัปโหลดในหน้าที่ใช้งาน เช่น 📄 Upload signed contract'],['เลือกหน้า','ติ๊กเฉพาะหน้าที่ต้องเก็บ'],['ถมดำ','กด 🔎 Find numbers แล้วลากกล่องเพิ่มเองในจุดที่ระบบไม่เจอ (ลายมือ สแกนจาง)'],['ยืนยันและบันทึก','ติ๊กยืนยันว่าตรวจแล้ว จากนั้นกดบันทึก']],
+ out:['ไฟล์ PDF ใหม่ที่ถมดำแล้ว เก็บในระบบพร้อมลายน้ำเมื่อเปิดดู'],
+ ex:'สลิป BBL EDC มีเลขบัตรเต็ม → 🔎 Find numbers เจอเลขบัตรกับวันหมดอายุ → ตรวจหน้าลายมือเพิ่ม → บันทึก',
+ warn:['ต้องถมดำ: เลขบัตรเครดิต วันหมดอายุ CVV เลขพาสปอร์ต แถว MRZ (<<<) เลขบัตรประชาชน','ระบบช่วยหา “เป็นข้อเสนอ” เท่านั้น — ลายมือและภาพจางมักหาไม่เจอ ต้องตรวจเองทุกหน้า','ถ้าถมดำผิด ให้อัปโหลดใหม่ด้วยปุ่ม replace ไฟล์เดิมถูกเก็บไว้ในประวัติ']},
+{id:'access',g:'start',c:'KEY',t:'สิทธิ์ & ความปลอดภัย',s:'ใครเห็นหน้าไหน และระบบบันทึกอะไรไว้บ้าง',who:'ทุกคน (แอดมินเป็นผู้กำหนดสิทธิ์)',upd:'28 ก.ย. 2569',
+ desc:'สิทธิ์กำหนดตาม role ของแต่ละคน เมนูที่ไม่มีสิทธิ์จะไม่แสดง และฐานข้อมูลก็ไม่ส่งข้อมูลนั้นมาด้วย ระบบนี้ออกแบบให้ข้อมูลลูกค้าไม่หลุด จึงไม่มีปุ่มดาวน์โหลดข้อมูลทั้งก้อน',
+ table:true,
+ can:['เปิดไฟล์สัญญา/สลิปแบบมีลายน้ำชื่อผู้เปิด','ดูประวัติการแก้ไขของแต่ละสัญญา (🕘 Change history)','ประวัติการรับเงินแต่ละรายการ (record / edit / unlock / undo)'],
+ prep:['ถ้าต้องการสิทธิ์เพิ่ม แจ้งแอดมินพร้อมเหตุผล'],
+ steps:[['ตรวจเมนูของตัวเอง','เมนูซ้ายแสดงเฉพาะที่มีสิทธิ์'],['เปิดไฟล์','ทุกครั้งที่เปิดหรือพิมพ์ ระบบบันทึกใน Access Log']],
+ out:['ข้อมูลแยกตามหน้าที่ และมีหลักฐานว่าใครทำอะไรเมื่อไร'],
+ warn:['ประวัติการแก้ไข (audit) แก้หรือลบไม่ได้ แม้แต่แอดมิน','ห้ามถ่ายภาพหน้าจอข้อมูลลูกค้าส่งออกนอกระบบ']},
+{id:'dashboard',g:'overview',c:'DB',t:'Dashboard',s:'เงินสดวันนี้ คาดการณ์ 12 เดือน และงานที่ต้องทำวันนี้',who:'ทุกคน',upd:'25 ก.ย. 2569',
+ desc:'หน้าแรกหลังเข้าสู่ระบบ สรุปฐานะเงินสด กราฟคาดการณ์ ยอดขายเดือนนี้ และรายการงานค้าง (เช่น งวดเกินกำหนด) กดรายการเพื่อไปยังหน้าที่ต้องจัดการ',
+ can:['ดูเงินสดปัจจุบันและคาดการณ์ล่วงหน้า','ดูดีลใหม่เดือนนี้/ปีนี้ แยกตามเซลส์ ช่องทาง สัญชาติ','รายการ “ต้องทำวันนี้” พร้อมลิงก์ไปหน้าที่เกี่ยวข้อง','สรุปสมาชิก: สิทธิ์เข้าพัก ค้าง MFEE ใกล้ต่ออายุ'],
+ prep:['เลือกบริษัทและปีที่แถบบนก่อน'],
+ steps:[['เปิด Dashboard','เป็นหน้าแรกโดยอัตโนมัติ'],['ดูรายการงานค้าง','กด open → เพื่อไปจัดการ'],['กดการ์ดสรุป','เช่น Membership contracts เพื่อเปิด Member Benefits']],
+ out:['ภาพรวมที่ใช้ตัดสินใจรายวัน'],
+ warn:['ตัวเลขตามบริษัทที่เลือก — ถ้าต้องการรวมให้กดปุ่ม รวม']},
+{id:'reports',g:'overview',c:'RP',t:'Reports',s:'รายรับ–รายจ่ายย้อนหลัง แยกหมวด บริษัท เซลส์ ช่องทาง สัญชาติ',who:'ทุกคน',upd:'28 ก.ย. 2569',
+ desc:'ตารางรายเดือน 12 เดือน เส้น Pulse สีฟ้าช่วยมองล่วงหน้าว่าเงินสดจะพอหรือไม่',
+ can:['Income & Expenses รายเดือน','By Category / Company / Sales Rep / Channel / Nationality','เลื่อนช่วงทีละ 12 เดือน'],
+ prep:['ไม่มี — ข้อมูลมาจากรายการในระบบ'],
+ steps:[['เลือกมุมมอง','กดปุ่มด้านบน เช่น By Nationality'],['เลื่อนช่วงเวลา','‹ 12 mo / 12 mo ›'],['พิมพ์ถ้าต้องการ','ใช้ Ctrl+P']],
+ out:['ตารางสรุปรายเดือนสำหรับประชุมหรือรายงานผู้บริหาร']},
+{id:'bookings',g:'member',c:'BK',t:'Bookings',s:'คำขอเข้าพักจากเว็บไซต์ + จองทางโทรศัพท์/walk-in',who:'Member Service (sales) และแอดมิน',upd:'17 ก.ย. 2569',
+ desc:'คำขอจากหน้าเว็บ elite-escapes.club เข้ามาที่นี่อัตโนมัติ ทุกคำขอมีการเช็กค่า Management Fee (MFEE) ว่าค้างหรือไม่',
+ can:['+ New booking (phone / walk-in)','🏨 check room — บันทึกว่าห้องว่าง','Confirm / decline / Mark done','→ log stay — ส่งต่อไปบันทึกการเข้าพักที่ Member Benefits'],
+ prep:['เลขสัญญาของสมาชิก','วันเข้า–ออก และจำนวนผู้เข้าพัก'],
+ steps:[['เปิดคำขอ','กด details ดูรายละเอียดและผลเช็ก MFEE'],['เช็กห้อง','กด 🏨 check room เมื่อยืนยันกับโรงแรมแล้ว'],['ยืนยัน','กด Confirm (หรือ decline พร้อมเหตุผล)'],['บันทึกการเข้าพัก','กด → log stay ปุ่มนี้ขึ้นเฉพาะการจองที่ยืนยันแล้ว ผูกสัญญาแล้ว และไม่ค้าง MFEE']],
+ out:['สถานะการจองที่ทีมเห็นตรงกัน และประวัติการเข้าพักของสมาชิก'],
+ ex:'สมาชิกโทรมาขอพัก 7 คืน → + New booking → ระบบเตือนค้าง MFEE → แจ้งลูกค้าชำระก่อน → ค่อย Confirm',
+ warn:['สมาชิกที่ค้าง MFEE เข้าพักไม่ได้จนกว่าจะชำระ']},
+{id:'stays',g:'member',c:'MB',t:'Member Benefits',s:'สิทธิ์สมาชิก การเข้าพัก MFEE และ Interval',who:'Member Service (sales) และแอดมิน',upd:'25 ก.ย. 2569',
+ desc:'การ์ดสมาชิกหนึ่งใบต่อสัญญา แสดงสัปดาห์ที่ใช้ไป สถานะ Interval สิทธิ์เข้าพัก และค่า MFEE ที่ค้าง',
+ can:['+ New Contract — สร้างสัญญาใหม่พร้อมตารางผ่อนอัตโนมัติ','log stay / record MFEE / edit','กรองกลุ่มลูกค้าด้วยปุ่มสี + ตัวกรองย่อย (สัญชาติ สินค้า LYO ช่องทาง)','ตัวกรองสถานะ Interval (เปิดใช้แล้ว / ยังไม่เปิด / ค้างค่า II)'],
+ prep:['ข้อมูลสัญญา: เลขสัญญา สินค้า ชื่อ สัญชาติ ราคา มัดจำ จำนวนงวด MFEE'],
+ steps:[['ค้นหาสมาชิก','พิมพ์ชื่อหรือเลขสัญญา หรือกดกลุ่ม'],['บันทึกการเข้าพัก','กด log stay เลือกปี'],['สร้างสัญญาใหม่','กด + New Contract กรอกข้อมูล ระบบแสดงตัวอย่างงวดก่อนบันทึก']],
+ out:['สัญญาและตารางผ่อนที่ไปปรากฏใน Contracts & Payments, AR และ Member Benefits พร้อมกัน'],
+ warn:['ระบบเช็กเลขสัญญาซ้ำก่อนสร้าง','ข้อมูลการเงินของสัญญาแก้ที่ Contracts & Payments']},
+{id:'followup',g:'member',c:'FU',t:'Member Follow-up',s:'ติดตามลูกค้า: สัญญาเดิน → สัญญาจบ → ติดต่อได้/ไม่ได้',who:'Member Service และฝ่ายบัญชี',upd:'25 ก.ย. 2569',
+ desc:'รายชื่อลูกค้าเรียงเป็นคิวงาน ระบบจัดกลุ่มให้เองจากสถานะสัญญาและประวัติการติดต่อ',
+ can:['กลุ่ม: คิวงาน / ถึงกำหนด / สัญญาเดิน / ค้างชำระ / ยังไม่ติดต่อ / กำลังติดต่อ / ติดต่อได้ / ติดต่อไม่ได้ / ประวัติ','Log contact — บันทึกช่องทางและผล','ดูประวัติการติดต่อทั้งหมดของลูกค้า'],
+ prep:['ผลการติดต่อ: reached / declined / no answer / bounced / wrong number'],
+ steps:[['เปิดคิวงาน','ค่าเริ่มต้นแสดงลูกค้าที่ต้องติดต่อ'],['ติดต่อลูกค้า','โทร อีเมล LINE หรือ WhatsApp'],['บันทึกผล','กด Log contact เลือกผลและวันนัดถัดไป']],
+ out:['สถานะลูกค้าอัปเดตอัตโนมัติ และวันติดต่อครั้งถัดไป'],
+ warn:['ติดต่อไม่ได้ 3 ครั้ง หรืออีเมลเด้ง/เบอร์ผิด → “ติดต่อไม่ได้” และระบบนัดลองใหม่อีก 6 เดือน','ไม่รับสาย → นัดใหม่ +7 วัน, ติดต่อได้ → นัดใหม่ +3 เดือน','บันทึกการติดต่อลบไม่ได้']},
+{id:'mktreport',g:'marketing',c:'MR',t:'Marketing Report',s:'ลูกค้าของเราเป็นใคร — สัญชาติ ช่วงเวลา สินค้า ราคา',isNew:true,who:'Marketing, Sales และแอดมิน',upd:'30 ก.ย. 2569',
+ desc:'วิเคราะห์จากสัญญาที่เซ็นแล้ว แสดงเฉพาะตัวเลขรวม ไม่มีชื่อ อีเมล หรือเบอร์โทร และไม่มีปุ่ม export',
+ change:{h:'หน้าใหม่',p:['สรุปอัตโนมัติ “Who our customers are”','การ์ดกลุ่มลูกค้า 6 ตลาดแรก: ราคาทั่วไป จ่ายล่วงหน้า ซื้อซ้ำ ยกเลิก สินค้าที่ซื้อ','กราฟเดือนที่เซ็น ปี สินค้า อายุสัญญา ช่วงราคา']},
+ can:['เลือกช่วง: ปีนี้ / 3 ปี / 5 ปี / ตั้งแต่ 2022 / ทุกปี','ตามบริษัทที่เลือกที่แถบบน','ตารางทุกสัญชาติ (กลุ่มที่น้อยกว่า 3 สัญญารวมเป็น Other)'],
+ prep:['ไม่มี — คำนวณจากข้อมูลในระบบ'],
+ steps:[['เปิด Marketing Report','เมนู Marketing'],['เลือกช่วงปี','ค่าเริ่มต้น 3 ปีล่าสุด'],['อ่านสรุปและการ์ดกลุ่ม','ใช้วางแผนโฆษณา SEO และภาษาเว็บไซต์']],
+ out:['ภาพลูกค้าแต่ละตลาด สำหรับวางแผนการตลาด'],
+ ex:'วางแผน SEO ไตรมาส 4 → ดู “When they buy” เห็นว่าขายดี ม.ค.–มี.ค. → ปล่อยบทความช่วง ต.ค.–ธ.ค.',
+ warn:['ราคาและเงินดาวน์มาจากบัญชีลูกหนี้ (USD) บางสัญญาเก่าอาจไม่มีข้อมูล']},
+{id:'guests',g:'marketing',c:'DG',t:'Daily Guest Register',s:'Reception บันทึกแขกทุกคนที่มาฟังพรีเซนต์',who:'Marketing และ Sales',upd:'17 ก.ย. 2569',
+ desc:'ทะเบียนแขกรายวัน (DGR) ใช้เป็นต้นทางของค่าจ้าง OPC ค่าแท็กซี่ และเวาเชอร์อาหารเช้า',
+ can:['+ Add guest / Edit / Delete','แนบหลักฐานแท็กซี่และเวาเชอร์ (ผ่านหน้าต่างถมดำ)','📊 Summarise into OPC Wages + Taxi — ส่งยอดเข้าค่าจ้างและค้างจ่าย'],
+ prep:['ชื่อแขก สัญชาติ เวลาเข้า–ออก ผล Q / Q+ / CT ผู้ปิดการขาย ของแถม แท็กซี่ โรงแรม','เลขสัญญาถ้าปิดดีล'],
+ steps:[['เลือกวัน','Today / ‹ Previous day / Next day ›'],['บันทึกแขก','กด + Add guest ระหว่างวัน'],['สรุปท้ายวัน','กด 📊 Summarise into OPC Wages + Taxi']],
+ out:['ยอด Q/Q+/CT ในหน้า OPC Wages และรายการแท็กซี่/เวาเชอร์ค้างจ่ายใน AR / AP'],
+ warn:['ถ้าเลขสัญญาออกทีหลัง ให้กลับมาเติมแล้วกด Summarise ซ้ำ — ระบบอัปเดตรายการเดิม ไม่สร้างซ้ำ']},
+{id:'mktwages',g:'marketing',c:'OW',t:'OPC Wages',s:'ค่าจ้างทีม OPC รายสัปดาห์ คำนวณจาก Q/Q+/CT และโบนัสดีล',who:'Marketing และแอดมิน',upd:'18 ก.ย. 2569',
+ desc:'กรอกยอดรายวัน จ่ายรายสัปดาห์ ระบบคำนวณค่าทัวร์ โบนัส ค่าหัก และยอดสุทธิให้ทันที',
+ can:['กรอก Q / Q+ / CT / Pack / Full รายวัน','Deductions/bonus… — ภาษี ประกันสังคม chargeback','Manager override จากยอดลูกทีม','💾 Save this week / 🖨️ Print สลิป'],
+ prep:['ยอดรายวันจาก DGR หรือ Summarise'],
+ steps:[['เลือกสัปดาห์','This week / ‹ Previous week'],['ตรวจยอดรายวัน','เลือกวันแล้วกรอก/แก้ตัวเลข'],['บันทึก','💾 Save this week'],['พิมพ์สลิป','🖨️ Print']],
+ out:['ยอดค่าจ้างค้างจ่ายใน AP — ตัดจ่ายจริงพร้อมแนบบิลที่ Contracts & Payments'],
+ warn:['ระบบคำนวณตามเรตที่บริษัทกำหนด (ดูกติกาในหน้า OPC Wages) — ไม่ต้องคิดเอง','โบนัสดีลจ่ายเมื่อเซ็นสัญญาและได้มัดจำตามเกณฑ์แล้ว และจ่ายหลังพ้นช่วง cooling-off']},
+{id:'receipts',g:'finance',c:'CP',t:'Contracts & Payments',s:'ศูนย์กลางของทุกสัญญา: การ์ดละหนึ่งสัญญา เงินรับ เงินจ่าย และไฟล์สัญญา',isNew:true,who:'Finance, Sales และแอดมิน',upd:'29 ก.ย. 2569',
+ desc:'ทุกสัญญาอยู่ที่หน้านี้ที่เดียว เปิดการ์ดเพื่อดูตารางผ่อน สลิป ไฟล์สัญญา และจัดการสัญญา',
+ change:{h:'แถบจัดการสัญญาบนการ์ด',p:['✎ Edit contract — แก้ชื่อ บริษัท สถานะ วันที่ ห้อง/ซีซัน ช่องทางติดต่อ ราคา','🗓 Edit schedule — แก้/เพิ่ม/ลบงวดที่ยังไม่จ่าย หรือแบ่งยอดค้างใหม่','⛔ Cancel contract — บันทึกการยกเลิกและคืนเงินพร้อมหลักฐาน (มี ↺ Reactivate)','waive — ยกเว้น MFEE ปีที่ได้ฟรี พร้อมจดหมาย','🕘 Change history — ประวัติทุกการแก้ไข']},
+ can:['Mark received / Mark paid พร้อมแนบสลิปหรือบิล','📄 Upload signed contract / replace','✓ ยืนยัน (บัญชี) สำหรับรายการที่ Member Service คีย์','กรองกลุ่ม + ตัวกรองย่อย, Expand all / Collapse all','＋ Add financial data ให้สัญญาที่ยังไม่มีตัวเลข'],
+ prep:['สลิปหรือบิลที่ถมดำแล้ว','เหตุผลทุกครั้งที่แก้ไข ยกเลิก หรือปลดล็อก'],
+ steps:[['ค้นหาสัญญา','พิมพ์เลขสัญญาหรือชื่อ แล้วกดเปิดการ์ด'],['บันทึกเงินเข้า','กด Mark received เลือกวิธีชำระ แนบหลักฐาน แล้วบันทึก'],['จัดการสัญญา','ใช้ปุ่มในแถบจัดการ ระบบถามเหตุผลทุกครั้ง'],['ตรวจประวัติ','กด 🕘 Change history']],
+ out:['ยอดค้างลดลงทันทีใน AR / AP และ Dashboard','ประวัติที่ตรวจสอบย้อนหลังได้'],
+ ex:'ลูกค้าขอยกเลิก → ⛔ Cancel contract → ใส่ยอดคืนเงิน วันที่ และแนบหลักฐานการโอน → ระบบปิดสัญญาและถามว่าจะลบงวดที่ยังไม่จ่ายหรือไม่',
+ warn:['รายการที่จ่ายแล้วและแนบหลักฐานจะถูกล็อก 🔒 — ปลดล็อกได้แต่ต้องใส่เหตุผล','ไฟล์หลักฐานเก่าไม่ถูกลบเมื่อแทนที่','ยกเลิกสัญญาและ waive MFEE ทำได้เฉพาะ Finance / แอดมิน','ห้ามสร้างรายการสัญญาที่อื่น — ข้อมูลที่ขาดให้เติมจากการ์ดนี้']},
+{id:'bank',g:'finance',c:'CB',t:'Cash & Bank',s:'ยอดคงเหลือรายวันของแต่ละบัญชีธนาคารและเงินสด',who:'Finance และแอดมิน',upd:'25 ก.ย. 2569',
+ desc:'บันทึกยอดธนาคารจาก statement และเงินสดที่นับจริง เลขบัญชีแสดงเฉพาะ 4 ตัวท้าย ทุกการเปลี่ยนแปลงถูกบันทึก',
+ can:['＋ Add account / edit / Remove','update — บันทึกยอดวันนี้','⬆ Import from Excel','Use this snapshot total — ตั้งเป็นจุดเริ่มของ Cash Flow','🖨 Print'],
+ prep:['Statement หรือยอดจากแอปธนาคาร','ยอดเงินสดที่นับ'],
+ steps:[['เลือกบัญชี','กด update ที่บัญชีนั้น'],['กรอกยอดและวันที่','บันทึก'],['ตั้งยอดเริ่ม Cash Flow','กด Use this snapshot total']],
+ out:['ยอดเงินรวมที่ถูกต้องสำหรับ Dashboard และ Cash Flow']},
+{id:'cashflow',g:'finance',c:'CF',t:'Cash Flow',s:'คาดการณ์เงินสด เงินเข้า–ออกล่วงหน้า',who:'Finance และแอดมิน',upd:'28 ก.ย. 2569',
+ desc:'ดูเงินสดล่วงหน้าแบบรายสัปดาห์หรือรายเดือน เพิ่มรายการรายรับ/รายจ่ายที่เกิดซ้ำได้',
+ can:['＋ Add Income / ＋ Add Expense','สลับมุมมองตาราง / รายการ / รายสัปดาห์','‹ Prev / Today / Next ›'],
+ prep:['รายการค่าใช้จ่ายประจำ เช่น ค่าเช่า เงินเดือน'],
+ steps:[['เพิ่มรายการ','กด ＋ Add Expense กรอกยอด วันที่ และความถี่'],['ดูผลกระทบ','ตรวจยอดคาดการณ์ที่เปลี่ยนไป']],
+ out:['ภาพเงินสดล่วงหน้าเพื่อวางแผนการจ่าย'],
+ warn:['รายการของสัญญาลูกค้าแก้จาก Cash Flow ไม่ได้ ระบบพาไปที่ Contracts & Payments ให้ — เพื่อไม่ให้ข้อมูลสัญญาหาย','รายการที่จ่ายแล้วหรือมีหลักฐานลบไม่ได้']},
+{id:'income',g:'finance',c:'PY',t:'Record Payment',s:'คีย์สลิป/ฟอร์มรับเงิน แล้วตัดยอดลูกหนี้อัตโนมัติ',who:'Finance, Sales (Member Service) และแอดมิน',upd:'28 ก.ย. 2569',
+ desc:'แนบสลิปหนึ่งใบ แล้วคีย์ได้หลายบรรทัด (สัญญา ประเภท บัตร USD × เรท = THB) ระบบหางวดที่ค้างของสัญญานั้นและตัดให้เอง',
+ can:['+ New payment slip / + Add row','THB คำนวณจาก USD × rate อัตโนมัติ','Save + clear AR','View — ดูสลิปเดิม'],
+ prep:['สลิป EDC / ใบโอน / ฟอร์มรับเงิน (ถมดำเลขบัตรแล้ว)','เลขสัญญาและประเภท: Deposit / Balance / MFEE / Admin fee / Booking fee'],
+ steps:[['สร้างสลิปใหม่','กด + New payment slip เลือกไฟล์ → ถมดำ'],['คีย์รายการ','หนึ่งบรรทัดต่อหนึ่งสัญญา/ประเภท'],['บันทึก','กด Save + clear AR']],
+ out:['งวดที่ตรงถูกตัดเป็นจ่ายแล้ว พร้อมหลักฐาน และขึ้นป้าย ⏳ รอบัญชียืนยัน'],
+ ex:'ลูกค้ารูดบัตร 2 สัญญาในสลิปเดียว → คีย์ 2 บรรทัด → Save + clear AR → บัญชีกด ✓ ยืนยัน ที่ Contracts & Payments',
+ warn:['คนคีย์ ≠ คนยืนยัน — รายการจะนับเข้าคอมมิชชันเมื่อบัญชียืนยันแล้ว']},
+{id:'arap',g:'finance',c:'AA',t:'AR / AP',s:'ยอดค้างรับและค้างจ่ายในหน้าเดียว พร้อมอายุหนี้',who:'Finance และแอดมิน',upd:'16 ก.ย. 2569',
+ desc:'AR = งวดลูกค้าที่ยังไม่ได้รับ, AP = ค่าใช้จ่ายที่ยังไม่ได้จ่าย (ค่าจ้าง OPC แท็กซี่ เวาเชอร์ Interval) แยกอายุ: ยังไม่ถึงกำหนด / 1–30 / 31–60 / 61–90 / 90+ วัน',
+ can:['สลับ AR / AP','กดตัดจ่าย → ไปที่การ์ดสัญญาใน Contracts & Payments'],
+ prep:['ไม่มี — มาจากรายการในระบบ'],
+ steps:[['เลือก AR หรือ AP','ดูยอดเกินกำหนด'],['ตัดยอด','กดปุ่มที่รายการ ระบบพาไปการ์ดสัญญา แล้วกด Mark received / Mark paid พร้อมแนบหลักฐาน']],
+ out:['รายการทวงถามและรายการที่ต้องจ่ายสัปดาห์นี้']},
+{id:'commission',g:'finance',c:'CM',t:'Commission',s:'คอมมิชชันจ่ายตามเงินที่ลูกค้าจ่ายจริง เดือนละ 2 รอบ',who:'Finance และแอดมิน',upd:'25 ก.ย. 2569',
+ desc:'ระบบคำนวณจากยอดที่บัญชียืนยันแล้ว รอบ 1–15 และ 16–สิ้นเดือน ใช้สูตรเดียวกับ Excel ของบัญชี',
+ can:['👤 By person / 📄 By contract','🧾 Pay Slip — หักภาษี ประกันสังคม วีซ่า/ใบอนุญาตทำงาน','Commission statement','↩ Undo confirmation for this period'],
+ prep:['เลือกบริษัทเดียวก่อน (หน้านี้ไม่รวมบริษัท)','ยืนยันรายการรับเงินให้ครบก่อนปิดรอบ'],
+ steps:[['เลือกรอบ','1–15 หรือ 16–สิ้นเดือน'],['ตรวจรายคน','👤 By person ดูยอด To Pay'],['ทำสลิป','🧾 Pay Slip ใส่รายการหัก แล้วพิมพ์/ส่ง']],
+ out:['สลิปคอมมิชชันรายคน และยอดที่ต้องจ่ายในรอบนั้น'],
+ warn:['สัญญาที่นำเข้าจาก Excel มีป้าย ⚠ ต้องตรวจสอบ จนกว่าบัญชีจะยืนยัน','สลิปที่ส่งแล้ว (sent) ถูกล็อก']},
+{id:'companies',g:'system',c:'CO',t:'Companies',s:'รายชื่อบริษัท และเลือกบริษัทที่ทำงาน',who:'ผู้มีสิทธิ์ data และแอดมิน',upd:'25 ก.ย. 2569',
+ desc:'กดบริษัทเพื่อทำงานในบริษัทนั้น ทั้งระบบจะแสดงเฉพาะบริษัทนั้น (หรือใช้ปุ่มสลับที่แถบบน)',
+ can:['＋ Add company / Edit / Delete','เลือกบริษัทที่ทำงาน'],
+ prep:['ชื่อบริษัทและข้อมูลติดต่อ'],
+ steps:[['กดแถวบริษัท','ระบบสลับทันที']],
+ out:['ข้อมูลแยกบริษัทอย่างชัดเจน'],
+ warn:['Club Unique = บริษัทเดิม, Elite Escapes = บริษัทใหม่ (เริ่ม 1 ก.ค. 2569)']},
+{id:'users',g:'system',c:'US',t:'Users & access',s:'แอดมินเพิ่มผู้ใช้ กำหนด role และอนุมัติคำขอ',who:'แอดมินเท่านั้น',upd:'28 ก.ย. 2569',
+ desc:'ลิงก์ 👥 Users อยู่ที่แถบบนขวา ตัวเลขสีแดงคือจำนวนคำขอที่รอ',
+ can:['เพิ่มผู้ใช้ (เฉพาะ @elite-escapes.club)','เปลี่ยน role / ลบผู้ใช้','อนุมัติหรือปฏิเสธคำขอเข้าใช้'],
+ prep:['อีเมลบริษัทของพนักงาน และ role ที่เหมาะกับหน้าที่'],
+ steps:[['กด 👥 Users','ดูรายชื่อและคำขอ'],['อนุมัติคำขอ','เลือก role แล้วกดอนุมัติ'],['แจ้งพนักงาน','ให้รีเฟรชหน้าเว็บ']],
+ out:['พนักงานเข้าใช้ได้ตามสิทธิ์'],
+ warn:['ลบแอดมินคนสุดท้ายไม่ได้','ให้สิทธิ์เท่าที่จำเป็นกับงาน']},
+{id:'accesslog',g:'system',c:'AL',t:'Access Log',s:'บันทึกทุกครั้งที่มีคนเปิดไฟล์สัญญา/สลิปหรือพิมพ์เอกสาร',who:'เฉพาะผู้ดูแลที่กำหนด (2 คน)',upd:'25 ก.ย. 2569',
+ desc:'ใช้ตรวจสอบย้อนหลังว่าใครเปิดเอกสารอะไร เมื่อไร บันทึกแก้หรือลบไม่ได้',
+ can:['ดูประวัติการเปิด/พิมพ์','＋ Add staff — รายชื่อพนักงานที่ใช้อ้างอิง'],
+ prep:['ไม่มี'],
+ steps:[['เปิด Access Log','กรองตามคนหรือไฟล์']],
+ out:['หลักฐานการเข้าถึงเอกสาร']}
+];
+const LOG=[
+ {d:'30 ก.ย. 2569',id:'mktreport',t:'Marketing Report',p:'หน้าใหม่: ลูกค้าของเราเป็นใคร — สัญชาติ ช่วงเวลา สินค้า ราคา (ตัวเลขรวมเท่านั้น)'},
+ {d:'29 ก.ย. 2569',id:'receipts',t:'Contracts & Payments',p:'แก้สัญญา แก้ตารางผ่อน ยกเลิก + คืนเงิน ยกเว้น MFEE — ทุกอย่างต้องใส่เหตุผลและมีประวัติ'},
+ {d:'29 ก.ย. 2569',id:'prep',t:'เตรียมเอกสาร',p:'ปุ่ม 🔎 Find numbers ช่วยหาเลขบัตร วันหมดอายุ CVV พาสปอร์ต MRZ'},
+ {d:'28 ก.ย. 2569',id:'prep',t:'เตรียมเอกสาร',p:'ทุกไฟล์ต้องเลือกหน้าและถมดำก่อนอัปโหลด ไม่มีการอัปไฟล์ดิบ'},
+ {d:'28 ก.ย. 2569',id:'users',t:'Users & access',p:'แอดมินเพิ่มผู้ใช้/อนุมัติคำขอได้เอง และหน้า “Access not set up yet”'},
+ {d:'28 ก.ย. 2569',id:'login',t:'ภาษา',p:'หน้าจอเป็นภาษาอังกฤษทั้งหมด พร้อมปุ่มสลับ EN / TH'},
+ {d:'27 ก.ย. 2569',id:'receipts',t:'Contracts & Payments',p:'เปิดดูสัญญาที่เซ็นแล้วในหน้าเดิม (มีลายน้ำ)'},
+ {d:'25 ก.ย. 2569',id:'login',t:'แถบบน',p:'ปุ่มสลับบริษัท + ปุ่มรวม และตัวเลือกปีสัญญา'},
+ {d:'25 ก.ย. 2569',id:'followup',t:'Member Follow-up',p:'หน้าใหม่: คิวติดตามลูกค้า Club Unique 2,485 สัญญาจากระบบเดิม'},
+ {d:'25 ก.ย. 2569',id:'stays',t:'Member Benefits',p:'สถานะ Interval + ตัวกรองกลุ่มลูกค้า'}
+];
+const ROLES=[['Dashboard, Reports','ทุกคน'],['Bookings, Member Benefits','sales'],['Member Follow-up','sales, finance'],['Marketing Report, Daily Guest Register','marketing, sales'],['OPC Wages','marketing'],['Contracts & Payments, Record Payment','finance, sales'],['Cash & Bank, Cash Flow, AR / AP, Commission','finance'],['Companies','data'],['Users & access','แอดมิน'],['Access Log','ผู้ดูแลที่กำหนด 2 คน']];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function li(a){return a.map(x=>`<li>${esc(x)}</li>`).join('');}
+function chapHtml(c,i){const g=G.find(x=>x.k===c.g);
+ return `<article class="card chap" id="${c.id}" data-g="${c.g}">
+  <div class="head"><div class="badge">${c.c}</div><div style="flex:1;min-width:200px"><div class="num">${String(i+1).padStart(2,'0')} · ${esc(g.t)}</div><h2>${esc(c.t)}${c.isNew?'<span class="tag new">ใหม่</span>':''}</h2><div class="meta">อัปเดตล่าสุด ${esc(c.upd)}</div></div></div>
+  <p class="lead">${esc(c.s)}</p><p>${esc(c.desc)}</p>
+  <div class="facts"><div><b>ใครใช้</b>${esc(c.who)}</div><div><b>อยู่ที่</b>เมนู ${esc(g.t)}${c.g==='start'?' (ทุกหน้า)':''}</div></div>
+  ${c.change?`<div class="change"><h4>มีอะไรเปลี่ยน · ${esc(c.upd)}</h4><b>${esc(c.change.h)}</b><ul>${li(c.change.p)}</ul></div>`:''}
+  ${c.table?`<h3>สิทธิ์ตาม role</h3><table class="roles"><tr><th>หน้า</th><th>role ที่เข้าได้ (แอดมินเข้าได้ทุกหน้า)</th></tr>${ROLES.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>`:''}
+  <div class="cols"><div><h3>ทำอะไรได้บ้าง</h3><ul>${li(c.can)}</ul></div><div><h3>เตรียมอะไรบ้าง</h3><ul>${li(c.prep)}</ul></div></div>
+  <h3>เริ่มใช้งานอย่างไร</h3><ol class="steps">${c.steps.map(s=>`<li><b>${esc(s[0])}</b>${esc(s[1])}</li>`).join('')}</ol>
+  <h3>จะได้ผลลัพธ์อะไร</h3><ul>${li(c.out)}</ul>
+  ${c.ex?`<div class="ex"><b>ตัวอย่างงาน</b><br>${esc(c.ex)}</div>`:''}
+  ${c.warn?`<h3>รู้ก่อนใช้งาน</h3><ul class="warn">${li(c.warn)}</ul>`:''}
+  <div class="foot"><span>คู่มือสำหรับพนักงาน · ตรวจข้อมูลก่อนบันทึกทุกครั้ง</span><a href="#top">กลับสารบัญ ↑</a></div>
+ </article>`;}
+function render(){
+ document.getElementById('toc').innerHTML=`<div class="top"><a href="#top">สารบัญ</a></div>`+G.map(g=>`<div class="grp">${esc(g.t)}</div>`+C.filter(c=>c.g===g.k).map(c=>`<a href="#${c.id}" data-id="${c.id}"><span class="c">${c.c}</span>${esc(c.t)}${c.isNew?'<span class="tag new">ใหม่</span>':''}</a>`).join('')).join('');
+ document.getElementById('cards').innerHTML=G.map(g=>`<h3 class="gtitle"><span class="dot"></span>${esc(g.t)} <span style="color:var(--muted);font-weight:400;font-size:13px">· ${esc(g.d)}</span></h3><div class="cards">`+C.filter(c=>c.g===g.k).map(c=>`<a class="card mini" href="#${c.id}"><div class="badge">${c.c}</div><div><b>${esc(c.t)}${c.isNew?'<span class="tag new">ใหม่</span>':''}</b><span>${esc(c.s)}</span><em>อัปเดต ${esc(c.upd)}</em></div></a>`).join('')+'</div>').join('');
+ let n=0; document.getElementById('chapters').innerHTML=G.map(g=>`<h2 class="sec-h" data-sec="${g.k}">${esc(g.t)}</h2><p class="sec-p" data-sec="${g.k}">${esc(g.d)}</p>`+C.filter(c=>c.g===g.k).map(c=>chapHtml(c,n++)).join('')).join('');
+ document.getElementById('log').innerHTML=LOG.map(l=>`<div class="log"><small>${esc(l.d)}</small><a href="#${l.id}">${esc(l.t)}</a><p>${esc(l.p)}</p></div>`).join('');
+ doSearch();
+}
+function doSearch(){const raw=document.getElementById('q').value.trim(), q=raw.toLowerCase();let shown=0;
+ document.querySelectorAll('.chap').forEach(el=>{el.querySelectorAll('mark').forEach(m=>m.replaceWith(m.textContent));el.normalize();
+  const hit=!q||el.textContent.toLowerCase().includes(q); el.classList.toggle('hidden',!hit); if(hit) shown++;
+  if(q&&hit){const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);const ns=[];while(w.nextNode()) ns.push(w.currentNode);
+   ns.forEach(t=>{const i=t.data.toLowerCase().indexOf(q); if(i<0) return; const r=document.createRange(); r.setStart(t,i); r.setEnd(t,i+q.length); const m=document.createElement('mark'); r.surroundContents(m);});}});
+ document.querySelectorAll('[data-sec]').forEach(h=>{h.classList.toggle('hidden',!!q&&!document.querySelector(`.chap[data-g="${h.dataset.sec}"]:not(.hidden)`));});
+ document.getElementById('count').textContent=q?(shown?`พบ ${shown} บทที่มีคำว่า “${raw}”`:`ไม่พบ “${raw}” ในคู่มือ`):`แสดงครบ ${C.length} บท`;}
+document.getElementById('q').addEventListener('input',doSearch);
+function setTheme(t){ if(t==='auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t);
+ document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===t)); try{localStorage.setItem('eeg_theme',t);}catch(e){} }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>setTheme(b.dataset.t));
+let th='auto'; try{th=localStorage.getItem('eeg_theme')||'auto';}catch(e){}
+if(th==='auto') th=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; setTheme(th);
+render();
+if(location.hash.length>1){ const t=document.getElementById(decodeURIComponent(location.hash.slice(1))); if(t){ const go=()=>t.scrollIntoView({behavior:'instant',block:'start'}); go(); (document.fonts?document.fonts.ready:Promise.resolve()).then(go); } }
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ document.querySelectorAll('#toc a[data-id]').forEach(a=>a.classList.toggle('on',a.dataset.id===e.target.id)); } }),{rootMargin:'-20% 0px -70% 0px'});
+document.querySelectorAll('.chap').forEach(c=>io.observe(c));
+document.getElementById('toc').addEventListener('click',e=>{ if(e.target.closest('a')) document.getElementById('side').classList.remove('open'); });
+</script>
+</body>
+</html>
